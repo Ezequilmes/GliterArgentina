@@ -16,6 +16,11 @@ import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firest
 import { auth, db } from './firebase';
 import { User } from '../types';
 
+// Función para verificar si Firebase está disponible
+function isFirebaseAvailable() {
+  return typeof window !== 'undefined' && auth && db;
+}
+
 // Proveedor de Google
 const googleProvider = new GoogleAuthProvider();
 
@@ -51,6 +56,11 @@ export interface SignInData {
 // Crear perfil de usuario en Firestore
 const createUserProfile = async (user: FirebaseUser, additionalData: Partial<User> = {}) => {
   if (!user) return;
+
+  if (!isFirebaseAvailable()) {
+    console.log('🔄 Firebase not available on server - skipping user profile creation');
+    return;
+  }
 
   const userRef = doc(db, 'users', user.uid);
   const userSnap = await getDoc(userRef);
@@ -108,6 +118,10 @@ const createUserProfile = async (user: FirebaseUser, additionalData: Partial<Use
 
 // Registrar usuario
 export const signUp = async (data: SignUpData): Promise<AuthUser> => {
+  if (!isFirebaseAvailable()) {
+    throw new Error('Firebase no está disponible en el servidor');
+  }
+
   try {
     const { user } = await createUserWithEmailAndPassword(auth, data.email, data.password);
     
@@ -136,6 +150,10 @@ export const signUp = async (data: SignUpData): Promise<AuthUser> => {
 
 // Iniciar sesión
 export const signIn = async (data: SignInData): Promise<AuthUser> => {
+  if (!isFirebaseAvailable()) {
+    throw new Error('Firebase no está disponible en el servidor');
+  }
+
   try {
     const { user } = await signInWithEmailAndPassword(auth, data.email, data.password);
     
@@ -151,6 +169,10 @@ export const signIn = async (data: SignInData): Promise<AuthUser> => {
 
 // Iniciar sesión con Google
 export const signInWithGoogle = async (): Promise<AuthUser> => {
+  if (!isFirebaseAvailable()) {
+    throw new Error('Firebase no está disponible en el servidor');
+  }
+
   try {
     const { user } = await signInWithPopup(auth, googleProvider);
     
@@ -169,6 +191,10 @@ export const signInWithGoogle = async (): Promise<AuthUser> => {
 
 // Cerrar sesión
 export const logout = async (): Promise<void> => {
+  if (!isFirebaseAvailable()) {
+    throw new Error('Firebase no está disponible en el servidor');
+  }
+
   try {
     if (auth.currentUser) {
       await updateUserOnlineStatus(auth.currentUser.uid, false);
@@ -182,6 +208,10 @@ export const logout = async (): Promise<void> => {
 
 // Restablecer contraseña
 export const resetPassword = async (email: string): Promise<void> => {
+  if (!isFirebaseAvailable()) {
+    throw new Error('Firebase no está disponible en el servidor');
+  }
+
   try {
     await sendPasswordResetEmail(auth, email);
   } catch (error: any) {
@@ -192,6 +222,10 @@ export const resetPassword = async (email: string): Promise<void> => {
 
 // Cambiar contraseña
 export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+  if (!isFirebaseAvailable()) {
+    throw new Error('Firebase no está disponible en el servidor');
+  }
+
   try {
     const user = auth.currentUser;
     if (!user || !user.email) throw new Error('No user logged in');
@@ -210,6 +244,11 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 
 // Actualizar estado online del usuario
 export const updateUserOnlineStatus = async (userId: string, isOnline: boolean): Promise<void> => {
+  if (!isFirebaseAvailable()) {
+    console.log('🔄 Firebase not available on server - skipping online status update');
+    return;
+  }
+
   try {
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, {
@@ -223,6 +262,11 @@ export const updateUserOnlineStatus = async (userId: string, isOnline: boolean):
 
 // Obtener perfil de usuario
 export const getUserProfile = async (userId: string): Promise<User | null> => {
+  if (!isFirebaseAvailable()) {
+    console.log('🔄 Firebase not available on server - cannot get user profile');
+    return null;
+  }
+
   try {
     const userRef = doc(db, 'users', userId);
     const userSnap = await getDoc(userRef);
@@ -241,6 +285,12 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
 
 // Observer de estado de autenticación
 export const onAuthStateChange = (callback: (user: AuthUser | null) => void) => {
+  if (!isFirebaseAvailable()) {
+    console.log('🔄 Firebase not available on server - auth state will be initialized on client');
+    // Retornar una función de limpieza vacía para el servidor
+    return () => {};
+  }
+  
   return onAuthStateChanged(auth, async (user) => {
     if (user) {
       try {

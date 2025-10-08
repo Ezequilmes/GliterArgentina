@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getDatabase, connectDatabaseEmulator } from 'firebase/database';
@@ -32,49 +32,92 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Inicializar Firebase
-const app = initializeApp(firebaseConfig);
-
-// Inicializar servicios
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-
-// Inicializar Realtime Database con validación
-let database: any = null;
-try {
-  if (firebaseConfig.databaseURL) {
-    database = getDatabase(app);
-    console.log('✅ Firebase Realtime Database initialized successfully');
-  } else {
-    console.error('❌ Firebase Database URL not configured');
+// Función para validar la configuración de Firebase
+function validateFirebaseConfig() {
+  const requiredFields = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+  const missingFields = requiredFields.filter(field => !firebaseConfig[field as keyof typeof firebaseConfig]);
+  
+  if (missingFields.length > 0) {
+    console.error('❌ Missing Firebase configuration fields:', missingFields);
+    return false;
   }
-} catch (error) {
-  console.error('❌ Error initializing Firebase Realtime Database:', error);
+  
+  return true;
 }
 
-export { database };
-export const storage = getStorage(app);
-export const functions = getFunctions(app);
+// Inicializar Firebase solo si estamos en el cliente y la configuración es válida
+let app: any = null;
+let auth: any = null;
+let db: any = null;
 
-// Inicializar Messaging (solo en el navegador)
-export let messaging: any = null;
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && validateFirebaseConfig()) {
+  // Verificar si ya existe una app inicializada
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  
+  // Inicializar servicios
+  auth = getAuth(app);
+  db = getFirestore(app);
+} else if (typeof window === 'undefined') {
+  // En el servidor, crear objetos mock para evitar errores
+  console.log('🔄 Running on server - Firebase services will be initialized on client');
+}
+
+export { auth, db };
+
+// Inicializar otros servicios solo en el cliente
+let database: any = null;
+let storage: any = null;
+let functions: any = null;
+let messaging: any = null;
+let analytics: any = null;
+
+if (typeof window !== 'undefined' && app) {
+  // Inicializar Realtime Database con validación
+  try {
+    if (firebaseConfig.databaseURL) {
+      database = getDatabase(app);
+      console.log('✅ Firebase Realtime Database initialized successfully');
+    } else {
+      console.error('❌ Firebase Database URL not configured');
+    }
+  } catch (error) {
+    console.error('❌ Error initializing Firebase Realtime Database:', error);
+  }
+
+  // Inicializar Storage
+  try {
+    storage = getStorage(app);
+  } catch (error) {
+    console.error('❌ Error initializing Firebase Storage:', error);
+  }
+
+  // Inicializar Functions
+  try {
+    functions = getFunctions(app);
+  } catch (error) {
+    console.error('❌ Error initializing Firebase Functions:', error);
+  }
+
+  // Inicializar Messaging
   try {
     messaging = getMessaging(app);
   } catch (error) {
     console.warn('Firebase Messaging not available:', error);
   }
-}
 
-// Inicializar Analytics (solo en el navegador y si está soportado)
-export let analytics: any = null;
-if (typeof window !== 'undefined') {
+  // Inicializar Analytics
   isSupported().then((supported) => {
     if (supported) {
-      analytics = getAnalytics(app);
+      try {
+        analytics = getAnalytics(app);
+      } catch (error) {
+        console.error('❌ Error initializing Firebase Analytics:', error);
+      }
     }
   });
 }
+
+export { database, storage, functions, messaging, analytics };
 
 // Nota: Firebase In-App Messaging no está disponible para aplicaciones web
 // Usamos un sistema personalizado de mensajes in-app para la web
@@ -83,15 +126,15 @@ if (typeof window !== 'undefined') {
 let emulatorsConnected = false;
 
 // Conectar a emuladores en desarrollo
-if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && typeof window !== 'undefined') {
+if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && typeof window !== 'undefined' && app && auth && db) {
   // Solo conectar una vez
   if (!emulatorsConnected) {
     try {
       connectAuthEmulator(auth, 'http://localhost:9099');
       connectFirestoreEmulator(db, 'localhost', 8080);
-      connectDatabaseEmulator(database, 'localhost', 9000);
-      connectStorageEmulator(storage, 'localhost', 9199);
-      connectFunctionsEmulator(functions, 'localhost', 5001);
+      if (database) connectDatabaseEmulator(database, 'localhost', 9000);
+      if (storage) connectStorageEmulator(storage, 'localhost', 9199);
+      if (functions) connectFunctionsEmulator(functions, 'localhost', 5001);
       emulatorsConnected = true;
       console.log('🔥 Firebase emulators connected');
     } catch (error) {

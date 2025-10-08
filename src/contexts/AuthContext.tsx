@@ -144,6 +144,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           message: error instanceof Error ? error.message : 'Unknown error',
           timestamp: new Date().toISOString()
         });
+        
+        // Si el error es porque Firebase no está disponible en el servidor, no es un error crítico
+        if (error instanceof Error && error.message.includes('Firebase no está disponible en el servidor')) {
+          console.log('🔄 [AUTH DEBUG] Firebase not available on server - this is expected during SSR');
+        }
+        
         setAuthUser(null);
         setUser(null);
       } finally {

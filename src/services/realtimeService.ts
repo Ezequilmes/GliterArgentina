@@ -13,13 +13,18 @@ import {
 } from 'firebase/database';
 import { database } from '@/lib/firebase';
 
-// Validar que la base de datos esté inicializada
-if (!database) {
-  console.error('❌ Firebase Realtime Database is not initialized. Check your Firebase configuration.');
-  throw new Error('Firebase Realtime Database is not initialized');
+// Función para verificar si Firebase está disponible
+function isFirebaseAvailable(): boolean {
+  return typeof window !== 'undefined' && !!database;
 }
 
-const rtdb = database;
+// Función para obtener la instancia de la base de datos
+function getDatabase() {
+  if (!isFirebaseAvailable()) {
+    throw new Error('Firebase Realtime Database is not available on server side');
+  }
+  return database;
+}
 
 export interface PresenceData {
   isOnline: boolean;
@@ -41,13 +46,26 @@ export interface ChatTyping {
 }
 
 class RealtimeService {
-  private presenceRef = ref(rtdb, 'presence');
-  private typingRef = ref(rtdb, 'typing');
-  private onlineRef = ref(rtdb, '.info/connected');
+  private getPresenceRef() {
+    return ref(getDatabase(), 'presence');
+  }
+  
+  private getTypingRef() {
+    return ref(getDatabase(), 'typing');
+  }
+  
+  private getOnlineRef() {
+    return ref(getDatabase(), '.info/connected');
+  }
 
   // Configurar presencia del usuario
   async setUserPresence(userId: string, status: 'online' | 'away' | 'busy' = 'online'): Promise<void> {
-    const userPresenceRef = ref(rtdb, `presence/${userId}`);
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, skipping presence setup');
+      return;
+    }
+    
+    const userPresenceRef = ref(getDatabase(), `presence/${userId}`);
     const presenceData: PresenceData = {
       isOnline: true,
       lastSeen: Date.now(),
@@ -75,11 +93,16 @@ class RealtimeService {
 
   // Escuchar presencia de usuarios
   onUserPresence(userIds: string[], callback: (presence: { [userId: string]: PresenceData }) => void): () => void {
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, returning empty unsubscribe function');
+      return () => {};
+    }
+    
     const listeners: Array<() => void> = [];
     const presenceData: { [userId: string]: PresenceData } = {};
 
     userIds.forEach(userId => {
-      const userPresenceRef = ref(rtdb, `presence/${userId}`);
+      const userPresenceRef = ref(getDatabase(), `presence/${userId}`);
       
       const unsubscribe = onValue(userPresenceRef, (snapshot) => {
         const data = snapshot.val() as PresenceData | null;
@@ -105,7 +128,12 @@ class RealtimeService {
 
   // Establecer estado de escritura
   async setTypingStatus(chatId: string, userId: string, isTyping: boolean): Promise<void> {
-    const typingRef = ref(rtdb, `typing/${chatId}/${userId}`);
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, skipping typing status');
+      return;
+    }
+    
+    const typingRef = ref(getDatabase(), `typing/${chatId}/${userId}`);
     
     try {
       if (isTyping) {
@@ -134,7 +162,12 @@ class RealtimeService {
 
   // Escuchar estado de escritura en un chat
   onTypingStatus(chatId: string, callback: (typing: ChatTyping) => void): () => void {
-    const chatTypingRef = ref(rtdb, `typing/${chatId}`);
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, returning empty unsubscribe function');
+      return () => {};
+    }
+    
+    const chatTypingRef = ref(getDatabase(), `typing/${chatId}`);
     
     const unsubscribe = onValue(chatTypingRef, (snapshot) => {
       const data = snapshot.val() as ChatTyping | null;
@@ -151,7 +184,12 @@ class RealtimeService {
     body: string;
     data?: any;
   }): Promise<void> {
-    const notificationRef = ref(rtdb, `notifications/${userId}`);
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, skipping notification');
+      return;
+    }
+    
+    const notificationRef = ref(getDatabase(), `notifications/${userId}`);
     const newNotificationRef = push(notificationRef);
     
     try {
@@ -168,7 +206,12 @@ class RealtimeService {
 
   // Escuchar notificaciones instantáneas
   onInstantNotifications(userId: string, callback: (notifications: any[]) => void): () => void {
-    const userNotificationsRef = ref(rtdb, `notifications/${userId}`);
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, returning empty unsubscribe function');
+      return () => {};
+    }
+    
+    const userNotificationsRef = ref(getDatabase(), `notifications/${userId}`);
     
     const unsubscribe = onValue(userNotificationsRef, (snapshot) => {
       const data = snapshot.val();
@@ -188,7 +231,12 @@ class RealtimeService {
 
   // Marcar notificación como leída
   async markNotificationAsRead(userId: string, notificationId: string): Promise<void> {
-    const notificationRef = ref(rtdb, `notifications/${userId}/${notificationId}`);
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, skipping mark as read');
+      return;
+    }
+    
+    const notificationRef = ref(getDatabase(), `notifications/${userId}/${notificationId}`);
     
     try {
       await update(notificationRef, { read: true });
@@ -200,7 +248,12 @@ class RealtimeService {
 
   // Limpiar notificaciones leídas
   async clearReadNotifications(userId: string): Promise<void> {
-    const userNotificationsRef = ref(rtdb, `notifications/${userId}`);
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, skipping clear notifications');
+      return;
+    }
+    
+    const userNotificationsRef = ref(getDatabase(), `notifications/${userId}`);
     
     try {
       const snapshot = await get(userNotificationsRef);
@@ -226,17 +279,28 @@ class RealtimeService {
 
   // Obtener estado de conexión
   onConnectionStatus(callback: (isConnected: boolean) => void): () => void {
-    const unsubscribe = onValue(this.onlineRef, (snapshot) => {
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, returning empty unsubscribe function');
+      return () => {};
+    }
+    
+    const onlineRef = this.getOnlineRef();
+    const unsubscribe = onValue(onlineRef, (snapshot) => {
       const isConnected = snapshot.val() === true;
       callback(isConnected);
     });
 
-    return () => off(this.onlineRef, 'value', unsubscribe);
+    return () => off(onlineRef, 'value', unsubscribe);
   }
 
   // Limpiar presencia del usuario al desconectarse
   async clearUserPresence(userId: string): Promise<void> {
-    const userPresenceRef = ref(rtdb, `presence/${userId}`);
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, skipping clear presence');
+      return;
+    }
+    
+    const userPresenceRef = ref(getDatabase(), `presence/${userId}`);
     
     try {
       await remove(userPresenceRef);
@@ -248,11 +312,16 @@ class RealtimeService {
 
   // Obtener usuarios en línea de una lista
   async getOnlineUsers(userIds: string[]): Promise<string[]> {
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available on server side, returning empty array');
+      return [];
+    }
+    
     const onlineUsers: string[] = [];
     
     try {
       for (const userId of userIds) {
-        const userPresenceRef = ref(rtdb, `presence/${userId}`);
+        const userPresenceRef = ref(getDatabase(), `presence/${userId}`);
         const snapshot = await get(userPresenceRef);
         const data = snapshot.val() as PresenceData | null;
         
