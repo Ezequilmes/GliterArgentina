@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Flujo de Pago - MercadoPago</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #009ee3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0080b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .payment-link {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .payment-link a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .payment-link a:hover {
+            text-decoration: underline;
+        }
+        .test-cards {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .test-cards h4 {
+            margin-top: 0;
+            color: #0056b3;
+        }
+        .card-info {
+            font-family: monospace;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .account-info {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .test-accounts {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Completo del Flujo de Pago</h1>
+        <p>Esta página te permite probar todo el flujo de pago de MercadoPago desde la creación de la preferencia hasta la verificación del resultado.</p>
+
+        <!-- Paso 1: Crear Preferencia -->
+        <div class="step">
+            <h3>📝 Paso 1: Crear Preferencia de Pago</h3>
+            <p>Primero creamos una preferencia de pago en MercadoPago:</p>
+            <button onclick="createPreference()">Crear Preferencia de Pago</button>
+            <div id="preferenceResult"></div>
+        </div>
+
+        <!-- Información de tarjetas de prueba -->
+        <div class="test-cards">
+            <h3>🎯 Tarjetas de Prueba para Argentina</h3>
+            <div class="card-info">
+                <h4>✅ Visa Aprobada</h4>
+                <p><strong>Número:</strong> 4509 9535 6623 3704</p>
+                <p><strong>CVV:</strong> 123 | <strong>Vencimiento:</strong> 11/30</p>
+            </div>
+            <div class="card-info">
+                <h4>❌ Mastercard Rechazada</h4>
+                <p><strong>Número:</strong> 5031 7557 3453 0604</p>
+                <p><strong>CVV:</strong> 123 | <strong>Vencimiento:</strong> 11/30</p>
+            </div>
+            <div class="card-info">
+                <h4>💳 American Express</h4>
+                <p><strong>Número:</strong> 3711 803032 57522</p>
+                <p><strong>CVV:</strong> 1234 | <strong>Vencimiento:</strong> 11/30</p>
+            </div>
+        </div>
+
+        <div class="test-accounts">
+            <h3>👥 Cuentas de Prueba MercadoPago</h3>
+            <div class="account-info">
+                <h4>🏪 Vendedor</h4>
+                <p><strong>Usuario:</strong> TESTUSER9256...</p>
+                <p><strong>User ID:</strong> 2622651810</p>
+                <p><strong>Contraseña:</strong> IJzQeHlPp7</p>
+                <p><strong>País:</strong> Argentina</p>
+            </div>
+            <div class="account-info">
+                <h4>🛒 Comprador</h4>
+                <p><strong>Usuario:</strong> TESTUSER3111...</p>
+                <p><strong>User ID:</strong> 2901647610</p>
+                <p><strong>Contraseña:</strong> dRwMWKeslD</p>
+                <p><strong>País:</strong> Argentina</p>
+            </div>
+            <div class="account-info">
+                <h4>🔧 Integrador</h4>
+                <p><strong>Usuario:</strong> TESTUSER2893...</p>
+                <p><strong>User ID:</strong> 2901647616</p>
+                <p><strong>Contraseña:</strong> 2YQ7pkSQu2</p>
+                <p><strong>País:</strong> Argentina</p>
+            </div>
+        </div>
+
+        <!-- Paso 2: Realizar Pago -->
+        <div class="step">
+            <h3>💳 Paso 2: Realizar Pago</h3>
+            <p>Usa el enlace generado para ir a MercadoPago y realizar el pago de prueba:</p>
+            <div id="paymentLinkContainer"></div>
+        </div>
+
+        <!-- Paso 3: Verificar Resultado -->
+        <div class="step">
+            <h3>✅ Paso 3: Verificar Resultado</h3>
+            <p>Después de completar el pago, ingresa el Payment ID para verificar el estado:</p>
+            <input type="text" id="paymentId" placeholder="Payment ID (ej: 1234567890)" style="padding: 8px; margin: 10px 5px; width: 200px;">
+            <button onclick="checkPaymentStatus()">Verificar Estado del Pago</button>
+            <div id="paymentStatusResult"></div>
+        </div>
+
+        <!-- Paso 4: Simular Webhook -->
+        <div class="step">
+            <h3>🔔 Paso 4: Simular Webhook</h3>
+            <p>Simula la notificación que MercadoPago envía a nuestro webhook:</p>
+            <input type="text" id="webhookPaymentId" placeholder="Payment ID para webhook" style="padding: 8px; margin: 10px 5px; width: 200px;">
+            <button onclick="simulateWebhook()">Simular Webhook</button>
+            <div id="webhookResult"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentPreferenceId = null;
+        let currentExternalReference = null;
+
+        async function createPreference() {
+            const resultDiv = document.getElementById('preferenceResult');
+            resultDiv.innerHTML = '<div class="info">Creando preferencia...</div>';
+
+            try {
+                const testData = {
+                    items: [
+                        {
+                            title: "Gold Mensual - Test",
+                            description: "Plan premium mensual para pruebas",
+                            quantity: 1,
+                            unit_price: 999,
+                            currency_id: "ARS"
+                        }
+                    ],
+                    back_urls: {
+                        success: "http://localhost:3000/payment/success",
+                        failure: "http://localhost:3000/payment/failure",
+                        pending: "http://localhost:3000/payment/pending"
+                    },
+                    external_reference: `test_user_gold_monthly_${Date.now()}`
+                };
+
+                currentExternalReference = testData.external_reference;
+
+                const response = await fetch('/api/mercadopago/create-preference', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentPreferenceId = data.id;
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ Preferencia creada exitosamente!
+ID: ${data.id}
+External Reference: ${currentExternalReference}</div>
+                    `;
+
+                    // Mostrar enlace de pago
+                    const paymentLinkContainer = document.getElementById('paymentLinkContainer');
+                    paymentLinkContainer.innerHTML = `
+                        <div class="payment-link">
+                            <strong>🔗 Enlace de Pago:</strong><br>
+                            <a href="${data.init_point}" target="_blank">Ir a MercadoPago para pagar</a><br>
+                            <small>Se abrirá en una nueva pestaña. Usa las tarjetas de prueba de arriba.</small>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error de conexión: ${error.message}</div>`;
+            }
+        }
+
+        async function checkPaymentStatus() {
+            const paymentId = document.getElementById('paymentId').value.trim();
+            const resultDiv = document.getElementById('paymentStatusResult');
+
+            if (!paymentId) {
+                resultDiv.innerHTML = '<div class="error">❌ Por favor ingresa un Payment ID</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="info">Verificando estado del pago...</div>';
+
+            try {
+                const response = await fetch(`/api/mercadopago/payment-status/${paymentId}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    const statusEmoji = {
+                        'approved': '✅',
+                        'rejected': '❌',
+                        'pending': '⏳',
+                        'cancelled': '🚫'
+                    };
+
+                    resultDiv.innerHTML = `
+                        <div class="success">${statusEmoji[data.status] || '❓'} Estado del Pago:
+Estado: ${data.status}
+Detalle: ${data.status_detail || 'N/A'}
+Método: ${data.payment_method || 'N/A'}
+Monto: $${data.amount} ${data.currency}
+Referencia: ${data.external_reference || 'N/A'}
+Creado: ${data.date_created || 'N/A'}
+Aprobado: ${data.date_approved || 'N/A'}</div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error de conexión: ${error.message}</div>`;
+            }
+        }
+
+        async function simulateWebhook() {
+            const paymentId = document.getElementById('webhookPaymentId').value.trim();
+            const resultDiv = document.getElementById('webhookResult');
+
+            if (!paymentId) {
+                resultDiv.innerHTML = '<div class="error">❌ Por favor ingresa un Payment ID</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="info">Simulando webhook...</div>';
+
+            try {
+                const webhookData = {
+                    type: "payment",
+                    data: {
+                        id: paymentId
+                    }
+                };
+
+                const response = await fetch('/api/webhooks/mercadopago', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(webhookData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ Webhook procesado exitosamente!
+Respuesta: ${JSON.stringify(data, null, 2)}</div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Error en webhook: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error de conexión: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

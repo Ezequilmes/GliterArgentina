@@ -1,0 +1,50 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradiente principal berenjena a naranja -->
+    <linearGradient id="eggplantGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradiente para el tallo -->
+    <linearGradient id="stemGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16a34a;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradiente de acento naranja -->
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ea580c;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Sombra suave -->
+    <filter id="softShadow">
+      <feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+  
+  <!-- Círculo de fondo con gradiente sutil -->
+  <circle cx="60" cy="60" r="58" fill="url(#accentGradient)" opacity="0.1" filter="url(#softShadow)"/>
+  
+  <!-- Cuerpo principal de la berenjena -->
+  <path d="M45 35 C45 25, 55 20, 60 20 C65 20, 75 25, 75 35 L75 70 C75 85, 65 95, 60 95 C55 95, 45 85, 45 70 Z" 
+        fill="url(#eggplantGradient)" 
+        filter="url(#softShadow)"/>
+  
+  <!-- Tallo de la berenjena -->
+  <path d="M55 20 C55 15, 57 10, 60 10 C63 10, 65 15, 65 20 L65 25 C65 27, 63 28, 60 28 C57 28, 55 27, 55 25 Z" 
+        fill="url(#stemGradient)"/>
+  
+  <!-- Hojas del tallo -->
+  <path d="M52 18 C50 16, 48 14, 50 12 C52 14, 54 16, 55 18" fill="url(#stemGradient)" opacity="0.8"/>
+  <path d="M68 18 C70 16, 72 14, 70 12 C68 14, 66 16, 65 18" fill="url(#stemGradient)" opacity="0.8"/>
+  
+  <!-- Brillo sutil en la berenjena -->
+  <ellipse cx="55" cy="40" rx="8" ry="15" fill="white" opacity="0.2"/>
+  
+  <!-- Texto del logo -->
+  <text x="60" y="110" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="url(#eggplantGradient)">
+    Gliter
+  </text>
+</svg>

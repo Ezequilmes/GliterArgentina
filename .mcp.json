@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "gliter-argentina": {
+      "command": "node",
+      "args": ["mcp-server.js"],
+      "cwd": "C:\\Users\\Admin\\Documents\\trae_projects\\Gliter Argentina",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    "mercadopago-mcp-server": {
+      "url": "https://mcp.mercadopago.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MERCADOPAGO_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

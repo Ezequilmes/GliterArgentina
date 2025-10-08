@@ -1,0 +1,230 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function to check if the current authenticated user (uid or email) is in the provided list
+    function userInList(list) {
+      return list != null && (
+        // For arrays, check if UID is in the array
+        (list is list && request.auth.uid in list) ||
+        // For maps/objects, check if UID is a key
+        (list is map && request.auth.uid in list) ||
+        // Legacy: check by email when available (helps during migration / backward-compat)
+        (list is list && request.auth.token.email != null && request.auth.token.email in list) ||
+        (list is map && request.auth.token.email != null && request.auth.token.email in list)
+      );
+    }
+
+    // Helper function to check if user participates in the given chatId
+    function isChatParticipant(chatId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/chats/$(chatId)) &&
+        (
+          // Check participation using helper util on every supported structure
+          userInList(get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds) ||
+          userInList(get(/databases/$(database)/documents/chats/$(chatId)).data.participants) ||
+          // Legacy structure with user1Id / user2Id
+          get(/databases/$(database)/documents/chats/$(chatId)).data.user1Id == request.auth.uid ||
+          get(/databases/$(database)/documents/chats/$(chatId)).data.user2Id == request.auth.uid
+        );
+    }
+    
+    // Users collection - users can read all users but only write their own
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // Allow owner full write; allow other authenticated users to add themselves to matches or receivedSuperLikes arrays
+      allow write: if isOwner(userId) || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['matches', 'receivedSuperLikes'])
+      );
+    }
+    
+    // Chat documents - accessible only to authenticated participants
+    match /chats/{chatId} {
+      // Allow get (individual document reads) if user is a participant
+      allow get: if isAuthenticated() && (
+        userInList(resource.data.participantIds) ||
+        userInList(resource.data.participants) ||
+        resource.data.user1Id == request.auth.uid ||
+        resource.data.user2Id == request.auth.uid
+      );
+      
+      // Allow list/query operations for authenticated users to find their chats
+      // This allows queries like where('user1Id', '==', uid) or where('participantIds', 'array-contains', uid)
+      allow list: if isAuthenticated();
+
+      // Updates/deletes are also restricted to participants
+      allow write: if isAuthenticated() && (
+        userInList(resource.data.participantIds) ||
+        userInList(resource.data.participants) ||
+        resource.data.user1Id == request.auth.uid ||
+        resource.data.user2Id == request.auth.uid
+      );
+
+      // Creation requires that the user being created is included in the payload as a participant (covers uid & email)
+      allow create: if isAuthenticated() && (
+        userInList(request.resource.data.participantIds) ||
+        userInList(request.resource.data.participants) ||
+        (request.resource.data.user1Id == request.auth.uid || request.resource.data.user2Id == request.auth.uid)
+      );
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Allow read/list if el usuario participa del chat
+        allow read, list: if isChatParticipant(chatId);
+
+        // Allow create if the requester is authenticated, is a participant of the chat, and is the sender
+        allow create: if isAuthenticated() &&
+          isChatParticipant(chatId) &&
+          request.auth.uid == request.resource.data.senderId;
+
+        // Allow sender full control; receiver may only toggle the 'read' flag
+        allow update: if isAuthenticated() && (
+          request.auth.uid == resource.data.senderId ||
+          (
+            request.auth.uid == resource.data.receiverId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          )
+        );
+        // Delete restricted to sender
+        allow delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
+      }
+    }
+    
+    // Messages collection (top-level) - accessible to chat participants
+    match /messages/{messageId} {
+      // Allow read if the requesting user is authenticated and either:
+      // 1. The message has no chatId (legacy)
+      // 2. The user is a participant of the chat
+      allow read: if isAuthenticated() && (
+        resource.data.chatId == null ||
+        resource.data.senderId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid ||
+        isChatParticipant(resource.data.chatId)
+      );
+
+      // Allow create if the requester is authenticated and is the sender
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.senderId;
+
+      // Allow updates/deletes
+      // Sender can update/delete any field.
+      // Receiver can update the 'read' field to mark message as read.
+      allow update: if isAuthenticated() && (
+        // Sender has full control
+        request.auth.uid == resource.data.senderId ||
+        // Receiver may only toggle the 'read' flag
+        (request.auth.uid == resource.data.receiverId &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
+      );
+      // Delete restricted to sender
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
+    }
+    
+    // Chat typing indicators
+    match /chatTyping/{typingId} {
+      allow read, write: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+
+    // Typing collection (used in code)
+    match /typing/{typingId} {
+      allow read, write: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+    
+    // User preferences and settings
+    match /userPreferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Location data - users can manage their own location
+    match /locations/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Public locations for discovery - readable by authenticated users
+    match /publicLocations/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+    
+    // Reports - users can create reports, only admins can read all
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.reporterId;
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.reporterId || 
+         request.auth.token.admin == true);
+    }
+    
+    // Likes - users can create and read their own likes
+    match /likes/{likeId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.fromUserId || 
+         request.auth.uid == resource.data.toUserId);
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.fromUserId;
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.fromUserId;
+    }
+
+    // Verification Requests - users can create their own request and read their own; admins can read all
+    match /verificationRequests/{requestId} {
+      // User can create a request for themselves
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      // User can read their own request; admins can read any
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || request.auth.token.admin == true);
+      // Prevent ordinary users from updating/deleting; allow only admins
+      allow update, delete: if isAuthenticated() && request.auth.token.admin == true;
+    }
+    
+    // Matches - accessible to both participants
+    match /matches/{matchId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.user1Id || 
+         request.auth.uid == resource.data.user2Id);
+      allow write: if isAuthenticated() && 
+        (request.auth.uid == resource.data.user1Id || 
+         request.auth.uid == resource.data.user2Id);
+      allow create: if isAuthenticated() && 
+        (request.auth.uid == request.resource.data.user1Id || 
+         request.auth.uid == request.resource.data.user2Id);
+    }
+    
+    // Notifications - users can read their own notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+    }
+    
+    // FCM tokens for push notifications
+    match /fcmTokens/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // User sessions and activity
+    match /userSessions/{sessionId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Online status - users can manage their own status and read others'
+    match /onlineStatus/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+  }
+}

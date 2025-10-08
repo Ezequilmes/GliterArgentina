@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Endpoints - Gliter Argentina</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        .error {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Endpoints - Gliter Argentina</h1>
+    
+    <div class="test-section">
+        <h2>In-App Messages API</h2>
+        <button onclick="testGetMessages()">GET /api/in-app-messages/messages</button>
+        <button onclick="testPostMessage()">POST /api/in-app-messages/messages</button>
+        <div id="messages-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Auth API</h2>
+        <button onclick="testAuthStatus()">GET /api/auth/status</button>
+        <div id="auth-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Health Check</h2>
+        <button onclick="testHealthCheck()">GET /api/health</button>
+        <div id="health-result" class="result"></div>
+    </div>
+
+    <script>
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                const data = await response.json();
+                return {
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    error: error.message
+                };
+            }
+        }
+
+        async function testGetMessages() {
+            const result = document.getElementById('messages-result');
+            result.textContent = 'Testing GET /api/in-app-messages/messages...';
+            
+            const response = await makeRequest('/api/in-app-messages/messages');
+            
+            if (response.error) {
+                result.className = 'result error';
+                result.textContent = `Error: ${response.error}`;
+            } else {
+                result.className = 'result success';
+                result.textContent = `Status: ${response.status} ${response.statusText}\n\nResponse:\n${JSON.stringify(response.data, null, 2)}`;
+            }
+        }
+
+        async function testPostMessage() {
+            const result = document.getElementById('messages-result');
+            result.textContent = 'Testing POST /api/in-app-messages/messages...';
+            
+            const testMessage = {
+                messageId: 'test-' + Date.now(),
+                title: 'Test Message',
+                content: 'This is a test message from the endpoint tester',
+                type: 'info',
+                priority: 'medium',
+                targetAudience: 'all',
+                actions: [{
+                    actionLabel: 'Test Action',
+                    actionUrl: 'https://example.com',
+                    messageId: 'test-' + Date.now(),
+                    timestamp: new Date().toISOString()
+                }],
+                metadata: {
+                    source: 'endpoint-test'
+                }
+            };
+            
+            const response = await makeRequest('/api/in-app-messages/messages', {
+                method: 'POST',
+                body: JSON.stringify(testMessage)
+            });
+            
+            if (response.error) {
+                result.className = 'result error';
+                result.textContent = `Error: ${response.error}`;
+            } else {
+                result.className = 'result success';
+                result.textContent = `Status: ${response.status} ${response.statusText}\n\nResponse:\n${JSON.stringify(response.data, null, 2)}`;
+            }
+        }
+
+        async function testAuthStatus() {
+            const result = document.getElementById('auth-result');
+            result.textContent = 'Testing GET /api/auth/status...';
+            
+            const response = await makeRequest('/api/auth/status');
+            
+            if (response.error) {
+                result.className = 'result error';
+                result.textContent = `Error: ${response.error}`;
+            } else {
+                result.className = 'result success';
+                result.textContent = `Status: ${response.status} ${response.statusText}\n\nResponse:\n${JSON.stringify(response.data, null, 2)}`;
+            }
+        }
+
+        async function testHealthCheck() {
+            const result = document.getElementById('health-result');
+            result.textContent = 'Testing GET /api/health...';
+            
+            const response = await makeRequest('/api/health');
+            
+            if (response.error) {
+                result.className = 'result error';
+                result.textContent = `Error: ${response.error}`;
+            } else {
+                result.className = 'result success';
+                result.textContent = `Status: ${response.status} ${response.statusText}\n\nResponse:\n${JSON.stringify(response.data, null, 2)}`;
+            }
+        }
+
+        // Auto-run health check on page load
+        window.addEventListener('load', () => {
+            testHealthCheck();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test MercadoPago API</title>
+</head>
+<body>
+    <h1>Test MercadoPago API</h1>
+    <button onclick="testCreatePreference()">Probar Crear Preferencia</button>
+    <div id="result"></div>
+
+    <script>
+        async function testCreatePreference() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Probando...';
+
+            try {
+                const preferenceData = {
+                    items: [
+                        {
+                            title: "Gold Mensual",
+                            description: "Acceso completo a todas las funciones premium por 1 mes",
+                            quantity: 1,
+                            unit_price: 999,
+                            currency_id: "ARS"
+                        }
+                    ],
+                    back_urls: {
+                        success: "http://localhost:3000/payment/success",
+                        failure: "http://localhost:3000/payment/failure",
+                        pending: "http://localhost:3000/payment/pending"
+                    },
+                    external_reference: "test_" + Date.now()
+                };
+
+                const response = await fetch('/api/mercadopago/create-preference', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(preferenceData)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <h3>✅ Preferencia creada exitosamente!</h3>
+                        <p><strong>ID:</strong> ${data.id}</p>
+                        <p><strong>Init Point:</strong> <a href="${data.init_point}" target="_blank">${data.init_point}</a></p>
+                        <p><strong>Sandbox Init Point:</strong> <a href="${data.sandbox_init_point}" target="_blank">${data.sandbox_init_point}</a></p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <h3>❌ Error al crear preferencia</h3>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Error:</strong> ${data.error}</p>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3>❌ Error de conexión</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

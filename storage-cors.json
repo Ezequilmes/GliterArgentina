@@ -1,0 +1,17 @@
+[
+  {
+    "origin": [
+      "https://gliter.com.ar",
+      "https://gliter-argentina.web.app",
+      "http://localhost:3000"
+    ],
+    "method": ["GET", "HEAD", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Accept-Ranges",
+      "Content-Range",
+      "Content-Length"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]
