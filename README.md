@@ -18,7 +18,7 @@ Una aplicación moderna de citas con sistema de In-App Messaging integrado y pag
 - **Estilos**: Tailwind CSS
 - **Pagos**: Mercado Pago SDK
 - **Testing**: Jest + Testing Library
-- **Deployment**: Vercel (recomendado)
+- **Deployment**: Firebase App Hosting
 
 ## 🏃‍♂️ Inicio Rápido
 
@@ -130,18 +130,21 @@ gliter-argentina/
 
 ## 🌐 Despliegue
 
-### Vercel (Recomendado)
+### Firebase App Hosting (Recomendado)
 
-1. **Conectar repositorio**:
-   - Ve a [vercel.com](https://vercel.com)
-   - Importa tu repositorio de GitHub
+1. **Configurar Firebase**:
+   - Asegúrate de tener Firebase CLI instalado: `npm install -g firebase-tools`
+   - Autentícate: `firebase login`
 
 2. **Configurar variables de entorno**:
-   - Añade todas las variables del archivo `.env.example`
+   - Configura las variables en Firebase Console
    - Usa credenciales de producción de Mercado Pago
 
 3. **Desplegar**:
-   - Vercel desplegará automáticamente desde tu rama principal
+   ```bash
+   npm run deploy:apphosting
+   ```
+   - Firebase App Hosting desplegará automáticamente desde tu rama principal
 
 ### Otras opciones
 

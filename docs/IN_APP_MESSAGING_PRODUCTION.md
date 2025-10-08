@@ -234,6 +234,7 @@ npm run build
 
 Configura todas las variables necesarias en tu plataforma de hosting:
 
+- Firebase App Hosting: Firebase Console > App Hosting > Environment Variables
 - Vercel: Project Settings > Environment Variables
 - Netlify: Site Settings > Environment Variables
 - Railway: Variables tab

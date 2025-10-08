@@ -16,11 +16,11 @@
 
 ## 🌐 Opciones de Despliegue
 
-### 1. 🔥 Vercel (Recomendado)
+### 1. 🔥 Firebase App Hosting (Recomendado)
 
-Vercel es la plataforma oficial de Next.js y ofrece la mejor experiencia para aplicaciones Next.js.
+Firebase App Hosting ofrece integración completa con el ecosistema Firebase y despliegue continuo optimizado.
 
-#### Pasos para Desplegar en Vercel:
+#### Pasos para Desplegar en Firebase App Hosting:
 
 1. **Preparar el repositorio**:
    ```bash
@@ -29,19 +29,60 @@ Vercel es la plataforma oficial de Next.js y ofrece la mejor experiencia para ap
    git push origin main
    ```
 
-2. **Conectar con Vercel**:
-   - Ve a [vercel.com](https://vercel.com)
-   - Conecta tu cuenta de GitHub/GitLab/Bitbucket
-   - Importa tu repositorio
+2. **Configurar Firebase CLI**:
+   ```bash
+   npm install -g firebase-tools
+   firebase login
+   firebase use gliter-argentina
+   ```
 
-3. **Configurar variables de entorno**:
+3. **Desplegar la aplicación**:
+   ```bash
+   npm run deploy:apphosting
+   ```
+
+4. **Configurar variables de entorno**:
+   - Ve a Firebase Console > App Hosting
+   - Configura las variables de entorno:
    ```env
    # Mercado Pago
    NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=tu_public_key_aqui
    MERCADOPAGO_ACCESS_TOKEN=tu_access_token_aqui
    
-   # Base de datos (si usas una)
-   DATABASE_URL=tu_database_url_aqui
+   # Configuración de la app
+   NEXT_PUBLIC_APP_URL=https://tu-app.web.app
+   
+   # Webhooks
+   WEBHOOK_SECRET=tu_webhook_secret_aqui
+   ```
+
+#### ✅ Ventajas de Firebase App Hosting:
+- Integración completa con Firebase services
+- Despliegue automático desde Git
+- CDN global de Google
+- Optimizaciones automáticas para Next.js
+- Escalado automático
+- SSL gratuito
+- Preview deployments
+
+---
+
+### 2. 🌐 Vercel (Alternativa)
+
+Vercel es la plataforma oficial de Next.js y ofrece una excelente experiencia para aplicaciones Next.js.
+
+#### Pasos para Desplegar en Vercel:
+
+1. **Conectar con Vercel**:
+   - Ve a [vercel.com](https://vercel.com)
+   - Conecta tu cuenta de GitHub/GitLab/Bitbucket
+   - Importa tu repositorio
+
+2. **Configurar variables de entorno**:
+   ```env
+   # Mercado Pago
+   NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=tu_public_key_aqui
+   MERCADOPAGO_ACCESS_TOKEN=tu_access_token_aqui
    
    # Configuración de la app
    NEXT_PUBLIC_APP_URL=https://tu-app.vercel.app
@@ -50,21 +91,15 @@ Vercel es la plataforma oficial de Next.js y ofrece la mejor experiencia para ap
    WEBHOOK_SECRET=tu_webhook_secret_aqui
    ```
 
-4. **Configurar dominio personalizado** (opcional):
-   - En el dashboard de Vercel, ve a Settings > Domains
-   - Añade tu dominio personalizado
-
 #### ✅ Ventajas de Vercel:
 - Despliegue automático desde Git
 - CDN global
 - Optimizaciones automáticas para Next.js
-- Escalado automático
-- SSL gratuito
 - Preview deployments
 
 ---
 
-### 2. 🐳 Docker + Cloud Provider
+### 3. 🐳 Docker + Cloud Provider
 
 #### Dockerfile:
 ```dockerfile
@@ -129,10 +164,10 @@ services:
 
 ---
 
-### 3. ☁️ Otras Opciones de Cloud
+### 4. ☁️ Otras Opciones de Cloud
 
 #### AWS (Amplify/EC2):
-- **AWS Amplify**: Similar a Vercel, optimizado para aplicaciones frontend
+- **AWS Amplify**: Optimizado para aplicaciones frontend
 - **AWS EC2**: Más control, requiere configuración manual
 
 #### Google Cloud Platform:
@@ -331,6 +366,7 @@ curl https://tu-dominio.com/api/in-app-messages/config
 Para soporte técnico:
 - **Documentación**: [Next.js Docs](https://nextjs.org/docs)
 - **Mercado Pago**: [Documentación de API](https://www.mercadopago.com.ar/developers)
+- **Firebase App Hosting**: [Documentación de Despliegue](https://firebase.google.com/docs/app-hosting)
 - **Vercel**: [Documentación de Despliegue](https://vercel.com/docs)
 
 ---

@@ -2,10 +2,10 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { useChat } from '@/hooks/useChat';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import Loading from '@/components/ui/Loading';
-import { ChatWindow } from '@/components/chat';
+import { useChat } from '../../../hooks/useChat';
+import ProtectedRoute from '../../../components/auth/ProtectedRoute';
+import Loading from '../../../components/ui/Loading';
+import { ChatWindow } from '../../../components/chat/ChatWindow';
 
 export default function ChatPage() {
   const params = useParams();

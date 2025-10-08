@@ -1,48 +1,5 @@
-runConfig:
-  runtime: nodejs20
-  cpu: 2
-  memory: 2GiB
-  maxInstances: 100
-  minInstances: 1
-  concurrency: 1000
-
-env:
-  - variable: NODE_ENV
-    value: production
-  - variable: NEXT_TELEMETRY_DISABLED
-    value: "1"
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyBDaKVYlJSfIJ7nKeIkTEWSmhlB1Soqay0
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: gliter-argentina.firebaseapp.com
-  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
-    value: https://gliter-argentina-default-rtdb.firebaseio.com
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: gliter-argentina
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: gliter-argentina.firebasestorage.app
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "1084162955705"
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:1084162955705:web:362b67d495109dff24fe68
-  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-    value: G-F439RH5X0R
-  - variable: NEXT_PUBLIC_APP_URL
-    value: https://gliter-argentina--default-app-hosting.web.app
-  - variable: NEXT_PUBLIC_USE_FIREBASE_EMULATOR
-    value: "false"
-  - variable: INAPP_MESSAGING_ENABLED
-    value: "true"
-  - variable: INAPP_MAX_MESSAGES_PER_SESSION
-    value: "3"
-  - variable: INAPP_DISPLAY_INTERVAL
-    value: "30000"
-  - variable: INAPP_MAX_MESSAGES_PER_REQUEST
-    value: "5"
-
 buildConfig:
   runtime: nodejs20
   commands:
-    - npm ci
+    - npm install
     - npm run build
-  outputDir: .next

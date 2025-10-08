@@ -277,7 +277,8 @@ if (!messageData.title || !messageData.body) {
 
 ### Plataformas Soportadas
 
-- **Vercel** (recomendado)
+- **Firebase App Hosting** (recomendado)
+- **Vercel**
 - **Netlify**
 - **Railway**
 - **AWS Amplify**
