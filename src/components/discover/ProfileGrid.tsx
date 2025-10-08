@@ -37,14 +37,25 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const { user, distance } = userDistance;
   const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const getDisplayAge = () => {
     return user.age || 'N/A';
   };
 
-  const handleAction = (e: React.MouseEvent, action: () => void) => {
+  const handleAction = async (e: React.MouseEvent, action: () => void) => {
     e.stopPropagation();
-    action();
+    if (isLoading) return; // Evitar múltiples clics
+    
+    setIsLoading(true);
+    try {
+      await action();
+    } catch (error) {
+      console.error('Error en la acción:', error);
+      // Aquí podrías agregar una notificación de error al usuario si es necesario
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -102,7 +113,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             {/* Chat button */}
             <button
               onClick={(e) => handleAction(e, () => onStartChat?.(user.id))}
-              className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110"
+              disabled={isLoading}
+              className={cn(
+                "bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110",
+                isLoading && "opacity-50 cursor-not-allowed"
+              )}
               title="Iniciar chat"
             >
               <MessageCircle size={20} />
@@ -111,7 +126,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             {/* Like button */}
             <button
               onClick={(e) => handleAction(e, () => onLike?.(user.id))}
-              className="bg-pink-500 hover:bg-pink-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110"
+              disabled={isLoading}
+              className={cn(
+                "bg-pink-500 hover:bg-pink-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110",
+                isLoading && "opacity-50 cursor-not-allowed"
+              )}
               title="Dar like"
             >
               <Heart size={20} />
@@ -120,7 +139,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             {/* Super like button */}
             <button
               onClick={(e) => handleAction(e, () => onSuperLike?.(user.id))}
-              className="bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110"
+              disabled={isLoading}
+              className={cn(
+                "bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110",
+                isLoading && "opacity-50 cursor-not-allowed"
+              )}
               title="Super like"
             >
               <Star size={20} />
@@ -129,7 +152,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             {/* Block button */}
             <button
               onClick={(e) => handleAction(e, () => onBlock?.(user.id))}
-              className="bg-red-500 hover:bg-red-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110"
+              disabled={isLoading}
+              className={cn(
+                "bg-red-500 hover:bg-red-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110",
+                isLoading && "opacity-50 cursor-not-allowed"
+              )}
               title="Bloquear usuario"
             >
               <Ban size={20} />

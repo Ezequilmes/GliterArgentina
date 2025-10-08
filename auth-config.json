@@ -1,0 +1,23 @@
+{"users": [
+{
+  "localId": "H6pJ38zqoiTzsuhjRpb2DE85HLz1",
+  "email": "eventos3.0@hotmail.com",
+  "emailVerified": false,
+  "passwordHash": "QOHaZQ0MBw71mlNlojobAdNoQ8SXVBXHwT28MfXu6HAmkj2Z6I9p931lmpSL0n2auq6nnzS8IKemS2OVfA/18Q==",
+  "salt": "79odLpWtQJrCpA==",
+  "displayName": "Ezequiel",
+  "lastSignedInAt": "1759896926560",
+  "createdAt": "1759289384883",
+  "providerUserInfo": []
+},
+{
+  "localId": "ZsiQPYW8soV0NiNaGlzXBvdkBhu1",
+  "email": "sportingwsc15@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "MSB+/CZb/ureq+RYr4KSelltedGDjYh4ByJtYBrQapAKIJKiE+taYRIuY+0mTb+5uF9Rd5xX2uGSUWxlC7pKUg==",
+  "salt": "wd43LbO5Q7niHA==",
+  "displayName": "Jose",
+  "lastSignedInAt": "1759823698051",
+  "createdAt": "1759460312111",
+  "providerUserInfo": []
+}]}

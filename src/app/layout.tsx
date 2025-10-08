@@ -93,11 +93,12 @@ export default function RootLayout({
         <ErrorBoundary>
           <ToastProvider>
             <ThemeProvider>
-               <AuthProvider>
+              <AuthProvider>
                 <PWAInitializer />
-
-          {children}
-                 <Toaster
+                <InAppMessageHandler />
+                <InAppMessageTester />
+                {children}
+                <Toaster
                   position="top-center"
                   toastOptions={{
                     duration: 4000,
