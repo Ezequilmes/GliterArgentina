@@ -1,5 +1,19 @@
+runConfig:
+  runtime: nodejs20
+  cpu: 1
+  memory: 1GiB
+  maxInstances: 10
+  minInstances: 0
+  concurrency: 100
+
+env:
+  - variable: NODE_ENV
+    value: production
+  - variable: NEXT_TELEMETRY_DISABLED
+    value: "1"
+
 buildConfig:
   runtime: nodejs20
   commands:
-    - npm install
+    - npm ci --production=false
     - npm run build
