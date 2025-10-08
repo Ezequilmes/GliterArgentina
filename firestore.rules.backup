@@ -1,0 +1,131 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    function userInList(userList) {
+      return request.auth != null && request.auth.uid in userList;
+    }
+
+    // Helper function to check if user participates in the given chatId
+    function userParticipatesInChat(chatId) {
+      return request.auth != null && 
+             request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Chats collection
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && userInList(resource.data.participants);
+      allow create: if isAuthenticated() && userInList(request.resource.data.participants);
+      allow update: if isAuthenticated() && userInList(resource.data.participants);
+      allow delete: if isAuthenticated() && userInList(resource.data.participants);
+
+      // Messages subcollection within chats
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && userParticipatesInChat(chatId);
+        allow create: if isAuthenticated() && userParticipatesInChat(chatId) && isOwner(request.resource.data.senderId);
+        allow update: if isAuthenticated() && userParticipatesInChat(chatId) && isOwner(resource.data.senderId);
+        allow delete: if isAuthenticated() && userParticipatesInChat(chatId) && isOwner(resource.data.senderId);
+      }
+    }
+
+    // Messages collection (top-level)
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && userParticipatesInChat(resource.data.chatId);
+      allow create: if isAuthenticated() && userParticipatesInChat(request.resource.data.chatId) && isOwner(request.resource.data.senderId);
+      allow update: if isAuthenticated() && userParticipatesInChat(resource.data.chatId) && isOwner(resource.data.senderId);
+      allow delete: if isAuthenticated() && userParticipatesInChat(resource.data.chatId) && isOwner(resource.data.senderId);
+    }
+
+    // Chat typing indicators
+    match /chatTyping/{chatId} {
+      allow read, write: if isAuthenticated() && userParticipatesInChat(chatId);
+    }
+
+    // Typing indicators
+    match /typing/{typingId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isOwner(request.resource.data.userId);
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // User preferences
+    match /userPreferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Locations
+    match /locations/{locationId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isOwner(request.resource.data.userId);
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // Public locations
+    match /publicLocations/{locationId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isOwner(request.resource.data.userId);
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // Reports
+    match /reports/{reportId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.reporterId) || isOwner(resource.data.reportedUserId));
+      allow create: if isAuthenticated() && isOwner(request.resource.data.reporterId);
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.reporterId);
+    }
+
+    // Likes
+    match /likes/{likeId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.likerId) || isOwner(resource.data.likedUserId));
+      allow create: if isAuthenticated() && isOwner(request.resource.data.likerId);
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.likerId);
+    }
+
+    // Verification requests
+    match /verificationRequests/{requestId} {
+      allow read, write: if isOwner(resource.data.userId);
+    }
+
+    // Matches
+    match /matches/{matchId} {
+      allow read: if isAuthenticated() && userInList(resource.data.users);
+      allow create: if isAuthenticated() && userInList(request.resource.data.users);
+      allow update, delete: if isAuthenticated() && userInList(resource.data.users);
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read, write: if isOwner(resource.data.userId);
+    }
+
+    // FCM Tokens
+    match /fcmTokens/{tokenId} {
+      allow read, write: if isOwner(resource.data.userId);
+    }
+
+    // User sessions
+    match /userSessions/{sessionId} {
+      allow read, write: if isOwner(resource.data.userId);
+    }
+
+    // Online status
+    match /onlineStatus/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+  }
+}

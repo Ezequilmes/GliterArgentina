@@ -2,41 +2,22 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is authenticated
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Helper function to check if user owns the resource
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
     
-    // Helper function to check if the current authenticated user (uid or email) is in the provided list
-    function userInList(list) {
-      return list != null && (
-        // For arrays, check if UID is in the array
-        (list is list && request.auth.uid in list) ||
-        // For maps/objects, check if UID is a key
-        (list is map && request.auth.uid in list) ||
-        // Legacy: check by email when available (helps during migration / backward-compat)
-        (list is list && request.auth.token.email != null && request.auth.token.email in list) ||
-        (list is map && request.auth.token.email != null && request.auth.token.email in list)
-      );
+    function userInList(userList) {
+      return request.auth != null && request.auth.uid in userList;
     }
-
-    // Helper function to check if user participates in the given chatId
+    
     function isChatParticipant(chatId) {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/chats/$(chatId)) &&
-        (
-          // Check participation using helper util on every supported structure
-          userInList(get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds) ||
-          userInList(get(/databases/$(database)/documents/chats/$(chatId)).data.participants) ||
-          // Legacy structure with user1Id / user2Id
-          get(/databases/$(database)/documents/chats/$(chatId)).data.user1Id == request.auth.uid ||
-          get(/databases/$(database)/documents/chats/$(chatId)).data.user2Id == request.auth.uid
-        );
+      return request.auth != null && 
+             request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
     }
     
     // Users collection - users can read all users but only write their own
