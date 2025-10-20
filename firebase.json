@@ -19,6 +19,13 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "apphosting": [
+    {
+      "backendId": "my-web-app",
+      "rootDir": "./",
+      "ignore": ["node_modules", ".git", "firebase-debug.log", ".trae", ".vercel"]
+    }
+  ],
   "emulators": {
     "auth": {
       "port": 9099

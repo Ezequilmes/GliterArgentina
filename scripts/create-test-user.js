@@ -1,6 +1,6 @@
-const { initializeApp } = require('firebase/app');
-const { getAuth, createUserWithEmailAndPassword, connectAuthEmulator } = require('firebase/auth');
-const { getFirestore, doc, setDoc, connectFirestoreEmulator, serverTimestamp } = require('firebase/firestore');
+import { initializeApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, doc, setDoc, connectFirestoreEmulator, serverTimestamp } from 'firebase/firestore';
 
 // Configuración de Firebase para emuladores
 const firebaseConfig = {

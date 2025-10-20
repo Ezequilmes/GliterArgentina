@@ -1,36 +1,50 @@
-runConfig:
-  runtime: nodejs20
-  cpu: 1
-  memory: 1GiB
-  maxInstances: 10
-  minInstances: 0
-  concurrency: 100
+runtime: nodejs20
+entrypoint: npm run start
 
 env:
-  - variable: NODE_ENV
+  - key: NODE_ENV
     value: production
-  - variable: NEXT_TELEMETRY_DISABLED
+  - key: NEXT_TELEMETRY_DISABLED
     value: "1"
+  - key: PORT
+    value: "8080"
   # Firebase Configuration
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+  - key: NEXT_PUBLIC_FIREBASE_API_KEY
     value: AIzaSyBDaKVYlJSfIJ7nKeIkTEWSmhlB1Soqay0
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+  - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
     value: gliter-argentina.firebaseapp.com
-  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
+  - key: NEXT_PUBLIC_FIREBASE_DATABASE_URL
     value: https://gliter-argentina-default-rtdb.firebaseio.com
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
     value: gliter-argentina
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+  - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
     value: gliter-argentina.appspot.com
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+  - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
     value: "1084162955705"
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+  - key: NEXT_PUBLIC_FIREBASE_APP_ID
     value: 1:1084162955705:web:25bb32180d1bdaf724fe68
-  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+  - key: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
     value: G-MMFQWWFCJD
 
-buildConfig:
-  runtime: nodejs20
-  commands:
-    - npm ci
-    - npm run build
+build:
+  command: |
+    echo ">>> Cleaning node state"
+    rm -rf node_modules package-lock.json pnpm-lock.yaml
+    echo ">>> Installing production deps"
+    npm ci --omit=dev
+    echo ">>> Type-check"
+    npm run type-check
+    echo ">>> Run build"
+    npm run build
+  environment:
+    - key: NODE_ENV
+      value: production
+
+resources:
+  cpu: 1
+  memoryMiB: 2048
+  diskMiB: 4096
+
+handlers:
+  - glob: '**'
+    script: auto

@@ -12,12 +12,23 @@ service cloud.firestore {
     }
     
     function userInList(userList) {
-      return request.auth != null && request.auth.uid in userList;
+      return request.auth != null && userList.hasAny([request.auth.uid]);
     }
     
     function isChatParticipant(chatId) {
+      return request.auth != null && (
+        // For direct chats, check if the chatId contains the current user's UID
+        (chatId.matches('direct_.*') && chatId.matches('.*' + request.auth.uid + '.*')) ||
+        // For existing chats, check the document
+        (exists(/databases/$(database)/documents/chats/$(chatId)) && 
+         get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid]))
+      );
+    }
+    
+    function isChatParticipantFromResource() {
       return request.auth != null && 
-             request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        (resource.data.participants.hasAny([request.auth.uid]) || 
+         resource.data.participantIds.hasAny([request.auth.uid]));
     }
     
     // Users collection - users can read all users but only write their own
@@ -30,55 +41,47 @@ service cloud.firestore {
       );
     }
     
-    // Chat documents - accessible only to authenticated participants
+    // Chat collection rules
     match /chats/{chatId} {
-      // Allow get (individual document reads) if user is a participant
-      allow get: if isAuthenticated() && (
-        userInList(resource.data.participantIds) ||
-        userInList(resource.data.participants) ||
-        resource.data.user1Id == request.auth.uid ||
-        resource.data.user2Id == request.auth.uid
-      );
-      
-      // Allow list/query operations for authenticated users to find their chats
-      // This allows queries like where('user1Id', '==', uid) or where('participantIds', 'array-contains', uid)
+      // Allow list queries for authenticated users (Firestore will filter results based on read rules)
       allow list: if isAuthenticated();
-
-      // Updates/deletes are also restricted to participants
-      allow write: if isAuthenticated() && (
-        userInList(resource.data.participantIds) ||
-        userInList(resource.data.participants) ||
-        resource.data.user1Id == request.auth.uid ||
-        resource.data.user2Id == request.auth.uid
-      );
-
-      // Creation requires that the user being created is included in the payload as a participant (covers uid & email)
-      allow create: if isAuthenticated() && (
-        userInList(request.resource.data.participantIds) ||
-        userInList(request.resource.data.participants) ||
-        (request.resource.data.user1Id == request.auth.uid || request.resource.data.user2Id == request.auth.uid)
-      );
+      
+      // Allow read if user is a participant
+      allow read: if isAuthenticated() && isChatParticipant(chatId);
+      
+      // Allow create if user is one of the participants in the new document
+      // This is crucial for automatic chat creation
+      allow create: if isAuthenticated() && 
+        request.resource.data.participants.hasAny([request.auth.uid]) &&
+        request.resource.data.participants.size() == 2 &&
+        request.resource.data.chatType == 'direct';
+      
+      // Allow update if user is a participant (for lastMessage, unreadCount, etc.)
+      allow update: if isAuthenticated() && isChatParticipant(chatId);
+      
+      // Allow delete only if user is a participant (optional, might want to restrict this)
+      allow delete: if isAuthenticated() && isChatParticipant(chatId);
 
       // Messages subcollection
       match /messages/{messageId} {
-        // Allow read/list if el usuario participa del chat
-        allow read, list: if isChatParticipant(chatId);
-
-        // Allow create if the requester is authenticated, is a participant of the chat, and is the sender
-        allow create: if isAuthenticated() &&
+        // Allow read if user is a chat participant
+        allow read: if isAuthenticated() && isChatParticipant(chatId);
+        
+        // Allow create if user is a chat participant and is the sender
+        allow create: if isAuthenticated() && 
           isChatParticipant(chatId) &&
           request.auth.uid == request.resource.data.senderId;
-
-        // Allow sender full control; receiver may only toggle the 'read' flag
-        allow update: if isAuthenticated() && (
-          request.auth.uid == resource.data.senderId ||
-          (
-            request.auth.uid == resource.data.receiverId &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
-          )
-        );
-        // Delete restricted to sender
-        allow delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
+        
+        // Allow update if user is the sender or receiver (for editing messages, reactions, read status, etc.)
+        allow update: if isAuthenticated() && 
+          isChatParticipant(chatId) &&
+          (request.auth.uid == resource.data.senderId || 
+           request.auth.uid == resource.data.receiverId);
+        
+        // Allow delete if user is the sender
+        allow delete: if isAuthenticated() && 
+          isChatParticipant(chatId) &&
+          request.auth.uid == resource.data.senderId;
       }
     }
     
@@ -86,12 +89,11 @@ service cloud.firestore {
     match /messages/{messageId} {
       // Allow read if the requesting user is authenticated and either:
       // 1. The message has no chatId (legacy)
-      // 2. The user is a participant of the chat
+      // 2. The user is the sender or receiver of the message
       allow read: if isAuthenticated() && (
         resource.data.chatId == null ||
         resource.data.senderId == request.auth.uid ||
-        resource.data.receiverId == request.auth.uid ||
-        isChatParticipant(resource.data.chatId)
+        resource.data.receiverId == request.auth.uid
       );
 
       // Allow create if the requester is authenticated and is the sender
@@ -100,13 +102,13 @@ service cloud.firestore {
 
       // Allow updates/deletes
       // Sender can update/delete any field.
-      // Receiver can update the 'read' field to mark message as read.
+      // Receiver can update the 'read' field or 'readBy' array to mark message as read.
       allow update: if isAuthenticated() && (
         // Sender has full control
         request.auth.uid == resource.data.senderId ||
-        // Receiver may only toggle the 'read' flag
+        // Receiver may update 'read' flag or 'readBy' array
         (request.auth.uid == resource.data.receiverId &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readBy']))
       );
       // Delete restricted to sender
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;

@@ -27,6 +27,7 @@ import { db } from './firebase';
 import { User, Chat, Message, UserDistance } from '@/types';
 import { notificationService } from '@/services/notificationService';
 import { withRetry, safeFirestoreReadSimple as safeFirestoreRead, safeFirestoreWriteSimple as safeFirestoreWrite } from './firestoreErrorHandler';
+import { calculateDistance } from './geolocation';
 
 // Servicios de usuarios
 export const userService = {
@@ -91,19 +92,26 @@ export const userService = {
     offset: number = 0
   ): Promise<UserDistance[]> {
     return await safeFirestoreRead(async () => {
+      console.log(`🔍 [getNearbyUsers] Buscando usuarios cerca de ${latitude}, ${longitude} para usuario ${currentUserId}`);
+      
       // Nota: Para una implementación completa de geolocalización,
       // se recomienda usar GeoFirestore o implementar índices geoespaciales
       const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef,
-        where('id', '!=', currentUserId),
-        limit(50)
-      );
+      
+      // Obtener todos los usuarios (excepto el actual) y filtrar por distancia
+      const q = query(usersRef, limit(100));
       
       const querySnapshot = await getDocs(q);
       const users: UserDistance[] = [];
       
+      console.log(`📊 [getNearbyUsers] Encontrados ${querySnapshot.size} usuarios en total`);
+      
       querySnapshot.forEach((doc) => {
+        // Skip current user
+        if (doc.id === currentUserId) {
+          return;
+        }
+        
         const userData = { id: doc.id, ...doc.data() } as User;
         
         // Check if user has location data
@@ -121,13 +129,37 @@ export const userService = {
               distance 
             });
           }
+        } else {
+          console.log(`⚠️ [getNearbyUsers] Usuario ${doc.id} no tiene datos de ubicación`);
         }
       });
+      
+      console.log(`✅ [getNearbyUsers] Encontrados ${users.length} usuarios dentro de ${maxDistance}km`);
       
       return users
         .sort((a, b) => a.distance - b.distance)
         .slice(offset, offset + 20); // Pagination
     }, [], `getNearbyUsers(${currentUserId})`);
+  },
+
+  // Verificar si un usuario es nuevo (menos de 7 días)
+  isNewUser(userData: User): boolean {
+    if (!userData.createdAt) return false;
+    
+    let createdAt: Date;
+    if (userData.createdAt instanceof Date) {
+      createdAt = userData.createdAt;
+    } else if (typeof userData.createdAt === 'object' && 'toDate' in userData.createdAt) {
+      // Firestore Timestamp object
+      createdAt = userData.createdAt.toDate();
+    } else {
+      // String or number timestamp
+      createdAt = new Date(userData.createdAt as any);
+    }
+    
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    return createdAt > sevenDaysAgo;
   },
 
   // Dar like a un usuario
@@ -136,18 +168,28 @@ export const userService = {
       const userRef = doc(db, 'users', userId);
       const targetUserRef = doc(db, 'users', targetUserId);
       
-      // Add to liked users
-      await updateDoc(userRef, {
-        likedUsers: arrayUnion(targetUserId)
-      });
-      
-      // Get user data (needed for notifications)
+      // Get user data first for validation
       const [currentUserSnap, targetUserSnap] = await Promise.all([
         getDoc(userRef),
         getDoc(targetUserRef)
       ]);
+      
+      if (!currentUserSnap.exists() || !targetUserSnap.exists()) {
+        throw new Error('Usuario no encontrado');
+      }
+      
       const currentUserData = currentUserSnap.data() as User;
       const targetUserData = targetUserSnap.data() as User;
+      
+      // Validación básica: evitar auto-likes
+      if (userId === targetUserId) {
+        throw new Error('No puedes darte like a ti mismo');
+      }
+      
+      // Add to liked users
+      await updateDoc(userRef, {
+        likedUsers: arrayUnion(targetUserId)
+      });
       
       // Check if it's a match (target user also liked this user)
       if (targetUserData.likedUsers?.includes(userId)) {
@@ -193,18 +235,68 @@ export const userService = {
       const userRef = doc(db, 'users', userId);
       const targetUserRef = doc(db, 'users', targetUserId);
       
+      // Get user data first for validation
+      const [currentUserSnap, targetUserSnap] = await Promise.all([
+        getDoc(userRef),
+        getDoc(targetUserRef)
+      ]);
+      
+      if (!currentUserSnap.exists() || !targetUserSnap.exists()) {
+        throw new Error('Usuario no encontrado');
+      }
+      
+      const currentUserData = currentUserSnap.data() as User;
+      const targetUserData = targetUserSnap.data() as User;
+      
+      // Validar restricciones de usuarios nuevos
+      const currentUserIsNew = userService.isNewUser(currentUserData);
+      const targetUserIsNew = userService.isNewUser(targetUserData);
+      
+      // Si el usuario actual es nuevo, no puede dar super like a usuarios existentes
+      if (currentUserIsNew && !targetUserIsNew) {
+        throw new Error('Los usuarios nuevos no pueden dar super like a usuarios existentes');
+      }
+      
+      // Si el usuario objetivo es nuevo, los usuarios existentes no pueden darle super like
+      if (!currentUserIsNew && targetUserIsNew) {
+        throw new Error('Los usuarios existentes no pueden dar super like a usuarios nuevos');
+      }
+      
       // Add to super liked users
       await updateDoc(userRef, {
         superLikedUsers: arrayUnion(targetUserId)
       });
       
-      // Notify target user (they received a super like)
+      // Add to received super likes
       await updateDoc(targetUserRef, {
         receivedSuperLikes: arrayUnion(userId)
       });
       
-      // Super likes always create a match opportunity
-      await chatService.getOrCreateChat(userId, targetUserId);
+      // Check if it's a match (target user also liked this user)
+      if (targetUserData.likedUsers?.includes(userId) || targetUserData.superLikedUsers?.includes(userId)) {
+        // It's a match! Create a chat
+        const chatId = await chatService.getOrCreateChat(userId, targetUserId);
+        
+        // Create match in matches collection
+        const matchesRef = collection(db, 'matches');
+        await addDoc(matchesRef, {
+          user1Id: userId,
+          user2Id: targetUserId,
+          createdAt: serverTimestamp(),
+          isActive: true,
+          lastActivity: serverTimestamp(),
+          chatId
+        });
+
+        // Send match notifications to both users
+        await Promise.all([
+          notificationService.createMatchNotification(userId, { name: targetUserData.name, id: targetUserId }),
+          notificationService.createMatchNotification(targetUserId, { name: currentUserData.name, id: userId })
+        ]);
+      } else {
+        // Send super like notification to target user
+        await notificationService.createSuperLikeNotification(targetUserId, { name: currentUserData.name, id: userId });
+      }
     }, `superLikeUser(${userId}, ${targetUserId})`);
   },
 
@@ -278,9 +370,31 @@ export const userService = {
 
 // Servicios de chat
 export const chatService = {
+
   // Crear o obtener chat entre dos usuarios
   async getOrCreateChat(userId1: string, userId2: string): Promise<string> {
     return await safeFirestoreWrite(async () => {
+      // Validar restricciones de usuarios nuevos antes de crear chat
+      const userRef1 = doc(db, 'users', userId1);
+      const userRef2 = doc(db, 'users', userId2);
+      
+      const [userSnap1, userSnap2] = await Promise.all([
+        getDoc(userRef1),
+        getDoc(userRef2)
+      ]);
+      
+      if (!userSnap1.exists() || !userSnap2.exists()) {
+        throw new Error('Usuario no encontrado');
+      }
+      
+      const userData1 = userSnap1.data() as User;
+      const userData2 = userSnap2.data() as User;
+      
+      // Validación básica: evitar chat consigo mismo
+      if (userId1 === userId2) {
+        throw new Error('No puedes crear un chat contigo mismo');
+      }
+      
       const chatsRef = collection(db, 'chats');
       
       // Buscar chat existente
@@ -401,6 +515,7 @@ export const chatService = {
 
 // Servicios de mensajes
 export const messageService = {
+
   // Enviar mensaje
   async sendMessage(data: {
     chatId: string;
@@ -431,6 +546,45 @@ export const messageService = {
         fileSize,
         location
       } = data;
+      
+      // Validar que el chat existe y obtener participantes
+      const chatRef = doc(db, 'chats', chatId);
+      const chatSnap = await getDoc(chatRef);
+      
+      if (!chatSnap.exists()) {
+        throw new Error('Chat no encontrado');
+      }
+      
+      const chatData = chatSnap.data();
+      const participantIds = chatData.participantIds || [];
+      
+      // Verificar que el sender es un participante
+      if (!participantIds.includes(senderId)) {
+        throw new Error('No tienes permiso para enviar mensajes en este chat');
+      }
+      
+      // Obtener datos de los usuarios para validar restricciones
+      const otherParticipantId = participantIds.find((id: string) => id !== senderId);
+      if (otherParticipantId) {
+        const senderUserRef = doc(db, 'users', senderId);
+        const otherUserRef = doc(db, 'users', otherParticipantId);
+        
+        const [senderSnap, otherSnap] = await Promise.all([
+          getDoc(senderUserRef),
+          getDoc(otherUserRef)
+        ]);
+        
+        if (senderSnap.exists() && otherSnap.exists()) {
+          const senderData = senderSnap.data() as User;
+          const otherData = otherSnap.data() as User;
+          
+          // Validación básica: verificar que no sea el mismo usuario
+          if (senderId === otherParticipantId) {
+            throw new Error('No puedes enviarte mensajes a ti mismo');
+          }
+        }
+      }
+      
       const messagesRef = collection(db, 'chats', chatId, 'messages');
       
       const messageData = {
@@ -452,7 +606,6 @@ export const messageService = {
       const messageRef = await addDoc(messagesRef, messageData);
       
       // Actualizar último mensaje del chat
-      const chatRef = doc(db, 'chats', chatId);
       await updateDoc(chatRef, {
         lastMessage: {
           id: messageRef.id,
@@ -464,15 +617,10 @@ export const messageService = {
       });
       
       // Incrementar contador de no leídos para el receptor
-      const chatSnap = await getDoc(chatRef);
-      if (chatSnap.exists()) {
-        const chatData = chatSnap.data();
-        const receiverId = chatData.participantIds?.find((id: string) => id !== senderId);
-        if (receiverId) {
-          await updateDoc(chatRef, {
-            [`unreadCount.${receiverId}`]: increment(1)
-          });
-        }
+      if (otherParticipantId) {
+        await updateDoc(chatRef, {
+          [`unreadCount.${otherParticipantId}`]: increment(1)
+        });
       }
       
       return messageRef.id;
@@ -639,29 +787,3 @@ export const messageService = {
     }, `deleteMessage(${chatId}, ${messageId})`);
   }
 };
-
-// Función auxiliar para calcular distancia (fórmula de Haversine)
-function calculateDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371; // Radio de la Tierra en kilómetros
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-  
-  return Math.round(distance * 100) / 100; // Redondear a 2 decimales
-}
-
-function toRadians(degrees: number): number {
-  return degrees * (Math.PI / 180);
-}

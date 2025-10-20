@@ -174,7 +174,49 @@ function PaymentFailureContent() {
 
 export default function PaymentFailurePage() {
   return (
-    <Suspense fallback={<div>Cargando...</div>}>
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-red-400 to-red-500 p-8 text-center">
+            <div className="h-16 w-16 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center">
+              <div className="h-8 w-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+            <h1 className="text-2xl font-bold text-white">Cargando información</h1>
+            <p className="text-red-100 mt-2">Obteniendo detalles del pago...</p>
+          </div>
+          
+          <div className="p-8">
+            <div className="space-y-4">
+              {/* Skeleton para el mensaje de error */}
+              <div className="bg-red-50 rounded-lg p-4">
+                <div className="h-4 bg-red-200 rounded animate-pulse mb-2" />
+                <div className="h-3 bg-red-100 rounded animate-pulse w-3/4" />
+              </div>
+              
+              {/* Skeleton para las recomendaciones */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="h-4 bg-gray-200 rounded animate-pulse mb-3" />
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-start">
+                      <div className="w-2 h-2 bg-gray-300 rounded-full mt-2 mr-2" />
+                      <div className="h-3 bg-gray-200 rounded animate-pulse flex-1" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Skeleton para los botones */}
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 bg-gray-200 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
       <PaymentFailureContent />
     </Suspense>
   );

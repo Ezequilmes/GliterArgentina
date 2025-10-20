@@ -18,6 +18,8 @@ const config: Config = {
         primary: {
           DEFAULT: "rgb(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          500: "rgb(var(--primary))",
+          600: "rgb(var(--primary-dark))",
         },
         secondary: {
           DEFAULT: "rgb(var(--secondary))",

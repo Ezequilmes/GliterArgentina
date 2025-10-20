@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { InAppMessage } from '@/services/inAppMessagingService';
 
-// Configuración para exportación estática
-export const dynamic = 'force-static';
-export const revalidate = false;
+// Configuración para contenido dinámico
+export const dynamic = 'force-dynamic';
 
 // Mensajes de ejemplo para desarrollo/testing
 const SAMPLE_MESSAGES: InAppMessage[] = [

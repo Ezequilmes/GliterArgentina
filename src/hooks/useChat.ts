@@ -20,7 +20,8 @@ export interface UseChatReturn {
   // Actions
   sendMessage: (chatId: string, content: string, type?: ChatMessage['type'], replyTo?: string, metadata?: any) => Promise<void>;
   createChat: (participantId: string) => Promise<string>;
-  selectChat: (chatId: string | null) => void;
+  startChat: (otherUserId: string) => Promise<string>;
+  selectChat: (chatId: string | null) => Promise<void>;
   loadMoreMessages: () => Promise<void>;
   markAsRead: (chatId: string) => Promise<void>;
   editMessage: (messageId: string, newContent: string) => Promise<void>;
@@ -50,6 +51,137 @@ export function useChat(): UseChatReturn {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Ref to store a chatId requested before chats are loaded
   const pendingChatIdRef = useRef<string | null>(null);
+
+  // Configurar mensajes cuando se selecciona un chat - MEMOIZED to prevent infinite re-renders
+  const setupMessages = useCallback(async () => {
+    // Verificar que el usuario esté autenticado y no esté inicializando
+    if (!user || initializing) {
+      console.log('🔍 Usuario no autenticado o inicializando, esperando...');
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    // Si no hay chat seleccionado, limpiar mensajes pero no mostrar advertencia
+    // (esto es normal durante la carga inicial)
+    if (!currentChat?.id) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+    
+    const currentChatId = currentChat?.id;
+    const userId = user?.id;
+    
+    if (!currentChatId || !userId) {
+      setMessages([]);
+      setHasMoreMessages(false);
+      setOtherUserTyping(false);
+      lastMessageDoc.current = undefined;
+      
+      // Limpiar suscripciones
+      if (unsubscribeMessagesRef.current) {
+        unsubscribeMessagesRef.current();
+        unsubscribeMessagesRef.current = null;
+      }
+      if (unsubscribeTypingRef.current) {
+        unsubscribeTypingRef.current();
+        unsubscribeTypingRef.current = null;
+      }
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Limpiar suscripciones anteriores
+      if (unsubscribeMessagesRef.current) {
+        unsubscribeMessagesRef.current();
+      }
+      if (unsubscribeTypingRef.current) {
+        unsubscribeTypingRef.current();
+      }
+      
+      // Suscribirse a mensajes
+      unsubscribeMessagesRef.current = chatService.subscribeToMessages(
+        currentChatId,
+        (chatMessages) => {
+          try {
+            setMessages(chatMessages);
+            setLoading(false);
+            setError(null); // Limpiar errores previos al recibir datos exitosos
+            
+            // Marcar como leído automáticamente
+            const unreadMessages = chatMessages.filter(
+              msg => !msg.read && msg.receiverId === userId
+            );
+            if (unreadMessages.length > 0) {
+              chatService.markMessagesAsRead(currentChatId, userId).catch(err => {
+                console.error('Error marking messages as read:', err);
+              });
+            }
+          } catch (err) {
+            console.error('Error processing messages:', err);
+            setError('Error al procesar mensajes');
+            setLoading(false);
+          }
+        },
+        (error) => {
+          console.error('Error en suscripción de mensajes:', error);
+          
+          // Provide more specific error messages based on error type
+          let errorMessage = 'Error al cargar mensajes';
+          
+          try {
+            if (error?.message) {
+              if (error.message.includes('permission') || error.message.includes('denied')) {
+                errorMessage = 'No tienes permisos para acceder a este chat';
+              } else if (error.message.includes('not-found') || error.message.includes('document')) {
+                errorMessage = 'El chat no existe o ha sido eliminado';
+              } else if (error.message.includes('network') || error.message.includes('offline')) {
+                errorMessage = 'Error de conexión. Verifica tu internet';
+              } else if (error.message.includes('unauthenticated') || error.message.includes('auth')) {
+                errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente';
+              } else if (error.message.includes('quota') || error.message.includes('limit')) {
+                errorMessage = 'Límite de uso excedido. Intenta más tarde';
+              } else {
+                errorMessage = `Error al cargar mensajes: ${error.message}`;
+              }
+            }
+          } catch (parseError) {
+            console.error('Error parsing error message:', parseError);
+            errorMessage = 'Error desconocido al cargar mensajes';
+          }
+          
+          setError(errorMessage);
+          setLoading(false);
+        }
+      );
+      
+      // Suscribirse al estado de escritura
+      const currentChatData = currentChat;
+      if (currentChatData) {
+        const otherUser = currentChatData.participants.find((participant: User) => participant.id !== userId);
+        const otherUserId = otherUser?.id;
+        if (otherUserId) {
+          unsubscribeTypingRef.current = chatService.subscribeToTyping(
+            currentChatId,
+            (typingUserId, isTyping) => {
+              // Solo mostrar el estado de escritura si es del otro usuario
+              if (typingUserId === otherUserId) {
+                setOtherUserTyping(isTyping);
+              }
+            }
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Error setting up messages:', err);
+      setError('Error al cargar los mensajes');
+      setLoading(false);
+    }
+  }, [currentChat?.id, user?.id, currentChat, user, initializing]); // Only depend on necessary values to prevent unnecessary re-renders
 
   // Limpiar suscripciones al desmontar
   useEffect(() => {
@@ -87,121 +219,80 @@ export function useChat(): UseChatReturn {
         userId: user.id,
         timestamp: new Date().toISOString()
       });
-      setError(`Chat subscription error: ${error.message}`);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Error al cargar chats';
+      
+      try {
+        if (error?.message) {
+          if (error.message.includes('permission') || error.message.includes('denied')) {
+            errorMessage = 'No tienes permisos para acceder a los chats';
+          } else if (error.message.includes('network') || error.message.includes('offline')) {
+            errorMessage = 'Error de conexión. Verifica tu internet';
+          } else if (error.message.includes('unauthenticated') || error.message.includes('auth')) {
+            errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente';
+          } else if (error.message.includes('quota') || error.message.includes('limit')) {
+            errorMessage = 'Límite de uso excedido. Intenta más tarde';
+          } else {
+            errorMessage = `Error al cargar chats: ${error.message}`;
+          }
+        }
+      } catch (parseError) {
+        console.error('Error parsing chat error message:', parseError);
+        errorMessage = 'Error desconocido al cargar chats';
+      }
+      
+      setError(errorMessage);
       setLoading(false);
     };
 
-    const unsubscribe = chatService.subscribeToUserChatsPopulated(
-      user.id,
-      (chats) => {
-        setChats(chats);
-        setLoading(false);
-        setError(null); // Clear any previous errors on successful data
-        
-        // Handle pending chat selection
-        if (pendingChatIdRef.current) {
-          const pendingChat = chats.find(c => c.id === pendingChatIdRef.current);
-          if (pendingChat) {
-            setCurrentChat(pendingChat);
-            pendingChatIdRef.current = null;
+    let unsubscribe: (() => void) | null = null;
+
+    try {
+      unsubscribe = chatService.subscribeToUserChatsPopulated(
+        user.id,
+        (chats) => {
+          try {
+            setChats(chats || []); // Ensure chats is always an array
+            setLoading(false);
+            setError(null); // Clear any previous errors on successful data
+            
+            // Handle pending chat selection
+            if (pendingChatIdRef.current) {
+              const pendingChat = chats?.find(c => c.id === pendingChatIdRef.current);
+              if (pendingChat) {
+                setCurrentChat(pendingChat);
+                pendingChatIdRef.current = null;
+              }
+            }
+          } catch (err) {
+            console.error('Error processing chats data:', err);
+            setError('Error al procesar datos de chats');
+            setLoading(false);
           }
-        }
-      },
-      handleError // Pass error handler to the service
-    );
+        },
+        handleError // Pass error handler to the service
+      );
+    } catch (subscriptionError) {
+      console.error('Error setting up chat subscription:', subscriptionError);
+      handleError(subscriptionError instanceof Error ? subscriptionError : new Error('Error desconocido'));
+    }
 
     return () => {
-      unsubscribe();
+      if (unsubscribe) {
+        try {
+          unsubscribe();
+        } catch (err) {
+          console.error('Error unsubscribing from chats:', err);
+        }
+      }
     };
   }, [user?.id, initializing]);
 
   // Cargar mensajes del chat actual
   useEffect(() => {
-    const currentChatId = currentChat?.id;
-    const userId = user?.id;
-    
-    if (!currentChatId || !userId) {
-      setMessages([]);
-      setHasMoreMessages(false);
-      setOtherUserTyping(false);
-      lastMessageDoc.current = undefined;
-      
-      // Limpiar suscripciones
-      if (unsubscribeMessagesRef.current) {
-        unsubscribeMessagesRef.current();
-        unsubscribeMessagesRef.current = null;
-      }
-      if (unsubscribeTypingRef.current) {
-        unsubscribeTypingRef.current();
-        unsubscribeTypingRef.current = null;
-      }
-      return;
-    }
-
-    const setupMessages = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Limpiar suscripciones anteriores
-        if (unsubscribeMessagesRef.current) {
-          unsubscribeMessagesRef.current();
-        }
-        if (unsubscribeTypingRef.current) {
-          unsubscribeTypingRef.current();
-        }
-        
-        // Suscribirse a mensajes
-        unsubscribeMessagesRef.current = chatService.subscribeToMessages(
-          currentChatId,
-          (chatMessages) => {
-            setMessages(chatMessages);
-            setLoading(false);
-            setError(null); // Limpiar errores previos al recibir datos exitosos
-            
-            // Marcar como leído automáticamente
-            const unreadMessages = chatMessages.filter(
-              msg => !msg.read && msg.receiverId === userId
-            );
-            if (unreadMessages.length > 0) {
-              chatService.markMessagesAsRead(currentChatId, userId).catch(err => {
-                console.error('Error marking messages as read:', err);
-              });
-            }
-          },
-          (error) => {
-            console.error('Error en suscripción de mensajes:', error);
-            setError(`Error al cargar mensajes: ${error.message}`);
-            setLoading(false);
-          }
-        );
-        
-        // Suscribirse al estado de escritura
-        const currentChatData = currentChat;
-        if (currentChatData) {
-          const otherUser = currentChatData.participants.find((participant: User) => participant.id !== userId);
-          const otherUserId = otherUser?.id;
-          if (otherUserId) {
-            unsubscribeTypingRef.current = chatService.subscribeToTyping(
-              currentChatId,
-              (typingUserId, isTyping) => {
-                // Solo mostrar el estado de escritura si es del otro usuario
-                if (typingUserId === otherUserId) {
-                  setOtherUserTyping(isTyping);
-                }
-              }
-            );
-          }
-        }
-      } catch (err) {
-        console.error('Error setting up messages:', err);
-        setError('Error al cargar los mensajes');
-        setLoading(false);
-      }
-    };
-
     setupMessages();
-  }, [currentChat?.id, user?.id]);
+  }, [currentChat?.id, user?.id, initializing]); // Dependencias específicas en lugar de setupMessages
 
   // Enviar mensaje
   const sendMessage = useCallback(async (
@@ -273,24 +364,117 @@ export function useChat(): UseChatReturn {
   }, [user?.id]);
 
   // Seleccionar chat
-  const selectChat = useCallback((chatId: string | null) => {
-    if (chatId === null) {
-      setCurrentChat(null);
-      setError(null);
-      pendingChatIdRef.current = null;
-      return;
-    }
+  const selectChat = useCallback(async (chatId: string | null) => {
+    try {
+      console.log('🔄 selectChat called with:', { chatId, currentChatId: currentChat?.id });
+      
+      if (chatId === null) {
+        setCurrentChat(null);
+        setError(null);
+        pendingChatIdRef.current = null;
+        return;
+      }
 
-    const chat = chats.find(c => c.id === chatId);
-    if (chat) {
-      setCurrentChat(chat);
+      // If it's the same chat, don't reload
+      if (currentChat?.id === chatId) {
+        console.log('📌 Same chat selected, skipping reload');
+        return;
+      }
+
       setError(null);
-      pendingChatIdRef.current = null;
-    } else {
-      // Store the chatId to select once chats are loaded
-      pendingChatIdRef.current = chatId;
+
+      // Validate user is authenticated
+      if (!user?.id) {
+        console.error('❌ User not authenticated');
+        setError('Usuario no autenticado');
+        return;
+      }
+
+      const chat = chats.find(c => c.id === chatId);
+      if (chat) {
+        setCurrentChat(chat);
+        pendingChatIdRef.current = null;
+      } else {
+        // If chat not found in loaded chats, try to create/get it
+        if (chatId.startsWith('direct_')) {
+          // Extract userIds from chatId format: direct_userId1_userId2
+          const parts = chatId.split('_');
+          if (parts.length === 3) {
+            const [, userId1, userId2] = parts;
+            
+            // Validate that current user is one of the participants
+            if (userId1 !== user.id && userId2 !== user.id) {
+              console.error('❌ User not authorized for this chat:', { chatId, userId: user.id });
+              setError('No tienes permisos para acceder a este chat');
+              return;
+            }
+            
+            const otherUserId = userId1 === user.id ? userId2 : userId1;
+            
+            console.log('🔧 Creating chat between users:', { userId1, userId2, currentUser: user.id, otherUser: otherUserId });
+            
+            // Set loading state during chat creation
+            setLoading(true);
+            
+            try {
+              // Ensure the chat document exists
+              const createdChatId = await chatService.getOrCreateChat(user.id, otherUserId);
+              console.log('✅ Chat created/verified successfully:', { requestedChatId: chatId, createdChatId });
+              
+              // Verify the created chat ID matches the requested one
+              if (createdChatId !== chatId) {
+                console.warn('⚠️ Created chat ID differs from requested:', { requested: chatId, created: createdChatId });
+              }
+              
+              // Store the chatId to select once chats are loaded
+              pendingChatIdRef.current = chatId;
+              
+              // Loading will be set to false when the chat subscription updates
+            } catch (createError) {
+              console.error('❌ Error creating/getting chat:', {
+                error: createError,
+                chatId,
+                userId1,
+                userId2,
+                currentUser: user.id
+              });
+              
+              // Provide more specific error messages
+              if (createError instanceof Error) {
+                if (createError.message.includes('permission')) {
+                  setError('No tienes permisos para crear este chat');
+                } else if (createError.message.includes('network')) {
+                  setError('Error de conexión. Verifica tu internet');
+                } else {
+                  setError(`Error al crear el chat: ${createError.message}`);
+                }
+              } else {
+                setError('Error desconocido al crear el chat');
+              }
+              setLoading(false);
+            }
+          } else {
+            console.error('❌ Invalid direct chat ID format:', chatId);
+            setError('Formato de chat inválido');
+            setLoading(false);
+          }
+        } else {
+          // Store the chatId to select once chats are loaded
+          pendingChatIdRef.current = chatId;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error in selectChat:', {
+        error,
+        chatId,
+        userId: user?.id,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      setError(error instanceof Error ? `Error al seleccionar el chat: ${error.message}` : 'Error desconocido al seleccionar el chat');
+      setLoading(false);
     }
-  }, [chats]);
+  }, [chats, user?.id, currentChat?.id]);
 
   // Cargar más mensajes
   const loadMoreMessages = useCallback(async () => {
@@ -450,7 +634,7 @@ export function useChat(): UseChatReturn {
     if (!user?.id) return 0;
 
     return chats.reduce((total, chat) => {
-      return total + (chat.unreadCount[user.id] || 0);
+      return total + (chat.unreadCount?.[user.id] || 0);
     }, 0);
   }, [chats, user?.id]);
 
@@ -458,6 +642,37 @@ export function useChat(): UseChatReturn {
   const clearError = useCallback(() => {
     setError(null);
   }, []);
+
+  // Start chat - more robust version of createChat
+  const startChat = useCallback(async (otherUserId: string): Promise<string> => {
+    if (!user?.id) throw new Error('Usuario no autenticado');
+    if (!otherUserId) throw new Error('ID de usuario requerido');
+    if (otherUserId === user.id) throw new Error('No puedes iniciar un chat contigo mismo');
+
+    try {
+      setError(null);
+      const chatId = await chatService.getOrCreateChat(user.id, otherUserId);
+      
+      // Wait a moment for the chat to be created and appear in the subscription
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Try to find the chat in the current chats list
+      const existingChat = chats.find(c => c.id === chatId);
+      if (existingChat) {
+        setCurrentChat(existingChat);
+      } else {
+        // Store for when chats are loaded
+        pendingChatIdRef.current = chatId;
+      }
+      
+      return chatId;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al iniciar chat';
+      setError(errorMessage);
+      console.error('Error starting chat:', err);
+      throw err;
+    }
+  }, [user?.id, chats]);
 
   return {
     chats,
@@ -470,6 +685,7 @@ export function useChat(): UseChatReturn {
     otherUserTyping,
     sendMessage,
     createChat,
+    startChat,
     selectChat,
     loadMoreMessages,
     markAsRead,

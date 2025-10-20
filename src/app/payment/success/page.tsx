@@ -84,10 +84,58 @@ function PaymentSuccessContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-pink-500 mx-auto mb-4" />
-          <p className="text-gray-600">Verificando tu pago...</p>
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center space-y-6">
+            {/* Animated Payment Icon */}
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500/20 to-pink-500/20 border border-green-500/30 flex items-center justify-center mx-auto animate-pulse">
+              <CheckCircle className="w-10 h-10 text-green-500 animate-bounce" />
+            </div>
+
+            {/* Loading Dots */}
+            <div className="flex justify-center space-x-2">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-2 h-2 bg-green-500 rounded-full animate-bounce"
+                  style={{ animationDelay: `${i * 0.2}s` }}
+                />
+              ))}
+            </div>
+
+            {/* Title and Message */}
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-foreground">
+                Verificando tu pago
+              </h3>
+              <p className="text-muted-foreground">
+                Confirmando los detalles de tu transacción...
+              </p>
+              <p className="text-sm text-muted-foreground/60">
+                Esto solo tomará unos segundos
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-muted rounded-full h-2">
+              <div 
+                className="h-2 bg-gradient-to-r from-green-500 to-pink-500 rounded-full animate-pulse"
+                style={{ width: '80%', animation: 'pulse 2s infinite' }}
+              />
+            </div>
+
+            {/* Payment ID if available */}
+            {paymentId && (
+              <div className="text-xs text-muted-foreground/60 font-mono bg-muted/50 px-3 py-2 rounded">
+                ID: {paymentId}
+              </div>
+            )}
+
+            {/* Tip */}
+            <div className="text-xs text-muted-foreground/60 italic">
+              💳 Verificando el estado de tu pago con Mercado Pago
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -195,10 +243,48 @@ function PaymentSuccessContent() {
 export default function PaymentSuccessPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando...</p>
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center space-y-6">
+            {/* Animated Loading Icon */}
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-500/20 border border-pink-500/30 flex items-center justify-center mx-auto animate-pulse">
+              <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
+            </div>
+
+            {/* Loading Dots */}
+            <div className="flex justify-center space-x-2">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-2 h-2 bg-pink-500 rounded-full animate-bounce"
+                  style={{ animationDelay: `${i * 0.2}s` }}
+                />
+              ))}
+            </div>
+
+            {/* Title and Message */}
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-foreground">
+                Cargando página
+              </h3>
+              <p className="text-muted-foreground">
+                Preparando la información de tu pago...
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-muted rounded-full h-2">
+              <div 
+                className="h-2 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full animate-pulse"
+                style={{ width: '60%', animation: 'pulse 2s infinite' }}
+              />
+            </div>
+
+            {/* Tip */}
+            <div className="text-xs text-muted-foreground/60 italic">
+              🎉 Preparando tu experiencia premium
+            </div>
+          </div>
         </div>
       </div>
     }>

@@ -119,8 +119,45 @@ export function VerificationPanel({ className = '' }: VerificationPanelProps) {
   if (loading) {
     return (
       <Card className={`p-6 ${className}`}>
-        <div className="flex items-center justify-center">
-          <Loading size="lg" />
+        <div className="text-center space-y-6">
+          {/* Animated Shield Icon */}
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center mx-auto animate-pulse">
+            <Shield className="w-10 h-10 text-blue-500 animate-bounce" />
+          </div>
+
+          {/* Loading Dots */}
+          <div className="flex justify-center space-x-2">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                style={{ animationDelay: `${i * 0.2}s` }}
+              />
+            ))}
+          </div>
+
+          {/* Title and Message */}
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-foreground">
+              Cargando verificaciones
+            </h3>
+            <p className="text-muted-foreground">
+              Obteniendo el estado de tus verificaciones...
+            </p>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-muted rounded-full h-2">
+            <div 
+              className="h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"
+              style={{ width: '70%', animation: 'pulse 2s infinite' }}
+            />
+          </div>
+
+          {/* Tip */}
+          <div className="text-xs text-muted-foreground/60 italic">
+            💡 Tip: Las verificaciones aumentan tu confiabilidad en la plataforma
+          </div>
         </div>
       </Card>
     );

@@ -12,3 +12,4 @@ export { usePushNotifications } from './usePushNotifications';
 export { useRealtime } from './useRealtime';
 export { useServiceWorker } from './useServiceWorker';
 export { useSounds } from './useSounds';
+export { useUserStats } from './useUserStats';

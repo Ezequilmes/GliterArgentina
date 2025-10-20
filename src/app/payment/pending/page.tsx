@@ -179,10 +179,30 @@ function PaymentPendingContent() {
             <button
               onClick={checkPaymentStatus}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center justify-center disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center justify-center disabled:opacity-50 relative overflow-hidden"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Verificando...' : 'Verificar Estado'}
+              {loading && (
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-blue-700/20 animate-pulse" />
+              )}
+              <RefreshCw className={`h-4 w-4 mr-2 z-10 ${loading ? 'animate-spin' : ''}`} />
+              <span className="z-10">
+                {loading ? (
+                  <span className="flex items-center">
+                    Verificando
+                    <span className="ml-1 flex space-x-1">
+                      {[0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          className="w-1 h-1 bg-white rounded-full animate-bounce"
+                          style={{ animationDelay: `${i * 0.2}s` }}
+                        />
+                      ))}
+                    </span>
+                  </span>
+                ) : (
+                  'Verificar Estado'
+                )}
+              </span>
             </button>
             
             <Link

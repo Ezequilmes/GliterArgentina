@@ -46,8 +46,58 @@ export default function MatchesPage() {
     return (
       <ProtectedRoute>
         <AppLayout>
-          <div className="flex items-center justify-center min-h-screen">
-            <Loading size="lg" />
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div className="text-center max-w-md w-full">
+              {/* Animated Hearts */}
+              <div className="relative mb-6">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-accent-start/20 to-accent-end/20 rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-accent-start to-accent-end rounded-full flex items-center justify-center animate-pulse">
+                    <Heart className="w-8 h-8 text-white fill-current animate-bounce" />
+                  </div>
+                </div>
+                {/* Floating hearts */}
+                <div className="absolute -top-2 -right-2 w-4 h-4 text-accent-start animate-bounce" style={{ animationDelay: '0.5s' }}>
+                  <Heart className="w-full h-full fill-current" />
+                </div>
+                <div className="absolute -bottom-2 -left-2 w-3 h-3 text-accent-end animate-bounce" style={{ animationDelay: '1s' }}>
+                  <Heart className="w-full h-full fill-current" />
+                </div>
+              </div>
+
+              {/* Loading Dots */}
+              <div className="flex justify-center space-x-1 mb-4">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 bg-gradient-to-r from-accent-start to-accent-end rounded-full animate-bounce"
+                    style={{ animationDelay: `${i * 0.3}s` }}
+                  />
+                ))}
+              </div>
+
+              {/* Title */}
+              <h3 className="text-xl font-bold text-foreground mb-2">
+                Cargando tus matches
+              </h3>
+
+              {/* Message */}
+              <p className="text-muted-foreground mb-4">
+                Buscando todas las personas que te han gustado...
+              </p>
+
+              {/* Progress Indicator */}
+              <div className="w-full bg-muted rounded-full h-1 mb-4 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-accent-start to-accent-end rounded-full animate-pulse" 
+                     style={{ width: '70%' }} />
+              </div>
+
+              {/* Tip */}
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground">
+                  💕 <strong>Tip:</strong> ¡Los matches son el primer paso hacia algo especial!
+                </p>
+              </div>
+            </div>
           </div>
         </AppLayout>
       </ProtectedRoute>

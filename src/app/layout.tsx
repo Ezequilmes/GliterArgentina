@@ -9,7 +9,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import PWAInitializer from "@/components/PWAInitializer";
 
 import InAppMessageHandler from "@/components/notifications/InAppMessageHandler";
-import { InAppMessageTester } from "@/components/notifications/InAppMessageTester";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -96,7 +95,6 @@ export default function RootLayout({
               <AuthProvider>
                 <PWAInitializer />
                 <InAppMessageHandler />
-                <InAppMessageTester />
                 {children}
                 <Toaster
                   position="top-center"

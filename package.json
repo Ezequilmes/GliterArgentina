@@ -31,6 +31,7 @@
     "logs:functions": "firebase functions:log --project gliter-argentina"
   },
   "dependencies": {
+    "@dataconnect/generated": "file:src/dataconnect-generated",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

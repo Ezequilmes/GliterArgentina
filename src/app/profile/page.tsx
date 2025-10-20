@@ -1,239 +1,270 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { User } from '@/types';
+import { ArrowLeft, Edit3, MapPin, Heart, Eye, Users, Camera, Check, X, Shield } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { AppLayout, Header } from '@/components/layout';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { Header } from '@/components/layout/Header';
 import { ProfileForm } from '@/components/profile/ProfileForm';
-import { UserCard } from '@/components/profile';
-import { VerificationPanel } from '@/components/verification';
-import { Avatar } from '@/components/ui';
-import { 
-  Settings, 
-  MapPin,
-  Calendar,
-  ArrowLeft
-} from 'lucide-react';
-import { analyticsService } from '@/services/analyticsService';
+import { UserCard } from '@/components/profile/UserCard';
+import { Avatar } from '@/components/ui/Avatar';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserStats } from '@/hooks/useUserStats';
+import { getUserProfilePhoto } from '@/lib/userUtils';
 
 export default function ProfilePage() {
   const { user } = useAuth();
+  const { stats, loading: statsLoading } = useUserStats();
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
 
-  const handleSaveProfile = async (profileData: User) => {
-    try {
-      // Aquí iría la lógica para guardar el perfil
-      console.log('Saving profile:', profileData);
-      
-      // Track profile updated event
-      try {
-        analyticsService.trackProfileUpdated();
-      } catch (analyticsError) {
-        console.error('Error tracking profile updated:', analyticsError);
-      }
-      
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error saving profile:', error);
-    }
+  const handleSaveProfile = () => {
+    setIsEditing(false);
   };
 
-  const handlePhotoUpload = async (file: File) => {
-    try {
-      // Aquí iría la lógica para subir la foto
-      console.log('Uploading photo:', file);
-    } catch (error) {
-      console.error('Error uploading photo:', error);
-    }
+  const handlePhotoUpload = (photoUrl: string) => {
+    // Handle photo upload
+    console.log('Photo uploaded:', photoUrl);
   };
 
-  if (isEditing) {
-    return (
-      <ProtectedRoute requireAuth>
-        <AppLayout>
-          <div className="space-y-6">
-            <Header
-              title="Editar Perfil"
-              backHref="/profile"
-              onBack={() => setIsEditing(false)}
-            />
-            {user && (
-              <ProfileForm
-                user={user}
-                onSave={handleSaveProfile}
-              />
-            )}
-          </div>
-        </AppLayout>
-      </ProtectedRoute>
-    );
+  if (!user) {
+    return null;
   }
 
+  // Calcular el porcentaje de completitud del perfil
+  const calculateProfileCompletion = () => {
+    let completed = 0;
+    let total = 5; // Total de elementos a completar
+
+    if (user.name) completed++;
+    if (user.age) completed++;
+    if (user.bio) completed++;
+    if (getUserProfilePhoto(user)) completed++; // Usar getUserProfilePhoto en lugar de user.profilePhoto
+    if (user.interests && user.interests.length > 0) completed++;
+
+    return Math.round((completed / total) * 100);
+  };
+
+  const profileCompletion = calculateProfileCompletion();
+
   return (
-    <ProtectedRoute requireAuth>
-      <div className="min-h-screen bg-background text-foreground">
-        {/* Header con botones de navegación */}
-        <div className="fixed top-20 left-0 right-0 z-40 bg-card px-6 py-4 border-b border-border">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Volver</span>
-            </button>
-            
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center space-x-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="font-medium">Editar</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Contenido principal con fondo redondeado */}
-        <div className="bg-card rounded-t-[2rem] min-h-screen px-6 pt-20 pb-24">
-          {/* Información del usuario */}
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-foreground mb-2">
-              {user?.name || 'Ezequiel'}
-            </h2>
-            
-            <div className="flex items-center justify-center space-x-6 text-muted-foreground mb-6">
-              <div className="flex items-center space-x-1">
-                <Calendar className="w-4 h-4 text-primary" />
-                <span className="font-medium">{user?.age || '30'} años</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <MapPin className="w-4 h-4 text-primary" />
-                <span className="font-medium">
-                  {user?.location?.city && user?.location?.country 
-                    ? `${user.location.city}, ${user.location.country}`
-                    : 'Buenos Aires, Argentina'
-                  }
-                </span>
-              </div>
+    <ProtectedRoute>
+      <AppLayout>
+        <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+          {/* Header fijo */}
+          <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200">
+            <div className="flex items-center justify-between p-4">
+              <button
+                onClick={() => router.back()}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span>Volver</span>
+              </button>
+              
+              <h1 className="text-lg font-semibold text-gray-800">Mi Perfil</h1>
+              
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-2 text-pink-600 hover:text-pink-700 transition-colors"
+              >
+                <Edit3 className="w-5 h-5" />
+                <span>Editar</span>
+              </button>
             </div>
+          </div>
 
-            {/* Avatar con gradiente circular */}
-            <div className="relative inline-block mb-8">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-accent-start via-accent-end to-accent-end p-1 shadow-lg">
-                <div className="w-full h-full rounded-full bg-card p-1">
+          {/* Contenido principal con padding superior ajustado */}
+          <div className="pt-24 pb-20">
+            {/* Información del usuario */}
+            <div className="px-4 mb-6">
+              <div className="text-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-800">{user.name}</h2>
+                <p className="text-gray-600">
+                  {user.age && `${user.age} años`}
+                  {user.location?.city && ` • ${user.location.city}`}
+                </p>
+              </div>
+
+              {/* Avatar */}
+              <div className="flex justify-center mb-6">
+                <div className="relative">
                   <Avatar
-                    src={user?.photos?.[0]}
-                    fallback={user?.name?.charAt(0) || 'E'}
-                    className="w-full h-full"
+                    src={getUserProfilePhoto(user)}
+                    alt={user.name}
+                    size="xl"
+                    className="border-4 border-white shadow-lg"
+                  />
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="absolute bottom-0 right-0 bg-pink-500 text-white p-2 rounded-full shadow-lg hover:bg-pink-600 transition-colors"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Estadísticas */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+                  <div className="flex items-center justify-center mb-2">
+                    <Users className="w-5 h-5 text-pink-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {statsLoading ? '...' : stats.matchesCount}
+                  </div>
+                  <div className="text-sm text-gray-600">Matches</div>
+                </div>
+                
+                <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+                  <div className="flex items-center justify-center mb-2">
+                    <Eye className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {statsLoading ? '...' : stats.visitsCount}
+                  </div>
+                  <div className="text-sm text-gray-600">Visitas</div>
+                </div>
+                
+                <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+                  <div className="flex items-center justify-center mb-2">
+                    <Heart className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {statsLoading ? '...' : stats.likesCount}
+                  </div>
+                  <div className="text-sm text-gray-600">Likes</div>
+                </div>
+              </div>
+
+              {/* Vista previa del perfil */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Vista previa</h3>
+                <div className="max-w-sm mx-auto">
+                  <UserCard
+                    user={user}
+                    distance={0}
+                    onLike={() => {}}
+                    onPass={() => {}}
+                    onSuperLike={() => {}}
+                    showActions={false}
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Estadísticas */}
-            <div className="grid grid-cols-3 gap-8 mb-8">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground mb-1">0</div>
-                <div className="text-sm text-muted-foreground font-medium">Matches</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground mb-1">0</div>
-                <div className="text-sm text-muted-foreground font-medium">Visits</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground mb-1">0</div>
-                <div className="text-sm text-muted-foreground font-medium">Likes</div>
-              </div>
-            </div>
-
-            {/* Vista previa del perfil */}
-            <div className="mb-8">
-              <h3 className="text-xl font-bold text-foreground mb-4 text-left">Vista previa de tu perfil</h3>
-              <p className="text-sm text-muted-foreground mb-4 text-left">Así es como otros usuarios ven tu perfil:</p>
-              <div className="flex justify-center">
-                <div className="max-w-sm w-full">
-                  {user && (
-                    <UserCard 
-                      user={user}
-                      showActions={false}
-                      className="shadow-lg"
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Completar perfil */}
-            <div className="text-left mb-8">
-              <h3 className="text-xl font-bold text-foreground mb-6">Completar Perfil</h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <span className="text-foreground font-medium">Información básica</span>
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center">
-                    <span className="text-success-foreground text-sm">✓</span>
-                  </div>
-                </div>
+              {/* Completar Perfil */}
+              <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Completar Perfil</h3>
                 
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <span className="text-foreground font-medium">Foto de perfil</span>
-                  <div className="bg-warning text-warning-foreground px-3 py-1 rounded-full text-sm font-medium">
-                    Pendiente
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600">Progreso</span>
+                    <span className="text-sm font-medium text-gray-800">{profileCompletion}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-pink-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${profileCompletion}%` }}
+                    ></div>
                   </div>
                 </div>
-                
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <span className="text-foreground font-medium">Biografía</span>
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center">
-                    <span className="text-success-foreground text-sm">✓</span>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Información básica</span>
+                    <div className="flex items-center gap-1">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span className="text-sm text-green-600">Completado</span>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <span className="text-foreground font-medium">Intereses</span>
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center">
-                    <span className="text-success-foreground text-sm">✓</span>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Foto de perfil</span>
+                    <div className="flex items-center gap-1">
+                      {getUserProfilePhoto(user) ? (
+                        <>
+                          <Check className="w-4 h-4 text-green-500" />
+                          <span className="text-sm text-green-600">Completado</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-4 h-4 text-orange-500" />
+                          <span className="text-sm text-orange-600">Pendiente</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Intereses</span>
+                    <div className="flex items-center gap-1">
+                      {user.interests && user.interests.length > 0 ? (
+                        <>
+                          <Check className="w-4 h-4 text-green-500" />
+                          <span className="text-sm text-green-600">Completado</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-4 h-4 text-orange-500" />
+                          <span className="text-sm text-orange-600">Pendiente</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Panel de Verificación */}
-            <div className="mb-8">
-              <VerificationPanel />
-            </div>
-
-          </div>
-        </div>
-      </div>
-        
-        {/* Modal de edición */}
-        {isEditing && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-foreground">Editar Perfil</h2>
-                  <button 
-                    onClick={() => setIsEditing(false)}
-                    className="w-8 h-8 bg-muted rounded-full flex items-center justify-center hover:bg-muted/80"
+              {/* Verificaciones - Simplificado */}
+              <div className="bg-white rounded-xl p-4 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Verificación</h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-blue-500" />
+                    <div>
+                      <p className="text-sm text-gray-600">Estado de verificación</p>
+                      <span className="text-sm font-medium">
+                        {user.isVerified ? 'Cuenta verificada' : 'Sin verificar'}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => router.push('/verification')}
+                    className="px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600 transition-colors"
                   >
-                    ✕
+                    {user.isVerified ? 'Ver estado' : 'Verificar'}
                   </button>
                 </div>
-                {user && (
-                  <ProfileForm 
+              </div>
+            </div>
+          </div>
+
+          {/* Modal de edición */}
+          {isEditing && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+                <div className="p-4 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-800">Editar Perfil</h2>
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <ProfileForm
                     user={user}
                     onSave={handleSaveProfile}
                   />
-                )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      </AppLayout>
     </ProtectedRoute>
   );
 }

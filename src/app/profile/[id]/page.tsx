@@ -174,8 +174,53 @@ export default function UserProfilePage() {
     return (
       <ProtectedRoute requireAuth>
         <AppLayout>
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <Loading variant="pulse" size="lg" text="Cargando perfil..." />
+          <div className="flex items-center justify-center min-h-[60vh] px-4">
+            <div className="text-center max-w-md w-full">
+              {/* Animated Icon */}
+              <div className="relative mb-6">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/20 to-secondary/20 rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center animate-pulse">
+                    <Heart className="w-8 h-8 text-white animate-bounce" />
+                  </div>
+                </div>
+                <div className="absolute inset-0 w-20 h-20 mx-auto border-4 border-primary/30 rounded-full animate-spin" 
+                     style={{ animationDuration: '3s' }} />
+              </div>
+
+              {/* Loading Dots */}
+              <div className="flex justify-center space-x-1 mb-4">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                    style={{ animationDelay: `${i * 0.2}s` }}
+                  />
+                ))}
+              </div>
+
+              {/* Title */}
+              <h3 className="text-xl font-bold text-foreground mb-2">
+                Cargando perfil
+              </h3>
+
+              {/* Message */}
+              <p className="text-muted-foreground mb-4">
+                Obteniendo información del usuario...
+              </p>
+
+              {/* Progress Indicator */}
+              <div className="w-full bg-muted rounded-full h-1 mb-4 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-primary to-secondary rounded-full animate-pulse" 
+                     style={{ width: '60%' }} />
+              </div>
+
+              {/* Tip */}
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground">
+                  💡 <strong>Tip:</strong> Los perfiles completos tienen más posibilidades de hacer match
+                </p>
+              </div>
+            </div>
           </div>
         </AppLayout>
       </ProtectedRoute>

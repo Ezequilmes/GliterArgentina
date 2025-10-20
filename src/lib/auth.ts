@@ -70,8 +70,7 @@ const createUserProfile = async (user: FirebaseUser, additionalData: Partial<Use
     const createdAt = serverTimestamp();
 
     try {
-      await setDoc(userRef, {
-        id: user.uid,
+      await setDoc(userRef, {        id: user.uid,
         name: displayName || additionalData.name || '',
         email,
         photos: photoURL ? [photoURL] : [],
@@ -104,8 +103,13 @@ const createUserProfile = async (user: FirebaseUser, additionalData: Partial<Use
             matches: true,
             likes: true,
             marketing: false
+,
           }
-        }
+        },
+        likedUsers: [],
+        superLikedUsers: [],
+        receivedSuperLikes: [],
+        passedUsers: []
       });
     } catch (error) {
       console.error('Error creating user profile:', error);

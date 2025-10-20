@@ -5,7 +5,7 @@ import { DiscoverCard } from './DiscoverCard';
 import { Button, Loading } from '@/components/ui';
 import RippleButton from '@/components/ui/RippleButton';
 import { cn } from '@/lib/utils';
-import { Heart, X, Star, RotateCcw } from 'lucide-react';
+import { Heart, X, Star, RotateCcw, RefreshCw } from 'lucide-react';
 import type { UserDistance } from '@/types';
 
 interface DiscoverStackProps {
@@ -233,12 +233,29 @@ export const DiscoverStack: React.FC<DiscoverStackProps> = ({
   }
 
   if (currentIndex >= users.length) {
-    return (
-      <div className={cn('flex flex-col items-center justify-center py-12', className)}>
-        <Loading variant="pulse" icon="heart" size="lg" text="Cargando más perfiles..." />
-      </div>
-    );
-  }
+      return (
+        <div className={cn('flex flex-col items-center justify-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 rounded-xl shadow-lg', className)}>
+          <div className="relative flex items-center justify-center mb-6">
+            <Heart className="w-16 h-16 text-red-500 animate-heartbeat" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-20 h-20 border-4 border-red-300 dark:border-red-700 rounded-full animate-spin-slow" style={{ borderTopColor: 'transparent' }}></div>
+            </div>
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 animate-pulse-fast">
+            Cargando más perfiles...
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 text-center max-w-xs mb-6 animate-fade-in-up">
+            Buscando nuevas conexiones para ti. ¡La espera valdrá la pena!
+          </p>
+          <div className="w-full max-w-xs bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-red-400 to-red-600 h-2.5 rounded-full animate-progress-bar"></div>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-500 text-center max-w-xs animate-fade-in-up delay-200">
+            💡 Consejo: Cuantos más detalles añadas a tu perfil, ¡más fácil será encontrar a tu match ideal!
+          </p>
+        </div>
+      );
+    }
 
   return (
     <div className={cn('w-full max-w-md mx-auto px-4 sm:px-0', className)}>
@@ -349,7 +366,10 @@ export const DiscoverStack: React.FC<DiscoverStackProps> = ({
       {/* Loading Indicator */}
       {isLoading && (
         <div className="flex justify-center mt-4">
-          <Loading variant="dots" size="sm" />
+          <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span className="text-sm">Cargando...</span>
+          </div>
         </div>
       )}
     </div>

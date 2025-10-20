@@ -135,8 +135,48 @@ export function ChatList({
 
   if (isLoading) {
     return (
-      <div className={cn("h-full flex items-center justify-center", className)}>
-        <Loading size="lg" />
+      <div className={cn("h-full flex flex-col bg-background", className)}>
+        {/* Header Skeleton */}
+        <div className="p-4 border-b border-border">
+          <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4 w-32" />
+          <div className="relative">
+            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+          </div>
+        </div>
+
+        {/* Chat List Skeleton */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="divide-y divide-border">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="p-4">
+                <div className="flex items-center space-x-3">
+                  {/* Avatar Skeleton */}
+                  <div className="relative">
+                    <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse" />
+                  </div>
+
+                  {/* Content Skeleton */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24" />
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-12" />
+                    </div>
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Loading indicator at bottom */}
+        <div className="p-4 border-t border-border">
+          <div className="flex items-center justify-center space-x-2 text-muted-foreground">
+            <MessageCircle className="w-4 h-4 animate-pulse" />
+            <span className="text-sm">Cargando conversaciones...</span>
+          </div>
+        </div>
       </div>
     );
   }

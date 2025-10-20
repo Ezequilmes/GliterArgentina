@@ -12,7 +12,7 @@ import { LocationStatus } from '@/components/location';
 import { useToast } from '@/components/ui/Toast';
 import ActionFeedback from '@/components/ui/ActionFeedback';
 import { UserCard } from '@/components/profile';
-import { Settings, Filter, MapPin, User as UserIcon, MessageCircle } from 'lucide-react';
+import { Settings, Filter, MapPin, User as UserIcon, MessageCircle, Users, Shield, RefreshCw, AlertCircle, Check, AlertTriangle } from 'lucide-react';
 import { userService } from '@/lib/firestore';
 import { matchService } from '@/lib/matchService';
 import { chatService } from '@/services/chatService';
@@ -23,9 +23,25 @@ import type { User, UserDistance } from '@/types';
 
 export default function DiscoverPage() {
   const { user } = useAuth();
-  const { location, error: locationError, loading: locationLoading } = useGeolocation();
+  const { 
+    location, 
+    error: locationError, 
+    loading: locationLoading,
+    permissionState,
+    retryCount,
+    isWatching,
+    getCurrentLocation,
+    watchLocation,
+    stopWatching
+  } = useGeolocation({ enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 });
   const { addToast } = useToast();
   const router = useRouter();
+  
+  // Debug logs at component initialization
+  console.log('🚀 DiscoverPage component initialized');
+  console.log('👤 Auth user:', user);
+  console.log('📍 Geolocation:', { location, locationLoading, locationError, permissionState, retryCount });
+  
   const [currentUserData, setCurrentUserData] = useState<User | null>(null);
   const [users, setUsers] = useState<UserDistance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,15 +63,95 @@ export default function DiscoverPage() {
     interests: []
   });
 
+  // Handle location retry
+  const handleLocationRetry = async () => {
+    try {
+      await getCurrentLocation();
+      addToast({ 
+        title: 'Ubicación actualizada', 
+        message: 'Tu ubicación ha sido obtenida correctamente', 
+        type: 'success' 
+      });
+    } catch (error) {
+      console.error('Error retrying location:', error);
+      addToast({ 
+        title: 'Error de ubicación', 
+        message: 'No se pudo obtener tu ubicación. Verifica los permisos.', 
+        type: 'error' 
+      });
+    }
+  };
+
+  // Handle permission request
+  const handleRequestPermission = async () => {
+    try {
+      // Try to get location which will trigger permission request
+      await getCurrentLocation();
+    } catch (error) {
+      console.error('Permission request failed:', error);
+      addToast({ 
+        title: 'Permisos requeridos', 
+        message: 'Por favor, permite el acceso a tu ubicación en la configuración del navegador.', 
+        type: 'warning' 
+      });
+    }
+  };
+
   useEffect(() => {
+    console.log('🔍 DiscoverPage useEffect triggered');
+    console.log('👤 User:', user ? `authenticated (${user.id})` : 'not authenticated');
+    console.log('📍 Location:', location ? `${location.latitude}, ${location.longitude}` : 'not available');
+    console.log('🔄 Loading state:', isLoading);
+    console.log('🌐 Location loading:', locationLoading);
+    console.log('❌ Location error:', locationError);
+    console.log('🔐 Permission state:', permissionState);
+    
+    if (!user) {
+      console.log('❌ No user authenticated');
+      return;
+    }
+
+    if (!location) {
+      console.log('❌ No location available');
+      if (locationError) {
+        console.log('📍 Location error details:', locationError);
+      }
+      // If no location and permission is granted or prompt, try to get it
+      if ((permissionState === 'granted' || permissionState === 'prompt') && !locationLoading) {
+        console.log('🔄 Attempting to get current location...');
+        getCurrentLocation().catch(err => console.error('Error getting location on mount:', err));
+      }
+      return;
+    }
+
+    console.log('✅ Loading nearby users with location:', location);
+    
     const loadData = async () => {
-      if (!user || !location) return;
+      console.log('🔍 [DiscoverPage] loadData called', { user: !!user, location: !!location });
+      
+      if (!user || !location) {
+        console.log('⚠️ [DiscoverPage] Missing user or location', { 
+          hasUser: !!user, 
+          hasLocation: !!location,
+          locationError,
+          locationLoading,
+          permissionState
+        });
+        return;
+      }
       
       setIsLoading(true);
       try {
+        console.log('📍 [DiscoverPage] Loading data with location:', { 
+          lat: location.latitude, 
+          lng: location.longitude, 
+          maxDistance: filters.maxDistance 
+        });
+        
         // Load current user data
         const userData = await userService.getUser(user.id);
         setCurrentUserData(userData);
+        console.log('👤 [DiscoverPage] Current user data loaded:', userData?.name);
 
         // Load nearby users
         const nearbyUsers = await userService.getNearbyUsers(
@@ -64,6 +160,8 @@ export default function DiscoverPage() {
           location.longitude,
           filters.maxDistance
         );
+        
+        console.log('👥 [DiscoverPage] Nearby users loaded:', nearbyUsers.length);
         
         // Apply additional filters
         const filteredUsers = nearbyUsers.filter(userWithDistance => {
@@ -129,16 +227,64 @@ export default function DiscoverPage() {
         // Sort by distance
         filteredUsers.sort((a, b) => a.distance - b.distance);
         
+        console.log('🔍 [DiscoverPage] Filtered users:', filteredUsers.length);
+        console.log('📊 [DiscoverPage] Applied filters:', filters);
+        
         setUsers(filteredUsers);
       } catch (error) {
         console.error('Error loading data:', error);
+        addToast({ 
+          title: 'Error al cargar datos', 
+          message: 'Hubo un problema al cargar los usuarios cercanos', 
+          type: 'error' 
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [user, location, filters]);
+  }, [user, location, locationLoading, locationError, filters, permissionState]);
+
+  // Enhanced location error handling
+  const getLocationErrorMessage = () => {
+    if (!locationError) return null;
+
+    // locationError is a string, so we check the content to determine the type
+    if (locationError.includes('denied') || locationError.includes('permission')) {
+      return {
+        title: 'Permisos de ubicación denegados',
+        message: 'Necesitamos acceso a tu ubicación para mostrarte personas cerca de ti.',
+        action: 'Permitir ubicación',
+        icon: Shield,
+        variant: 'warning' as const
+      };
+    } else if (locationError.includes('unavailable') || locationError.includes('position')) {
+      return {
+        title: 'Ubicación no disponible',
+        message: 'No se pudo determinar tu ubicación. Verifica tu conexión GPS.',
+        action: 'Reintentar',
+        icon: MapPin,
+        variant: 'error' as const
+      };
+    } else if (locationError.includes('timeout') || locationError.includes('time')) {
+      return {
+        title: 'Tiempo de espera agotado',
+        message: 'La solicitud de ubicación tardó demasiado. Intenta de nuevo.',
+        action: 'Reintentar',
+        icon: RefreshCw,
+        variant: 'warning' as const
+      };
+    } else {
+      return {
+        title: 'Error de ubicación',
+        message: 'Hubo un problema al obtener tu ubicación.',
+        action: 'Reintentar',
+        icon: AlertTriangle,
+        variant: 'error' as const
+      };
+    }
+  };
 
   const handleLike = async (userId: string) => {
     if (!user) return;
@@ -262,35 +408,102 @@ export default function DiscoverPage() {
     }
   };
 
-  // Show location error if geolocation failed
-  if (locationError) {
+  // Show enhanced location error if geolocation failed
+  if (locationError && !location) {
+    const errorInfo = getLocationErrorMessage();
+    
     return (
       <ProtectedRoute requireAuth>
         <AppLayout>
           <div className="flex items-center justify-center min-h-[60vh] animate-in fade-in-0 duration-500">
-            <div className="text-center animate-in slide-in-from-bottom-4 duration-700 delay-200">
-              <div className="w-16 h-16 bg-gradient-to-br from-destructive/20 to-destructive/10
-                            rounded-full flex items-center justify-center mx-auto mb-4 
-                            animate-pulse shadow-lg border border-destructive/30">
-                <MapPin className="w-8 h-8 text-destructive" />
+            <div className="text-center animate-in slide-in-from-bottom-4 duration-700 delay-200 max-w-md mx-auto px-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 
+                            animate-pulse shadow-lg border transition-all duration-300
+                            ${errorInfo?.variant === 'warning' 
+                              ? 'bg-gradient-to-br from-warning/20 to-warning/10 border-warning/30' 
+                              : 'bg-gradient-to-br from-destructive/20 to-destructive/10 border-destructive/30'
+                            }`}>
+                {errorInfo?.icon && (
+                  <errorInfo.icon className={`w-8 h-8 ${
+                    errorInfo.variant === 'warning' ? 'text-warning' : 'text-destructive'
+                  }`} />
+                )}
               </div>
+              
               <h3 className="text-lg font-semibold text-foreground mb-2 
                            animate-in slide-in-from-bottom-2 duration-500 delay-300">
-                Ubicación requerida
+                {errorInfo?.title}
               </h3>
+              
               <p className="text-muted-foreground mb-4 
                           animate-in slide-in-from-bottom-2 duration-500 delay-400">
-                Necesitamos acceso a tu ubicación para mostrarte personas cerca de ti.
+                {errorInfo?.message}
               </p>
-              <div className="animate-in slide-in-from-bottom-2 duration-500 delay-500">
+
+              {permissionState === 'denied' && (
+                <div className="bg-warning/10 border border-warning/20 rounded-lg p-4 mb-4
+                              animate-in slide-in-from-bottom-2 duration-500 delay-500">
+                  <p className="text-sm text-warning-foreground">
+                    <strong>Instrucciones:</strong> Ve a la configuración de tu navegador, 
+                    busca los permisos de ubicación para este sitio y actívalos.
+                  </p>
+                </div>
+              )}
+
+              {retryCount > 0 && (
+                <div className="text-xs text-muted-foreground mb-4
+                              animate-in slide-in-from-bottom-2 duration-500 delay-600">
+                  Intentos realizados: {retryCount}
+                </div>
+              )}
+              
+              <div className="flex flex-col sm:flex-row gap-3 justify-center
+                            animate-in slide-in-from-bottom-2 duration-500 delay-700">
                 <Button 
                   variant="primary" 
+                  onClick={permissionState === 'denied' ? handleRequestPermission : handleLocationRetry}
+                  className="hover:scale-105 transition-transform duration-300"
+                  disabled={locationLoading}
+                >
+                  {locationLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Obteniendo...
+                    </>
+                  ) : errorInfo ? (
+                    <>
+                      <errorInfo.icon className="w-4 h-4 mr-2" />
+                      {errorInfo.action}
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Reintentar
+                    </>
+                  )}
+                </Button>
+                
+                <Button 
+                  variant="outline" 
                   onClick={() => window.location.reload()}
                   className="hover:scale-105 transition-transform duration-300"
                 >
-                  Intentar de nuevo
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Recargar página
                 </Button>
               </div>
+
+              {/* Debug info for development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-6 p-3 bg-muted rounded-lg text-xs text-left
+                              animate-in slide-in-from-bottom-2 duration-500 delay-800">
+                  <strong>Debug Info:</strong><br />
+                  Error: {locationError}<br />
+                  Permission: {permissionState}<br />
+                  Retry Count: {retryCount}<br />
+                  Is Watching: {isWatching ? 'Yes' : 'No'}
+                </div>
+              )}
             </div>
           </div>
         </AppLayout>
@@ -299,23 +512,119 @@ export default function DiscoverPage() {
   }
 
   if (isLoading || locationLoading) {
+    const getLoadingInfo = () => {
+      if (locationLoading) {
+        return {
+          icon: MapPin,
+          title: 'Obteniendo tu ubicación',
+          message: 'Necesitamos conocer tu ubicación para mostrarte personas cerca de ti',
+          submessage: permissionState === 'prompt' 
+            ? 'Por favor, permite el acceso a tu ubicación cuando se solicite'
+            : retryCount > 0 
+              ? `Reintentando... (${retryCount}/${3})`
+              : 'Esto puede tomar unos segundos...',
+          color: 'primary'
+        };
+      }
+      
+      return {
+        icon: Users,
+        title: 'Buscando personas increíbles',
+        message: 'Estamos encontrando los mejores perfiles para ti',
+        submessage: 'Preparando tu experiencia de descubrimiento...',
+        color: 'secondary'
+      };
+    };
+
+    const loadingInfo = getLoadingInfo();
+    const LoadingIcon = loadingInfo.icon;
+
     return (
       <ProtectedRoute requireAuth>
         <AppLayout>
           <div className="flex items-center justify-center min-h-[60vh] animate-in fade-in-0 duration-500">
-            <div className="text-center animate-in slide-in-from-bottom-4 duration-700 delay-200">
-              <Loading 
-                variant="pulse" 
-                size="lg" 
-                text={locationLoading ? 'Obteniendo ubicación...' : 'Buscando personas cerca de ti...'} 
-              />
-              <div className="mt-6 animate-in slide-in-from-bottom-2 duration-500 delay-500">
-                <p className="text-sm text-muted-foreground">
-                  {locationLoading 
-                    ? 'Esto puede tomar unos segundos...' 
-                    : 'Preparando tu experiencia de descubrimiento...'
-                  }
-                </p>
+            <div className="text-center animate-in slide-in-from-bottom-4 duration-700 delay-200 max-w-md mx-auto px-4">
+              {/* Animated Icon */}
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 
+                            animate-pulse shadow-lg border transition-all duration-300
+                            ${loadingInfo.color === 'primary' 
+                              ? 'bg-gradient-to-br from-primary/20 to-primary/10 border-primary/30' 
+                              : 'bg-gradient-to-br from-secondary/20 to-secondary/10 border-secondary/30'
+                            }`}>
+                <LoadingIcon className={`w-10 h-10 ${
+                  loadingInfo.color === 'primary' ? 'text-primary' : 'text-secondary'
+                } animate-bounce`} />
+              </div>
+
+              {/* Loading Dots */}
+              <div className="flex justify-center space-x-2 mb-6">
+                <div className={`w-2 h-2 rounded-full animate-bounce ${
+                  loadingInfo.color === 'primary' ? 'bg-primary' : 'bg-secondary'
+                }`} style={{ animationDelay: '0ms' }} />
+                <div className={`w-2 h-2 rounded-full animate-bounce ${
+                  loadingInfo.color === 'primary' ? 'bg-primary' : 'bg-secondary'
+                }`} style={{ animationDelay: '150ms' }} />
+                <div className={`w-2 h-2 rounded-full animate-bounce ${
+                  loadingInfo.color === 'primary' ? 'bg-primary' : 'bg-secondary'
+                }`} style={{ animationDelay: '300ms' }} />
+              </div>
+              
+              {/* Title */}
+              <h3 className="text-xl font-bold text-foreground mb-3 
+                           animate-in slide-in-from-bottom-2 duration-500 delay-300">
+                {loadingInfo.title}
+              </h3>
+              
+              {/* Main Message */}
+              <p className="text-muted-foreground mb-4 
+                          animate-in slide-in-from-bottom-2 duration-500 delay-400">
+                {loadingInfo.message}
+              </p>
+
+              {/* Submessage */}
+              <p className="text-sm text-muted-foreground/80 mb-4
+                          animate-in slide-in-from-bottom-2 duration-500 delay-500">
+                {loadingInfo.submessage}
+              </p>
+
+              {/* Progress Indicator */}
+              <div className="w-full bg-muted rounded-full h-2 mb-4
+                            animate-in slide-in-from-bottom-2 duration-500 delay-600">
+                <div className={`h-2 rounded-full transition-all duration-1000 ease-out
+                              ${loadingInfo.color === 'primary' 
+                                ? 'bg-gradient-to-r from-primary to-primary/80' 
+                                : 'bg-gradient-to-r from-secondary to-secondary/80'
+                              }`}
+                     style={{ 
+                       width: locationLoading ? '60%' : '90%',
+                       animation: 'pulse 2s infinite'
+                     }} />
+              </div>
+
+              {/* Additional Info */}
+              {locationLoading && permissionState && (
+                <div className="bg-muted/50 rounded-lg p-3 mb-4
+                              animate-in slide-in-from-bottom-2 duration-500 delay-700">
+                  <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground">
+                    <Shield className="w-3 h-3" />
+                    <span>Estado de permisos: {permissionState}</span>
+                  </div>
+                  {retryCount > 0 && (
+                    <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground mt-1">
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Reintento #{retryCount}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tips while loading */}
+              <div className="text-xs text-muted-foreground/60 italic
+                            animate-in slide-in-from-bottom-2 duration-500 delay-800">
+                💡 {locationLoading 
+                  ? 'Tip: Asegúrate de tener activada la ubicación en tu dispositivo'
+                  : 'Tip: Completa tu perfil para obtener mejores matches'
+                }
               </div>
             </div>
           </div>

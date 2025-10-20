@@ -20,7 +20,8 @@ import {
   increment,
   documentId,
   deleteField, // FIX: Added deleteField import for proper reaction removal
-  runTransaction // FIX: Added runTransaction for atomic operations
+  runTransaction, // FIX: Added runTransaction for atomic operations
+  arrayUnion // FIX: Added arrayUnion for readBy field compatibility
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { userService } from '@/lib/firestore';
@@ -60,7 +61,7 @@ export interface Chat {
     senderId: string;
     timestamp: Timestamp;
     type: ChatMessage['type'];
-  };
+  } | null;
   lastActivity: Timestamp;
   unreadCount: { [userId: string]: number };
   isActive: boolean;
@@ -301,14 +302,50 @@ class ChatService {
         return content.length > 50 ? content.substring(0, 50) + '...' : content;
     }
   }
-  
-  // Marcar mensajes como leídos
+
+  // Helper to recursively remove undefined values
+  private removeUndefinedValues(obj: any): any {
+    if (Array.isArray(obj)) {
+      return obj.map(this.removeUndefinedValues.bind(this));
+    }
+    if (obj && typeof obj === 'object') {
+      return Object.fromEntries(
+        Object.entries(obj)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, this.removeUndefinedValues(v)])
+      );
+    }
+    return obj;
+  }
+
+  // Marcar mensajes como leídos con validaciones
   async markMessagesAsRead(chatId: string, userId: string): Promise<void> {
     try {
+      // Validar parámetros
+      if (!chatId || typeof chatId !== 'string' || chatId.trim().length === 0) {
+        throw new Error('ID de chat inválido');
+      }
+      
+      if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+        throw new Error('ID de usuario inválido');
+      }
+      
+      // Verificar que el chat existe y el usuario tiene permisos
+      const chatRef = doc(db, 'chats', chatId);
+      const chatDoc = await getDoc(chatRef);
+      
+      if (!chatDoc.exists()) {
+        throw new Error('El chat no existe');
+      }
+      
+      const chatData = chatDoc.data();
+      if (!chatData?.participants?.includes(userId)) {
+        throw new Error('No tienes permisos para marcar mensajes como leídos en este chat');
+      }
+      
       const messagesRef = collection(db, 'chats', chatId, 'messages');
       const q = query(
         messagesRef,
-        where('chatId', '==', chatId),
         where('receiverId', '==', userId),
         where('read', '==', false)
       );
@@ -317,31 +354,52 @@ class ChatService {
       const batch: Promise<void>[] = [];
       
       querySnapshot.forEach((doc) => {
-        batch.push(updateDoc(doc.ref, { read: true }));
+        // Actualizar tanto el campo read como readBy para compatibilidad
+        batch.push(updateDoc(doc.ref, { 
+          read: true,
+          readBy: arrayUnion(userId)
+        }));
       });
       
       await Promise.all(batch);
       
       // Resetear contador de no leídos
-      const chatRef = doc(db, 'chats', chatId);
       await updateDoc(chatRef, {
         [`unreadCount.${userId}`]: 0
       });
     } catch (error) {
       console.error('Error marking messages as read:', error);
-      // FIX: Optional error reporting integration point
-      // if (window.Sentry) window.Sentry.captureException(error);
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Error al marcar mensajes como leídos');
     }
   }
   
-  // OPTIMIZED: Obtener mensajes de un chat con paginación mejorada
+  // Obtener mensajes de un chat con paginación mejorada y validaciones
   async getMessages(
     chatId: string, 
     limitCount: number = 50, 
     lastDoc?: DocumentSnapshot
   ): Promise<{ messages: ChatMessage[], lastDoc?: DocumentSnapshot }> {
     try {
+      // Validar parámetros
+      if (!chatId || typeof chatId !== 'string' || chatId.trim().length === 0) {
+        throw new Error('ID de chat inválido');
+      }
+      
+      if (typeof limitCount !== 'number' || limitCount <= 0 || limitCount > 100) {
+        throw new Error('Límite de mensajes inválido (debe ser entre 1 y 100)');
+      }
+      
+      // Verificar que el chat existe
+      const chatRef = doc(db, 'chats', chatId);
+      const chatDoc = await getDoc(chatRef);
+      
+      if (!chatDoc.exists()) {
+        throw new Error('El chat no existe');
+      }
+      
       const messagesRef = collection(db, 'chats', chatId, 'messages');
       let q = query(
         messagesRef,
@@ -349,7 +407,7 @@ class ChatService {
         limit(limitCount)
       );
       
-      // FIX: Ensure proper pagination with lastDoc
+      // Ensure proper pagination with lastDoc
       if (lastDoc) {
         q = query(q, startAfter(lastDoc));
       }
@@ -359,65 +417,110 @@ class ChatService {
       let newLastDoc: DocumentSnapshot | undefined;
       
       querySnapshot.forEach((doc) => {
-        messages.push({ id: doc.id, ...doc.data() } as ChatMessage);
-        newLastDoc = doc; // FIX: Always update lastDoc for proper pagination
+        const messageData = doc.data();
+        // Validar datos del mensaje antes de añadirlo
+        if (messageData && messageData.chatId === chatId) {
+          messages.push({ id: doc.id, ...messageData } as ChatMessage);
+          newLastDoc = doc;
+        }
       });
       
       return { 
         messages: messages.reverse(), 
-        lastDoc: querySnapshot.docs.length === limitCount ? newLastDoc : undefined // FIX: Only return lastDoc if there might be more data
+        lastDoc: querySnapshot.docs.length === limitCount ? newLastDoc : undefined
       };
     } catch (error) {
       console.error('Error getting messages:', error);
-      // FIX: Optional error reporting integration point
-      // if (window.Sentry) window.Sentry.captureException(error);
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Error al obtener mensajes');
     }
   }
   
-  // Suscribirse a mensajes en tiempo real
-  /**
-   * Subscribe to real-time messages in a chat.
-   * By default we limit the listener to the last `limitCount` messages to
-   * reduce bandwidth and memory usage. Pagination is handled separately via
-   * `getMessages`.
-   */
+  // Suscribirse a mensajes en tiempo real con validaciones mejoradas
   subscribeToMessages(
     chatId: string,
     callback: (messages: ChatMessage[]) => void,
     onError?: (error: Error) => void,
     limitCount: number = 50
   ): () => void {
-    // Listen on /chats/{chatId}/messages sub-collection
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
+    // Validar chatId antes de proceder
+    if (!chatId || typeof chatId !== 'string' || chatId.trim().length === 0) {
+      const error = new Error(`Invalid chatId provided: ${chatId}`);
+      console.error('🚨 Error de validación en subscribeToMessages:', {
+        chatId,
+        chatIdType: typeof chatId,
+        chatIdLength: chatId?.length
+      });
+      if (onError) {
+        onError(error);
+      }
+      return () => {}; // Return empty unsubscribe function
+    }
+    
+    // Validar limitCount
+    if (typeof limitCount !== 'number' || limitCount <= 0 || limitCount > 100) {
+      const error = new Error(`Invalid limitCount: ${limitCount}. Must be between 1 and 100.`);
+      console.error('🚨 Error de validación en subscribeToMessages:', error);
+      if (onError) {
+        onError(error);
+      }
+      return () => {};
+    }
+    
+    // Validar callback
+    if (typeof callback !== 'function') {
+      const error = new Error('Callback must be a function');
+      console.error('🚨 Error de validación en subscribeToMessages:', error);
+      if (onError) {
+        onError(error);
+      }
+      return () => {};
+    }
 
-    // We fetch the latest `limitCount` messages ordered by timestamp DESC and
-    // later reverse them so the consumer always receives them ASC.
-    const q = query(
-      messagesRef,
-      orderBy('timestamp', 'desc'),
-      limit(limitCount)
-    );
+    try {
+      // Listen on /chats/{chatId}/messages sub-collection
+      const messagesRef = collection(db, 'chats', chatId, 'messages');
 
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const messages: ChatMessage[] = [];
-        snapshot.forEach((doc) => {
-          messages.push({ id: doc.id, ...doc.data() } as ChatMessage);
-        });
-        // Firestore returned them DESC, reverse to ASC for UI consistency.
-        callback(messages.reverse());
-      },
-      (error) => {
+      // We fetch the latest `limitCount` messages ordered by timestamp DESC and
+      // later reverse them so the consumer always receives them ASC.
+      const q = query(
+        messagesRef,
+        orderBy('timestamp', 'desc'),
+        limit(limitCount)
+      );
+
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          const messages: ChatMessage[] = [];
+          snapshot.forEach((doc) => {
+            messages.push({ id: doc.id, ...doc.data() } as ChatMessage);
+          });
+          // Firestore returned them DESC, reverse to ASC for UI consistency.
+          callback(messages.reverse());
+        },
+        (error) => {
         console.error('🚨 Error en snapshot listener de mensajes:', {
           error: error,
           message: error.message,
           code: error.code,
           chatId: chatId,
           queryType: 'messages',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          stack: error.stack,
+          name: error.name
         });
+        
+        // Log additional context for debugging
+        console.error('🔍 Contexto adicional del error:', {
+          chatIdType: typeof chatId,
+          chatIdLength: chatId?.length,
+          isValidChatId: chatId && typeof chatId === 'string' && chatId.length > 0,
+          limitCount: limitCount
+        });
+        
         // FIX: Optional error reporting integration point
         // if (window.Sentry) window.Sentry.captureException(error);
         if (onError) {
@@ -425,6 +528,20 @@ class ChatService {
         }
       }
     );
+    } catch (error) {
+      console.error('🚨 Error al crear la consulta de mensajes:', {
+        error,
+        chatId,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+      
+      if (onError && error instanceof Error) {
+        onError(error);
+      }
+      
+      return () => {}; // Return empty unsubscribe function
+    }
   }
   
   // OPTIMIZED: Obtener chats del usuario con ordenamiento en servidor

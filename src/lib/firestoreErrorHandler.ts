@@ -232,8 +232,10 @@ export const safeFirestoreWriteSimple = async <T>(
   context?: string
 ): Promise<T> => {
   const result = await firestoreErrorHandler.safeWrite(operation, context);
-  if (result.success && result.data !== undefined) {
-    return result.data;
+  if (result.success) {
+    // Para operaciones que no retornan datos (como updateDoc), data puede ser undefined
+    // pero la operación sigue siendo exitosa
+    return result.data as T;
   }
   throw new Error(result.error || 'Operation failed');
 };

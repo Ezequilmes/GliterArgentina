@@ -35,6 +35,15 @@ export default function SettingsPage() {
   const [ageRange, setAgeRange] = useState([18, 35]);
   const [maxDistance, setMaxDistance] = useState([50]);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  
+  // Settings states
+  const [globalMode, setGlobalMode] = useState(false);
+  const [recentlyActive, setRecentlyActive] = useState(true);
+  const [matchNotifications, setMatchNotifications] = useState(true);
+  const [messageNotifications, setMessageNotifications] = useState(true);
+  const [superLikeNotifications, setSuperLikeNotifications] = useState(true);
+  const [soundNotifications, setSoundNotifications] = useState(true);
+  const [vibrationNotifications, setVibrationNotifications] = useState(true);
 
   const handleAgeRangeChange = (values: number[]) => {
     setAgeRange(values);
@@ -128,7 +137,10 @@ export default function SettingsPage() {
                     Descubre personas de todo el mundo
                   </p>
                 </div>
-                <Switch />
+                <Switch 
+                  checked={globalMode}
+                  onCheckedChange={setGlobalMode}
+                />
               </div>
 
               {/* Recently Active */}
@@ -139,7 +151,10 @@ export default function SettingsPage() {
                     Mostrar solo personas activas recientemente
                   </p>
                 </div>
-                <Switch checked={true} />
+                <Switch 
+                  checked={recentlyActive}
+                  onCheckedChange={setRecentlyActive}
+                />
               </div>
             </div>
           </Card>
@@ -161,7 +176,10 @@ export default function SettingsPage() {
                     Cuando hagas match con alguien
                   </p>
                 </div>
-                <Switch checked={true} />
+                <Switch 
+                  checked={matchNotifications}
+                  onCheckedChange={setMatchNotifications}
+                />
               </div>
 
               <div className="flex items-center justify-between">
@@ -171,7 +189,10 @@ export default function SettingsPage() {
                     Nuevos mensajes de tus matches
                   </p>
                 </div>
-                <Switch checked={true} />
+                <Switch 
+                  checked={messageNotifications}
+                  onCheckedChange={setMessageNotifications}
+                />
               </div>
 
               <div className="flex items-center justify-between">
@@ -181,7 +202,10 @@ export default function SettingsPage() {
                     Cuando recibas un Super Like
                   </p>
                 </div>
-                <Switch checked={true} />
+                <Switch 
+                  checked={superLikeNotifications}
+                  onCheckedChange={setSuperLikeNotifications}
+                />
               </div>
 
               <div className="flex items-center justify-between">
@@ -191,7 +215,10 @@ export default function SettingsPage() {
                     Reproducir sonidos de notificación
                   </p>
                 </div>
-                <Switch checked={true} />
+                <Switch 
+                  checked={soundNotifications}
+                  onCheckedChange={setSoundNotifications}
+                />
               </div>
 
               <div className="flex items-center justify-between">
@@ -201,7 +228,10 @@ export default function SettingsPage() {
                     Vibrar al recibir notificaciones
                   </p>
                 </div>
-                <Switch checked={true} />
+                <Switch 
+                  checked={vibrationNotifications}
+                  onCheckedChange={setVibrationNotifications}
+                />
               </div>
             </div>
           </Card>

@@ -126,7 +126,7 @@ export { database, storage, functions, messaging, analytics };
 let emulatorsConnected = false;
 
 // Conectar a emuladores en desarrollo
-if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && typeof window !== 'undefined' && app && auth && db) {
+if (false && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && typeof window !== 'undefined' && app && auth && db) {
   // Solo conectar una vez
   if (!emulatorsConnected) {
     try {
