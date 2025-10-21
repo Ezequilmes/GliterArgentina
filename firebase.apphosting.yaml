@@ -4,42 +4,30 @@ entrypoint: npm run start
 env:
   - key: NODE_ENV
     value: production
-  - key: PORT
-    value: "8080"
   - key: NEXT_TELEMETRY_DISABLED
     value: "1"
-  # Firebase Configuration
-  - key: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyBDaKVYlJSfIJ7nKeIkTEWSmhlB1Soqay0
-  - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: gliter-argentina.firebaseapp.com
-  - key: NEXT_PUBLIC_FIREBASE_DATABASE_URL
-    value: https://gliter-argentina-default-rtdb.firebaseio.com/
-  - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: gliter-argentina
-  - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: gliter-argentina.firebasestorage.app
-  - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "1084162955705"
-  - key: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:1084162955705:web:25bb32180d1bdaf724fe68
-  - key: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-    value: G-MMFQWWFCJD
-  - key: NEXT_PUBLIC_FIREBASE_VAPID_KEY
-    value: BCZtYuSvf7-7lkyzOgsuz_0SbCBpxJbm4us1BI304rHT_5ud4J8dpCCBAC-O7Bi07aPWbiOSEAG-DM8t4LSHdGk
-  # MercadoPago Configuration
-  - key: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
-    value: APP_USR-eef5b234-f79b-46ab-aa28-ffd2369f8060
-  - key: MERCADOPAGO_ACCESS_TOKEN
-    value: APP_USR-2100654215920021-090302-fcde5bf150a88e7b9f2223ca0dd2a1e0-93900446
-  - key: MERCADOPAGO_CLIENT_ID
-    value: "2100654215920021"
-  - key: MERCADOPAGO_CLIENT_SECRET
-    value: XZo9vgAxYEmGKD1XiWzv2keT7DT5nOvh
-  - key: MERCADOPAGO_WEBHOOK_SECRET
-    value: 6123b18eb72dba618750cb40a49ea1d26440e748bcf25dd13ce08f8a5fcfe2f2
-  # App Configuration
-  - key: NEXT_PUBLIC_APP_URL
-    value: https://my-web-app--gliter-argentina.us-central1.hosted.app
-  - key: NEXT_PUBLIC_USE_FIREBASE_EMULATOR
-    value: "false"
+  - key: PORT
+    value: "8080"
+
+build:
+  command: |
+    echo ">>> Cleaning node state"
+    rm -rf node_modules package-lock.json pnpm-lock.yaml
+    echo ">>> Installing production deps"
+    npm ci --omit=dev
+    echo ">>> Type-check"
+    npm run type-check
+    echo ">>> Run build"
+    npm run build
+  environment:
+    - key: NODE_ENV
+      value: production
+
+resources:
+  cpu: 1
+  memoryMiB: 2048
+  diskMiB: 4096
+
+handlers:
+  - glob: '**'
+    script: auto
