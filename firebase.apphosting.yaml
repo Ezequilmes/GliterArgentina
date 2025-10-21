@@ -11,10 +11,8 @@ env:
 
 build:
   command: |
-    echo ">>> Cleaning node state"
-    rm -rf node_modules package-lock.json pnpm-lock.yaml
-    echo ">>> Installing production deps"
-    npm ci --omit=dev
+    echo ">>> Installing dependencies"
+    npm ci
     echo ">>> Type-check"
     npm run type-check
     echo ">>> Run build"
