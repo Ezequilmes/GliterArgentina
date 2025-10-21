@@ -23,7 +23,14 @@
     {
       "backendId": "my-web-app",
       "rootDir": "./",
-      "ignore": ["node_modules", ".git", "firebase-debug.log", ".trae", ".vercel"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        ".trae",
+        ".vercel"
+      ],
+      "alwaysDeployFromSource": true
     }
   ],
   "emulators": {

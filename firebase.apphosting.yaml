@@ -1,31 +1,14 @@
 runtime: nodejs20
-entrypoint: npm run start
+entrypoint: npm start
 
 env:
   - key: NODE_ENV
     value: production
-  - key: NEXT_TELEMETRY_DISABLED
-    value: "1"
   - key: PORT
     value: "8080"
 
 build:
-  command: |
-    echo ">>> Installing dependencies"
-    npm ci
-    echo ">>> Type-check"
-    npm run type-check
-    echo ">>> Run build"
-    npm run build
+  command: npm ci && npm run build
   environment:
     - key: NODE_ENV
       value: production
-
-resources:
-  cpu: 1
-  memoryMiB: 2048
-  diskMiB: 4096
-
-handlers:
-  - glob: '**'
-    script: auto
