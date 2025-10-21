@@ -21,12 +21,15 @@ import {
   documentId,
   deleteField, // FIX: Added deleteField import for proper reaction removal
   runTransaction, // FIX: Added runTransaction for atomic operations
-  arrayUnion // FIX: Added arrayUnion for readBy field compatibility
+  arrayUnion, // FIX: Added arrayUnion for readBy field compatibility
+  enableNetwork,
+  disableNetwork
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { userService } from '@/lib/firestore';
 import { PopulatedChat } from '@/types';
 import { notificationService } from '@/services/notificationService';
+import { realtimeService } from '@/services/realtimeService';
 
 export interface ChatMessage {
   id: string;
@@ -38,6 +41,10 @@ export interface ChatMessage {
   timestamp: Timestamp;
   read: boolean;
   status?: 'sending' | 'sent' | 'delivered' | 'failed' | 'retrying';
+  // Nuevos campos para acknowledgments
+  deliveredAt?: Timestamp;
+  readAt?: Timestamp;
+  deliveryAttempts?: number;
   edited?: boolean;
   editedAt?: Timestamp;
   replyTo?: string | null; // ID del mensaje al que responde
@@ -88,52 +95,197 @@ export interface OnlineStatus {
 
 class ChatService {
   private onlineStatusCache = new Map<string, OnlineStatus>();
-  // FIX: Updated typing timeout type for Node/browser compatibility
   private typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  // Mejorado: Cache para tracking de mensajes pendientes de acknowledgment con cleanup automático
+  private pendingAcknowledgments = new Map<string, { 
+    messageId: string; 
+    chatId: string; 
+    timestamp: number;
+    unsubscribe: () => void; // Para cleanup de listeners
+    timeoutId: ReturnType<typeof setTimeout>; // Para cleanup de timeouts
+  }>();
+  // Nuevo: Cache para listeners de mensajes con paginación
+  private messageListeners = new Map<string, { unsubscribe: () => void; lastDoc?: any; hasMore: boolean }>();
+  // Nuevo: Sistema de reintento automático
+  private retryQueue = new Map<string, { messageData: any; attempts: number; nextRetry: number }>();
+  private isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  private retryInterval: ReturnType<typeof setInterval> | null = null;
+  private maxRetryAttempts = 5;
+  private baseRetryDelay = 1000; // 1 segundo
+  // Mejorado: Sistema de heartbeat avanzado para presencia
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private heartbeatFrequency = 30000; // 30 segundos (base)
+  private adaptiveHeartbeatFrequency = 30000; // Frecuencia adaptativa
+  private currentUserId: string | null = null;
+  private lastHeartbeatTime = 0;
+  private heartbeatFailures = 0;
+  private maxHeartbeatFailures = 3;
+  private isTabActive = true;
+  private lastUserActivity = Date.now();
+  private heartbeatMetrics = {
+    totalSent: 0,
+    totalFailed: 0,
+    averageLatency: 0,
+    lastLatency: 0
+  };
 
-  // FIX: Crear o obtener un chat entre dos usuarios con ID determinístico
-  async getOrCreateChat(userId1: string, userId2: string, matchId?: string): Promise<string> {
+  constructor() {
+    this.setupNetworkListeners();
+    this.startRetryProcessor();
+  }
+
+  // Nuevo: Configurar listeners de conectividad
+  private setupNetworkListeners(): void {
+    // Verificar que estamos en el lado del cliente
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    // Listener para cambios de conectividad
+    window.addEventListener('online', () => {
+      console.log('🌐 Conexión restaurada');
+      this.isOnline = true;
+      this.handleNetworkReconnection();
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('🚫 Conexión perdida');
+      this.isOnline = false;
+    });
+
+    // Listener para cambios de visibilidad de la página
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && this.isOnline) {
+        this.handleNetworkReconnection();
+      }
+    });
+  }
+
+  // Nuevo: Manejar reconexión de red
+  private async handleNetworkReconnection(): Promise<void> {
     try {
-      // FIX: Generate deterministic chat ID to prevent duplicates
-      const sortedIds = [userId1, userId2].sort();
-      const deterministicId = `direct_${sortedIds[0]}_${sortedIds[1]}`;
-      
-      // FIX: Use transaction to ensure atomicity
-      return await runTransaction(db, async (transaction) => {
-        const chatRef = doc(db, 'chats', deterministicId);
-        const chatDoc = await transaction.get(chatRef);
-        
-        if (chatDoc.exists()) {
-          return deterministicId;
-        }
-        
-        // Create new chat with deterministic ID
-        const newChat: Omit<Chat, 'id'> = {
-          participants: [userId1, userId2],
-          participantIds: [userId1, userId2],
-          lastActivity: serverTimestamp() as Timestamp,
-          unreadCount: {
-            [userId1]: 0,
-            [userId2]: 0
-          },
-          isActive: true,
-          createdAt: serverTimestamp() as Timestamp,
-          chatType: 'direct',
-          matchId
-        };
-        
-        transaction.set(chatRef, newChat);
-        return deterministicId;
-      });
+      // Reactivar Firestore
+      await enableNetwork(db);
+      console.log('🔄 Firestore reactivado');
+
+      // Procesar mensajes en cola de reintento
+      await this.processRetryQueue();
+
+      // Reestablecer listeners activos
+      this.reestablishActiveListeners();
     } catch (error) {
-      console.error('Error creating/getting chat:', error);
-      // FIX: Optional error reporting integration point
-      // if (window.Sentry) window.Sentry.captureException(error);
-      throw error;
+      console.error('Error durante la reconexión:', error);
     }
   }
-  
-  // FIX: Enviar mensaje con validaciones de seguridad y tamaño
+
+  // Nuevo: Procesar cola de reintentos
+  private async processRetryQueue(): Promise<void> {
+    const now = Date.now();
+    const toRetry: string[] = [];
+
+    this.retryQueue.forEach((retryData, messageId) => {
+      if (now >= retryData.nextRetry) {
+        toRetry.push(messageId);
+      }
+    });
+
+    for (const messageId of toRetry) {
+      await this.retryFailedMessage(messageId);
+    }
+  }
+
+  // Nuevo: Reintentar mensaje fallido
+  private async retryFailedMessage(messageId: string): Promise<void> {
+    const retryData = this.retryQueue.get(messageId);
+    if (!retryData) return;
+
+    try {
+      const { messageData, attempts } = retryData;
+      
+      if (attempts >= this.maxRetryAttempts) {
+        console.log(`❌ Mensaje ${messageId} excedió máximo de reintentos`);
+        this.retryQueue.delete(messageId);
+        
+        // Marcar como fallido permanentemente
+        await this.updateMessageStatus(messageData.chatId, messageId, 'failed');
+        return;
+      }
+
+      console.log(`🔄 Reintentando mensaje ${messageId} (intento ${attempts + 1})`);
+
+      // Actualizar estado a 'retrying'
+      await this.updateMessageStatus(messageData.chatId, messageId, 'retrying');
+
+      // Intentar reenviar
+      const messagesRef = collection(db, 'chats', messageData.chatId, 'messages');
+      const messageRef = doc(messagesRef, messageId);
+      
+      await updateDoc(messageRef, {
+        status: 'sent',
+        deliveryAttempts: increment(1),
+        timestamp: serverTimestamp() // Actualizar timestamp
+      });
+
+      // Configurar acknowledgment
+      await this.setupDeliveryAcknowledgment(messageData.chatId, messageId, messageData.receiverId);
+
+      // Remover de cola de reintento
+      this.retryQueue.delete(messageId);
+      
+      console.log(`✅ Mensaje ${messageId} reenviado exitosamente`);
+
+    } catch (error) {
+      console.error(`Error reintentando mensaje ${messageId}:`, error);
+      
+      // Incrementar contador de intentos y programar siguiente reintento
+      const newAttempts = retryData.attempts + 1;
+      const delay = this.calculateRetryDelay(newAttempts);
+      
+      this.retryQueue.set(messageId, {
+        ...retryData,
+        attempts: newAttempts,
+        nextRetry: Date.now() + delay
+      });
+    }
+  }
+
+  // Nuevo: Calcular delay de reintento con backoff exponencial
+  private calculateRetryDelay(attempts: number): number {
+    // Backoff exponencial: 1s, 2s, 4s, 8s, 16s
+    return this.baseRetryDelay * Math.pow(2, attempts - 1);
+  }
+
+  // Nuevo: Iniciar procesador de reintentos
+  private startRetryProcessor(): void {
+    this.retryInterval = setInterval(() => {
+      if (this.isOnline && this.retryQueue.size > 0) {
+        this.processRetryQueue();
+      }
+    }, 5000); // Revisar cada 5 segundos
+  }
+
+  // Nuevo: Reestablecer listeners activos
+  private reestablishActiveListeners(): void {
+    // Reestablecer listeners de mensajes
+    this.messageListeners.forEach((listenerInfo, chatId) => {
+      console.log(`🔄 Reestableciendo listener para chat ${chatId}`);
+      // Los listeners de Firestore se reestablecen automáticamente
+      // pero podemos forzar una reconexión si es necesario
+    });
+  }
+
+  // Nuevo: Agregar mensaje a cola de reintento
+  private addToRetryQueue(messageId: string, messageData: any): void {
+    this.retryQueue.set(messageId, {
+      messageData,
+      attempts: 0,
+      nextRetry: Date.now() + this.baseRetryDelay
+    });
+    
+    console.log(`📝 Mensaje ${messageId} agregado a cola de reintento`);
+  }
+
+  // Modificado: sendMessage con manejo de reintento automático
   async sendMessage(
     chatId: string, 
     senderId: string, 
@@ -192,6 +344,7 @@ class ChatService {
     };
 
     const sanitizedMetadata = metadata !== undefined ? removeUndefinedDeep(metadata) : undefined;
+    
     try {
       const message: Omit<ChatMessage, 'id'> = {
         chatId,
@@ -202,8 +355,8 @@ class ChatService {
         timestamp: serverTimestamp() as Timestamp,
         read: false,
         status: 'sending',
+        deliveryAttempts: 0,
         replyTo: replyTo ?? null,
-        // metadata will be conditionally added below to avoid undefined values
       } as any;
 
       if (sanitizedMetadata !== undefined) {
@@ -212,7 +365,7 @@ class ChatService {
       
       const docRef = await addDoc(messagesRef, message);
       
-      // FIX: Actualizar último mensaje del chat y usar increment para contador de no leídos
+      // Actualizar último mensaje del chat y usar increment para contador de no leídos
       const chatRef = doc(db, 'chats', chatId);
       await updateDoc(chatRef, {
         lastMessage: {
@@ -222,7 +375,6 @@ class ChatService {
           type
         },
         lastActivity: serverTimestamp(),
-        // FIX: Use increment to avoid race conditions
         [`unreadCount.${receiverId}`]: increment(1)
       });
       
@@ -232,9 +384,11 @@ class ChatService {
       // Actualizar estado a 'sent' después del envío exitoso
       await this.updateMessageStatus(chatId, docRef.id, 'sent');
       
+      // Configurar acknowledgment automático
+      await this.setupDeliveryAcknowledgment(chatId, docRef.id, receiverId);
+      
       // Crear notificación para el receptor
       try {
-        // Obtener información del usuario que envía el mensaje
         const senderDoc = await getDoc(doc(db, 'users', senderId));
         const senderData = senderDoc.data();
         
@@ -247,17 +401,13 @@ class ChatService {
         }
       } catch (notificationError) {
         console.error('Error creating notification:', notificationError);
-        // No lanzar error aquí para no afectar el envío del mensaje
       }
       
       return docRef.id;
     } catch (error) {
       console.error('Error sending message:', error);
-      // FIX: Optional error reporting integration point
-      // if (window.Sentry) window.Sentry.captureException(error);
       
-      // Si hay un error, intentar marcar el mensaje como fallido
-      // (esto solo funcionará si el mensaje se creó antes del error)
+      // Si hay un error, crear mensaje fallido y agregarlo a cola de reintento
       try {
         const failedMessage: Omit<ChatMessage, 'id'> = {
           chatId,
@@ -268,18 +418,188 @@ class ChatService {
           timestamp: serverTimestamp() as Timestamp,
           read: false,
           status: 'failed',
+          deliveryAttempts: 1,
           replyTo: replyTo ?? null,
-          // metadata will be conditionally added below
         } as any;
+        
         if (sanitizedMetadata !== undefined) {
           (failedMessage as any).metadata = sanitizedMetadata;
         }
+        
         const docRef = await addDoc(messagesRef, failedMessage);
+        
+        // Agregar a cola de reintento si estamos online
+        if (this.isOnline) {
+          this.addToRetryQueue(docRef.id, {
+            chatId,
+            senderId,
+            receiverId,
+            content,
+            type,
+            replyTo,
+            metadata: sanitizedMetadata
+          });
+        }
+        
         return docRef.id;
       } catch (secondError) {
         console.error('Error creating failed message:', secondError);
         throw new Error('No se pudo enviar el mensaje');
       }
+    }
+  }
+
+  // Nuevo: Configurar acknowledgment automático de entrega
+  private async setupDeliveryAcknowledgment(chatId: string, messageId: string, receiverId: string): Promise<void> {
+    try {
+      // Limpiar acknowledgment previo si existe
+      this.cleanupPendingAcknowledgment(messageId);
+
+      // Crear listener para detectar cuando el receptor está activo
+      const receiverStatusRef = doc(db, 'onlineStatus', receiverId);
+      
+      const unsubscribe = onSnapshot(receiverStatusRef, async (snapshot) => {
+        if (snapshot.exists()) {
+          const statusData = snapshot.data() as OnlineStatus;
+          
+          // Si el receptor está online, marcar como delivered
+          if (statusData.isOnline) {
+            await this.markMessageAsDelivered(chatId, messageId);
+            this.cleanupPendingAcknowledgment(messageId);
+          }
+        }
+      });
+
+      // Timeout inteligente basado en el estado del receptor
+      const timeoutDelay = await this.calculateAcknowledgmentTimeout(receiverId);
+      const timeoutId = setTimeout(async () => {
+        if (this.pendingAcknowledgments.has(messageId)) {
+          await this.markMessageAsDelivered(chatId, messageId);
+          this.cleanupPendingAcknowledgment(messageId);
+        }
+      }, timeoutDelay);
+
+      // Guardar referencia para cleanup posterior
+      this.pendingAcknowledgments.set(messageId, {
+        messageId,
+        chatId,
+        timestamp: Date.now(),
+        unsubscribe,
+        timeoutId
+      });
+
+    } catch (error) {
+      console.error('Error setting up delivery acknowledgment:', error);
+    }
+  }
+
+  // Nuevo: Calcular timeout inteligente basado en el historial del usuario
+  private async calculateAcknowledgmentTimeout(receiverId: string): Promise<number> {
+    try {
+      // Verificar si el usuario está actualmente online
+      const receiverStatusRef = doc(db, 'onlineStatus', receiverId);
+      const statusSnapshot = await getDoc(receiverStatusRef);
+      
+      if (statusSnapshot.exists()) {
+        const statusData = statusSnapshot.data() as OnlineStatus;
+        
+        // Si está online, timeout corto (5 segundos)
+        if (statusData.isOnline) {
+          return 5000;
+        }
+        
+        // Si estuvo online recientemente (últimos 5 minutos), timeout medio (15 segundos)
+        const lastSeen = statusData.lastSeen;
+        if (lastSeen && typeof lastSeen.toMillis === 'function') {
+          const timeSinceLastSeen = Date.now() - lastSeen.toMillis();
+          if (timeSinceLastSeen < 5 * 60 * 1000) { // 5 minutos
+            return 15000;
+          }
+        }
+      }
+      
+      // Timeout por defecto para usuarios offline (30 segundos)
+      return 30000;
+    } catch (error) {
+      console.error('Error calculating acknowledgment timeout:', error);
+      return 30000; // Fallback a timeout por defecto
+    }
+  }
+
+  // Nuevo: Limpiar acknowledgment pendiente
+  private cleanupPendingAcknowledgment(messageId: string): void {
+    const pending = this.pendingAcknowledgments.get(messageId);
+    if (pending) {
+      // Limpiar listener
+      pending.unsubscribe();
+      // Limpiar timeout
+      clearTimeout(pending.timeoutId);
+      // Remover del cache
+      this.pendingAcknowledgments.delete(messageId);
+    }
+  }
+
+  // Mejorado: Marcar mensaje como entregado con mejor logging
+  async markMessageAsDelivered(chatId: string, messageId: string): Promise<void> {
+    try {
+      const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+      
+      // Verificar el estado actual del mensaje antes de actualizar
+      const messageSnapshot = await getDoc(messageRef);
+      if (!messageSnapshot.exists()) {
+        console.warn(`Message ${messageId} not found when marking as delivered`);
+        return;
+      }
+
+      const currentMessage = messageSnapshot.data();
+      
+      // Solo actualizar si el mensaje no está ya en un estado superior
+      if (currentMessage.status === 'sent' || currentMessage.status === 'sending') {
+        await updateDoc(messageRef, {
+          status: 'delivered',
+          deliveredAt: serverTimestamp()
+        });
+
+        console.log(`✅ Message ${messageId} marked as delivered`);
+      } else {
+        console.log(`📋 Message ${messageId} already in status: ${currentMessage.status}`);
+      }
+
+      // Limpiar del cache de acknowledgments pendientes
+      this.cleanupPendingAcknowledgment(messageId);
+      
+    } catch (error) {
+      console.error('Error marking message as delivered:', error);
+    }
+  }
+
+  // Nuevo: Marcar mensaje como leído (diferente de delivered)
+  async markMessageAsRead(chatId: string, messageId: string): Promise<void> {
+    try {
+      const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+      
+      // Verificar el estado actual del mensaje
+      const messageSnapshot = await getDoc(messageRef);
+      if (!messageSnapshot.exists()) {
+        console.warn(`Message ${messageId} not found when marking as read`);
+        return;
+      }
+
+      const currentMessage = messageSnapshot.data();
+      
+      // Actualizar a 'read' solo si no está ya leído
+      if (currentMessage.status !== 'read') {
+        await updateDoc(messageRef, {
+          status: 'read',
+          read: true,
+          readAt: serverTimestamp()
+        });
+
+        console.log(`👁️ Message ${messageId} marked as read`);
+      }
+
+    } catch (error) {
+      console.error('Error marking message as read:', error);
     }
   }
 
@@ -318,61 +638,106 @@ class ChatService {
     return obj;
   }
 
-  // Marcar mensajes como leídos con validaciones
+  // Marcar mensajes como leídos con transiciones de estado correctas
   async markMessagesAsRead(chatId: string, userId: string): Promise<void> {
     try {
       // Validar parámetros
-      if (!chatId || typeof chatId !== 'string' || chatId.trim().length === 0) {
-        throw new Error('ID de chat inválido');
+      if (!chatId || !userId) {
+        throw new Error('chatId y userId son requeridos');
       }
-      
-      if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
-        throw new Error('ID de usuario inválido');
-      }
-      
-      // Verificar que el chat existe y el usuario tiene permisos
-      const chatRef = doc(db, 'chats', chatId);
-      const chatDoc = await getDoc(chatRef);
-      
-      if (!chatDoc.exists()) {
-        throw new Error('El chat no existe');
-      }
-      
-      const chatData = chatDoc.data();
-      if (!chatData?.participants?.includes(userId)) {
-        throw new Error('No tienes permisos para marcar mensajes como leídos en este chat');
-      }
-      
+
+      // Obtener mensajes no leídos del usuario
       const messagesRef = collection(db, 'chats', chatId, 'messages');
-      const q = query(
+      const unreadQuery = query(
         messagesRef,
         where('receiverId', '==', userId),
         where('read', '==', false)
       );
+
+      const unreadSnapshot = await getDocs(unreadQuery);
       
-      const querySnapshot = await getDocs(q);
-      const batch: Promise<void>[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        // Actualizar tanto el campo read como readBy para compatibilidad
-        batch.push(updateDoc(doc.ref, { 
+      if (unreadSnapshot.empty) {
+        console.log('No hay mensajes no leídos para marcar');
+        return;
+      }
+
+      // Usar batch para actualizar múltiples mensajes
+      const batch = writeBatch(db);
+      const readTimestamp = serverTimestamp();
+      let messagesUpdated = 0;
+
+      unreadSnapshot.docs.forEach((messageDoc) => {
+        const messageData = messageDoc.data();
+        const currentStatus = messageData.status;
+        
+        // Preparar datos de actualización
+        const updateData: any = {
           read: true,
-          readBy: arrayUnion(userId)
-        }));
+          readAt: readTimestamp
+        };
+
+        // Manejar transiciones de estado correctas
+        if (currentStatus === 'sent') {
+          // Primero marcar como delivered, luego como read
+          updateData.status = 'delivered';
+          updateData.deliveredAt = readTimestamp;
+          
+          // Programar actualización a 'read' después de un breve delay
+          setTimeout(async () => {
+            try {
+              await updateDoc(messageDoc.ref, {
+                status: 'read',
+                readAt: serverTimestamp()
+              });
+              console.log(`📖 Mensaje ${messageDoc.id} actualizado de 'delivered' a 'read'`);
+            } catch (error) {
+              console.error(`Error actualizando mensaje ${messageDoc.id} a 'read':`, error);
+            }
+          }, 100); // 100ms delay para asegurar la transición
+          
+        } else if (currentStatus === 'delivered') {
+          // Directamente a read
+          updateData.status = 'read';
+        } else if (currentStatus === 'sending') {
+          // Casos edge: mensaje aún enviándose pero el usuario ya lo está leyendo
+          updateData.status = 'delivered';
+          updateData.deliveredAt = readTimestamp;
+          
+          // También programar actualización a 'read'
+          setTimeout(async () => {
+            try {
+              await updateDoc(messageDoc.ref, {
+                status: 'read',
+                readAt: serverTimestamp()
+              });
+            } catch (error) {
+              console.error(`Error actualizando mensaje ${messageDoc.id} a 'read':`, error);
+            }
+          }, 200);
+        } else {
+          // Para otros estados, solo marcar como leído sin cambiar status
+          console.log(`Mensaje ${messageDoc.id} en estado ${currentStatus}, solo marcando como leído`);
+        }
+
+        batch.update(messageDoc.ref, updateData);
+        messagesUpdated++;
+
+        // Limpiar acknowledgment pendiente si existe
+        this.cleanupPendingAcknowledgment(messageDoc.id);
       });
-      
-      await Promise.all(batch);
-      
-      // Resetear contador de no leídos
-      await updateDoc(chatRef, {
+
+      // Actualizar contador de no leídos en el chat
+      const chatRef = doc(db, 'chats', chatId);
+      batch.update(chatRef, {
         [`unreadCount.${userId}`]: 0
       });
+
+      await batch.commit();
+      
+      console.log(`📖 Marcados ${messagesUpdated} mensajes como leídos en chat ${chatId} con transiciones de estado correctas`);
     } catch (error) {
       console.error('Error marking messages as read:', error);
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Error al marcar mensajes como leídos');
+      throw error;
     }
   }
   
@@ -438,110 +803,188 @@ class ChatService {
     }
   }
   
-  // Suscribirse a mensajes en tiempo real con validaciones mejoradas
+  // Mejorado: Sistema de paginación para mensajes
   subscribeToMessages(
-    chatId: string,
+    chatId: string, 
     callback: (messages: ChatMessage[]) => void,
-    onError?: (error: Error) => void,
-    limitCount: number = 50
+    limitCount: number = 50,
+    options?: {
+      enablePagination?: boolean;
+      loadOlder?: boolean;
+      startAfter?: any; // DocumentSnapshot para paginación
+      onError?: (error: Error) => void;
+    }
   ): () => void {
-    // Validar chatId antes de proceder
-    if (!chatId || typeof chatId !== 'string' || chatId.trim().length === 0) {
-      const error = new Error(`Invalid chatId provided: ${chatId}`);
-      console.error('🚨 Error de validación en subscribeToMessages:', {
-        chatId,
-        chatIdType: typeof chatId,
-        chatIdLength: chatId?.length
-      });
-      if (onError) {
-        onError(error);
-      }
-      return () => {}; // Return empty unsubscribe function
-    }
-    
-    // Validar limitCount
-    if (typeof limitCount !== 'number' || limitCount <= 0 || limitCount > 100) {
-      const error = new Error(`Invalid limitCount: ${limitCount}. Must be between 1 and 100.`);
-      console.error('🚨 Error de validación en subscribeToMessages:', error);
-      if (onError) {
-        onError(error);
-      }
-      return () => {};
-    }
-    
-    // Validar callback
-    if (typeof callback !== 'function') {
-      const error = new Error('Callback must be a function');
-      console.error('🚨 Error de validación en subscribeToMessages:', error);
-      if (onError) {
-        onError(error);
-      }
-      return () => {};
-    }
-
     try {
-      // Listen on /chats/{chatId}/messages sub-collection
-      const messagesRef = collection(db, 'chats', chatId, 'messages');
+      // Validaciones
+      if (!chatId || typeof chatId !== 'string' || chatId.trim().length === 0) {
+        throw new Error('ID de chat inválido');
+      }
+      
+      if (!callback || typeof callback !== 'function') {
+        throw new Error('Callback es requerido y debe ser una función');
+      }
+      
+      if (limitCount <= 0 || limitCount > 100) {
+        throw new Error('Límite debe estar entre 1 y 100');
+      }
 
-      // We fetch the latest `limitCount` messages ordered by timestamp DESC and
-      // later reverse them so the consumer always receives them ASC.
-      const q = query(
+      const messagesRef = collection(db, 'chats', chatId, 'messages');
+      
+      // Construir query base
+      let baseQuery = query(
         messagesRef,
         orderBy('timestamp', 'desc'),
         limit(limitCount)
       );
 
-      return onSnapshot(
-        q,
+      // Si hay paginación, agregar startAfter
+      if (options?.startAfter) {
+        baseQuery = query(
+          messagesRef,
+          orderBy('timestamp', 'desc'),
+          startAfter(options.startAfter),
+          limit(limitCount)
+        );
+      }
+
+      const unsubscribe = onSnapshot(
+        baseQuery,
         (snapshot) => {
-          const messages: ChatMessage[] = [];
-          snapshot.forEach((doc) => {
-            messages.push({ id: doc.id, ...doc.data() } as ChatMessage);
-          });
-          // Firestore returned them DESC, reverse to ASC for UI consistency.
-          callback(messages.reverse());
+          try {
+            const messages: ChatMessage[] = [];
+            let lastDoc = null;
+
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              lastDoc = doc; // Guardar último documento para paginación
+              
+              messages.push({
+                id: doc.id,
+                chatId: data.chatId || chatId,
+                senderId: data.senderId || '',
+                receiverId: data.receiverId || '',
+                content: data.content || '',
+                type: data.type || 'text',
+                timestamp: data.timestamp,
+                read: data.read || false,
+                status: data.status || 'sent',
+                deliveredAt: data.deliveredAt,
+                readAt: data.readAt,
+                deliveryAttempts: data.deliveryAttempts || 0,
+                edited: data.edited || false,
+                editedAt: data.editedAt,
+                replyTo: data.replyTo || null,
+                reactions: data.reactions || {},
+                metadata: data.metadata
+              });
+            });
+
+            // Invertir para mostrar mensajes más antiguos primero
+            const sortedMessages = messages.reverse();
+
+            // Actualizar cache de listener
+            const listenerKey = options?.startAfter ? `${chatId}_paginated` : chatId;
+            this.messageListeners.set(listenerKey, {
+              unsubscribe,
+              lastDoc,
+              hasMore: messages.length === limitCount
+            });
+
+            callback(sortedMessages);
+          } catch (error) {
+            console.error('Error processing messages snapshot:', error);
+            if (options?.onError) {
+              options.onError(error as Error);
+            }
+            callback([]);
+          }
         },
         (error) => {
-        console.error('🚨 Error en snapshot listener de mensajes:', {
-          error: error,
-          message: error.message,
-          code: error.code,
-          chatId: chatId,
-          queryType: 'messages',
-          timestamp: new Date().toISOString(),
-          stack: error.stack,
-          name: error.name
-        });
-        
-        // Log additional context for debugging
-        console.error('🔍 Contexto adicional del error:', {
-          chatIdType: typeof chatId,
-          chatIdLength: chatId?.length,
-          isValidChatId: chatId && typeof chatId === 'string' && chatId.length > 0,
-          limitCount: limitCount
-        });
-        
-        // FIX: Optional error reporting integration point
-        // if (window.Sentry) window.Sentry.captureException(error);
-        if (onError) {
-          onError(error);
+          console.error('Error in messages subscription:', error);
+          if (options?.onError) {
+            options.onError(error);
+          }
+          callback([]);
         }
-      }
-    );
+      );
+
+      return unsubscribe;
     } catch (error) {
-      console.error('🚨 Error al crear la consulta de mensajes:', {
-        error,
-        chatId,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      });
-      
-      if (onError && error instanceof Error) {
-        onError(error);
+      console.error('Error subscribing to messages:', error);
+      if (options?.onError) {
+        options.onError(error as Error);
       }
-      
       return () => {}; // Return empty unsubscribe function
     }
+  }
+
+  // Nuevo: Cargar mensajes más antiguos (paginación hacia atrás)
+  async loadOlderMessages(
+    chatId: string,
+    callback: (messages: ChatMessage[]) => void,
+    limitCount: number = 50
+  ): Promise<boolean> {
+    try {
+      const listenerInfo = this.messageListeners.get(chatId);
+      
+      if (!listenerInfo?.lastDoc || !listenerInfo.hasMore) {
+        console.log('No hay más mensajes antiguos para cargar');
+        return false;
+      }
+
+      // Crear nuevo listener para mensajes más antiguos
+      const olderUnsubscribe = this.subscribeToMessages(
+        chatId,
+        callback,
+        limitCount,
+        {
+          enablePagination: true,
+          loadOlder: true,
+          startAfter: listenerInfo.lastDoc
+        }
+      );
+
+      return true;
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+      return false;
+    }
+  }
+
+  // Nuevo: Limpiar listeners de mensajes
+  cleanupMessageListeners(chatId?: string): void {
+    if (chatId) {
+      // Limpiar listener específico
+      const listenerInfo = this.messageListeners.get(chatId);
+      if (listenerInfo) {
+        listenerInfo.unsubscribe();
+        this.messageListeners.delete(chatId);
+      }
+      
+      // También limpiar listener paginado si existe
+      const paginatedKey = `${chatId}_paginated`;
+      const paginatedListener = this.messageListeners.get(paginatedKey);
+      if (paginatedListener) {
+        paginatedListener.unsubscribe();
+        this.messageListeners.delete(paginatedKey);
+      }
+    } else {
+      // Limpiar todos los listeners
+      this.messageListeners.forEach((listenerInfo) => {
+        listenerInfo.unsubscribe();
+      });
+      this.messageListeners.clear();
+    }
+  }
+
+  // Nuevo: Obtener información de paginación
+  getPaginationInfo(chatId: string): { hasMore: boolean; canLoadOlder: boolean } {
+    const listenerInfo = this.messageListeners.get(chatId);
+    return {
+      hasMore: listenerInfo?.hasMore || false,
+      canLoadOlder: !!listenerInfo?.lastDoc
+    };
   }
   
   // OPTIMIZED: Obtener chats del usuario con ordenamiento en servidor
@@ -802,82 +1245,291 @@ class ChatService {
     // Return cleanup function
     return unsubscribe;
   }
+
+  // Nuevo: Inicializar presencia del usuario
+  async initializePresence(userId: string): Promise<void> {
+    try {
+      this.currentUserId = userId;
+      this.isOnline = true;
+      this.lastUserActivity = Date.now();
+      this.heartbeatFailures = 0;
+      
+      // Establecer presencia inicial
+      await realtimeService.setUserPresence(userId, 'online');
+      
+      // Configurar listeners de actividad y visibilidad
+      this.setupActivityListeners();
+      
+      // Iniciar heartbeat adaptativo
+      this.startHeartbeat();
+      
+      console.log(`✅ Presencia inicializada para usuario ${userId}`);
+    } catch (error) {
+      console.error('Error inicializando presencia:', error);
+      throw error;
+    }
+  }
+
+  // Mejorado: Heartbeat adaptativo para mantener presencia activa
+  private startHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+
+    this.heartbeatInterval = setInterval(async () => {
+      if (!this.currentUserId || !this.isOnline) {
+        return;
+      }
+
+      // Pausar heartbeat si la pestaña está inactiva por más de 5 minutos
+      if (!this.isTabActive && Date.now() - this.lastUserActivity > 300000) {
+        console.log('⏸️ Heartbeat pausado - pestaña inactiva');
+        return;
+      }
+
+      try {
+        const startTime = Date.now();
+        await realtimeService.setUserPresence(this.currentUserId, 'online');
+        
+        // Calcular latencia y actualizar métricas
+        const latency = Date.now() - startTime;
+        this.updateHeartbeatMetrics(latency, true);
+        
+        // Resetear contador de fallos en caso de éxito
+        this.heartbeatFailures = 0;
+        this.lastHeartbeatTime = Date.now();
+        
+        console.log(`💓 Heartbeat enviado (${latency}ms)`);
+        
+        // Ajustar frecuencia adaptativa basada en actividad
+        this.adjustHeartbeatFrequency();
+        
+      } catch (error) {
+        this.heartbeatFailures++;
+        this.updateHeartbeatMetrics(0, false);
+        
+        console.error(`❌ Error en heartbeat (${this.heartbeatFailures}/${this.maxHeartbeatFailures}):`, error);
+        
+        // Si hay muchos fallos consecutivos, intentar reconectar
+        if (this.heartbeatFailures >= this.maxHeartbeatFailures) {
+          console.warn('🔄 Demasiados fallos de heartbeat, intentando reconectar...');
+          await this.handleHeartbeatFailure();
+        }
+      }
+    }, this.adaptiveHeartbeatFrequency);
+  }
+
+  // Nuevo: Detener heartbeat
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  // Mejorado: Limpiar presencia del usuario y listeners
+  async clearPresence(): Promise<void> {
+    try {
+      if (this.currentUserId) {
+        await realtimeService.clearUserPresence(this.currentUserId);
+        this.stopHeartbeat();
+        this.cleanupActivityListeners();
+        this.resetHeartbeatMetrics();
+        this.currentUserId = null;
+        console.log('🧹 Presencia y listeners limpiados');
+      }
+    } catch (error) {
+      console.error('Error limpiando presencia:', error);
+    }
+  }
+
+  // Nuevo: Configurar listeners de actividad del usuario
+  private setupActivityListeners(): void {
+    if (typeof window === 'undefined') return;
+
+    // Listener para visibilidad de la página
+    document.addEventListener('visibilitychange', () => {
+      this.isTabActive = !document.hidden;
+      if (this.isTabActive) {
+        this.lastUserActivity = Date.now();
+        console.log('👁️ Pestaña activa - reanudando heartbeat normal');
+      } else {
+        console.log('😴 Pestaña inactiva - heartbeat reducido');
+      }
+    });
+
+    // Listeners para actividad del usuario
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    const updateActivity = () => {
+      this.lastUserActivity = Date.now();
+    };
+
+    activityEvents.forEach(event => {
+      document.addEventListener(event, updateActivity, { passive: true });
+    });
+
+    // Listener para conexión de red
+    window.addEventListener('online', () => {
+      console.log('🌐 Conexión restaurada - reiniciando heartbeat');
+      this.heartbeatFailures = 0;
+      if (this.currentUserId) {
+        this.startHeartbeat();
+      }
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('📡 Conexión perdida - pausando heartbeat');
+    });
+  }
+
+  // Nuevo: Ajustar frecuencia de heartbeat basada en actividad
+  private adjustHeartbeatFrequency(): void {
+    const timeSinceActivity = Date.now() - this.lastUserActivity;
+    
+    if (timeSinceActivity < 60000) { // Menos de 1 minuto
+      this.adaptiveHeartbeatFrequency = 15000; // 15 segundos - muy activo
+    } else if (timeSinceActivity < 300000) { // Menos de 5 minutos
+      this.adaptiveHeartbeatFrequency = 30000; // 30 segundos - moderadamente activo
+    } else if (timeSinceActivity < 900000) { // Menos de 15 minutos
+      this.adaptiveHeartbeatFrequency = 60000; // 1 minuto - poco activo
+    } else {
+      this.adaptiveHeartbeatFrequency = 120000; // 2 minutos - inactivo
+    }
+
+    // Reiniciar heartbeat con nueva frecuencia si cambió significativamente
+    const frequencyDiff = Math.abs(this.adaptiveHeartbeatFrequency - this.heartbeatFrequency);
+    if (frequencyDiff > 5000) { // Cambio significativo de más de 5 segundos
+      this.heartbeatFrequency = this.adaptiveHeartbeatFrequency;
+      this.startHeartbeat(); // Reiniciar con nueva frecuencia
+    }
+  }
+
+  // Nuevo: Actualizar métricas de heartbeat
+  private updateHeartbeatMetrics(latency: number, success: boolean): void {
+    this.heartbeatMetrics.totalSent++;
+    
+    if (success) {
+      this.heartbeatMetrics.lastLatency = latency;
+      // Calcular promedio móvil de latencia
+      this.heartbeatMetrics.averageLatency = 
+        (this.heartbeatMetrics.averageLatency * 0.8) + (latency * 0.2);
+    } else {
+      this.heartbeatMetrics.totalFailed++;
+    }
+  }
+
+  // Nuevo: Manejar fallos de heartbeat
+  private async handleHeartbeatFailure(): Promise<void> {
+    try {
+      // Detener heartbeat actual
+      this.stopHeartbeat();
+      
+      // Esperar un poco antes de reintentar
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Intentar reconectar
+      if (this.currentUserId) {
+        console.log('🔄 Reintentando conexión de presencia...');
+        await realtimeService.setUserPresence(this.currentUserId, 'online');
+        
+        // Reiniciar heartbeat con frecuencia reducida temporalmente
+        this.adaptiveHeartbeatFrequency = 60000; // 1 minuto
+        this.heartbeatFailures = 0;
+        this.startHeartbeat();
+        
+        console.log('✅ Reconexión de presencia exitosa');
+      }
+    } catch (error) {
+      console.error('❌ Error en reconexión de presencia:', error);
+      // Programar otro intento en 30 segundos
+      setTimeout(() => {
+        if (this.heartbeatFailures >= this.maxHeartbeatFailures) {
+          this.handleHeartbeatFailure();
+        }
+      }, 30000);
+    }
+  }
+
+  // Nuevo: Limpiar listeners de actividad
+  private cleanupActivityListeners(): void {
+    if (typeof window === 'undefined') return;
+
+    // Remover listeners de actividad
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    const updateActivity = () => {
+      this.lastUserActivity = Date.now();
+    };
+
+    activityEvents.forEach(event => {
+      document.removeEventListener(event, updateActivity);
+    });
+
+    console.log('🧹 Listeners de actividad limpiados');
+  }
+
+  // Nuevo: Resetear métricas de heartbeat
+  private resetHeartbeatMetrics(): void {
+    this.heartbeatMetrics = {
+      totalSent: 0,
+      totalFailed: 0,
+      averageLatency: 0,
+      lastLatency: 0
+    };
+    this.heartbeatFailures = 0;
+    this.lastHeartbeatTime = 0;
+    this.adaptiveHeartbeatFrequency = this.heartbeatFrequency;
+  }
+
+  // Nuevo: Obtener métricas de heartbeat
+  getHeartbeatMetrics() {
+    return {
+      ...this.heartbeatMetrics,
+      currentFrequency: this.adaptiveHeartbeatFrequency,
+      failures: this.heartbeatFailures,
+      lastHeartbeat: this.lastHeartbeatTime,
+      isActive: this.isTabActive,
+      timeSinceActivity: Date.now() - this.lastUserActivity
+    };
+  }
+
+  // Nuevo: Obtener usuarios en línea
+  async getOnlineUsers(userIds: string[]): Promise<string[]> {
+    try {
+      return await realtimeService.getOnlineUsers(userIds);
+    } catch (error) {
+      console.error('Error obteniendo usuarios en línea:', error);
+      return [];
+    }
+  }
   
-  // FIX: Indicar que el usuario está escribiendo con validación de seguridad
+  // Migrado: Usar Realtime Database para typing
   async setTyping(chatId: string, userId: string, isTyping: boolean): Promise<void> {
     try {
-      // FIX: Validate that user can only modify their own typing status
-      // This should be enforced by Firestore rules, but adding client-side validation
-      if (!userId || userId.trim().length === 0) {
-        throw new Error('ID de usuario inválido');
+      if (!chatId || !userId) {
+        throw new Error('chatId y userId son requeridos');
       }
-      
-      const typingRef = doc(db, 'typing', `${chatId}_${userId}`);
-      const timeoutKey = `${chatId}_${userId}`;
-      
-      // Limpiar timeout anterior
-      if (this.typingTimeouts.has(timeoutKey)) {
-        clearTimeout(this.typingTimeouts.get(timeoutKey)!);
-        this.typingTimeouts.delete(timeoutKey);
-      }
-      
-      if (isTyping) {
-        const typingData: ChatTyping = {
-          chatId,
-          userId,
-          isTyping: true,
-          timestamp: serverTimestamp() as Timestamp
-        };
-        
-        await setDoc(typingRef, typingData, { merge: true });
-        
-        // Auto-limpiar después de 3 segundos
-        const timeout = setTimeout(async () => {
-          try {
-            await this.setTyping(chatId, userId, false);
-          } catch (error) {
-            console.error('Error auto-clearing typing status:', error);
-          }
-        }, 3000);
-        
-        this.typingTimeouts.set(timeoutKey, timeout);
-      } else {
-         // Eliminar documento de typing
-         try {
-           await deleteDoc(typingRef);
-         } catch (error) {
-           // Ignorar error si el documento no existe
-         }
-       }
+
+      await realtimeService.setTypingStatus(chatId, userId, isTyping);
+      console.log(`📝 Estado de typing actualizado: ${isTyping ? 'escribiendo' : 'no escribiendo'}`);
     } catch (error) {
-      console.error('Error setting typing status:', error);
-      // FIX: Optional error reporting integration point
-      // if (window.Sentry) window.Sentry.captureException(error);
+      console.error('Error actualizando estado de typing:', error);
+      throw error;
     }
   }
   
   // Suscribirse al estado de escritura de un chat
+  // Migrado: Usar Realtime Database para typing
   subscribeToTyping(chatId: string, callback: (userId: string, isTyping: boolean) => void): () => void {
-    const typingQuery = query(
-      collection(db, 'typing'),
-      where('chatId', '==', chatId)
-    );
-
-    return onSnapshot(typingQuery, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        const data = change.doc.data() as ChatTyping;
-        
-        if (change.type === 'added' || change.type === 'modified') {
-          callback(data.userId, data.isTyping);
-        } else if (change.type === 'removed') {
-          callback(data.userId, false);
-        }
+    try {
+      return realtimeService.onTypingStatus(chatId, (typingData) => {
+        Object.entries(typingData).forEach(([userId, typing]) => {
+          callback(userId, typing.isTyping);
+        });
       });
-    }, (error) => {
-      console.error('Error in typing subscription:', error);
-      // FIX: Optional error reporting integration point
-      // if (window.Sentry) window.Sentry.captureException(error);
-    });
+    } catch (error) {
+      console.error('Error suscribiéndose a typing status:', error);
+      return () => {}; // Return empty cleanup function
+    }
   }
   
   // Editar mensaje
@@ -906,13 +1558,51 @@ class ChatService {
     }
   }
 
-  // Actualizar estado de mensaje
-  async updateMessageStatus(chatId: string, messageId: string, status: 'sending' | 'sent' | 'delivered' | 'failed' | 'retrying'): Promise<void> {
+  // Actualizar estado de mensaje con validaciones mejoradas
+  async updateMessageStatus(chatId: string, messageId: string, status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'retrying'): Promise<void> {
     try {
+      if (!chatId || !messageId) {
+        throw new Error('chatId y messageId son requeridos');
+      }
+
       const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
-      await updateDoc(messageRef, {
-        status: status
-      });
+      
+      // Obtener estado actual del mensaje para validar transición
+      const messageDoc = await getDoc(messageRef);
+      if (!messageDoc.exists()) {
+        console.warn(`Mensaje ${messageId} no encontrado para actualizar estado`);
+        return;
+      }
+
+      const currentStatus = messageDoc.data().status;
+      
+      // Validar transiciones de estado válidas
+      const validTransitions: Record<string, string[]> = {
+        'sending': ['sent', 'failed'],
+        'sent': ['delivered', 'failed'],
+        'delivered': ['read'],
+        'failed': ['retrying', 'sent'],
+        'retrying': ['sent', 'failed'],
+        'read': [] // Estado final
+      };
+
+      if (currentStatus && validTransitions[currentStatus] && !validTransitions[currentStatus].includes(status)) {
+        console.warn(`Transición de estado inválida: ${currentStatus} -> ${status}`);
+        return;
+      }
+
+      const updateData: any = { status };
+      
+      // Añadir timestamp específico según el estado
+      if (status === 'delivered') {
+        updateData.deliveredAt = serverTimestamp();
+      } else if (status === 'read') {
+        updateData.readAt = serverTimestamp();
+      }
+
+      await updateDoc(messageRef, updateData);
+      
+      console.log(`Estado del mensaje ${messageId} actualizado a: ${status}`);
     } catch (error) {
       console.error('Error updating message status:', error);
       // FIX: Optional error reporting integration point
@@ -992,19 +1682,14 @@ class ChatService {
         throw new Error('ID de usuario inválido');
       }
       
-      const statusRef = doc(db, 'onlineStatus', userId);
-      const statusData: OnlineStatus = {
-        userId,
-        isOnline,
-        lastSeen: serverTimestamp() as Timestamp
-      };
+      // Usar realtimeService para gestionar presencia
+      const status = isOnline ? 'online' : 'away';
+      await realtimeService.setUserPresence(userId, status);
       
-      await setDoc(statusRef, statusData, { merge: true });
-      this.onlineStatusCache.set(userId, statusData);
+      console.log(`🟢 Estado de presencia actualizado: ${userId} -> ${status}`);
     } catch (error) {
       console.error('Error setting online status:', error);
-      // FIX: Optional error reporting integration point
-      // if (window.Sentry) window.Sentry.captureException(error);
+      throw error;
     }
   }
 
@@ -1013,37 +1698,25 @@ class ChatService {
     userIds: string[],
     callback: (userId: string, isOnline: boolean, lastSeen?: Date) => void
   ): () => void {
-    const unsubscribes: (() => void)[] = [];
-    
-    // FIX: Filter out empty/invalid user IDs
-    const validUserIds = userIds.filter(id => id && id.trim().length > 0);
-    
-    validUserIds.forEach(userId => {
-      const statusRef = doc(db, 'onlineStatus', userId);
-      const unsubscribe = onSnapshot(statusRef, 
-        (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data() as OnlineStatus;
-            this.onlineStatusCache.set(userId, data);
-            callback(userId, data.isOnline, data.lastSeen?.toDate());
-          } else {
-            callback(userId, false);
-          }
-        },
-        (error) => {
-          console.error(`Error in online status subscription for ${userId}:`, error);
-          // FIX: Optional error reporting integration point
-          // if (window.Sentry) window.Sentry.captureException(error);
-          callback(userId, false);
-        }
-      );
+    try {
+      // FIX: Filter out empty/invalid user IDs
+      const validUserIds = userIds.filter(id => id && id.trim().length > 0);
       
-      unsubscribes.push(unsubscribe);
-    });
-    
-    return () => {
-      unsubscribes.forEach(unsubscribe => unsubscribe());
-    };
+      if (validUserIds.length === 0) {
+        console.warn('No hay IDs de usuario válidos para suscribirse al estado en línea');
+        return () => {};
+      }
+      
+      // Usar realtimeService para suscribirse a la presencia
+      return realtimeService.onUserPresence(validUserIds, (presenceData) => {
+        Object.entries(presenceData).forEach(([userId, presence]) => {
+          callback(userId, presence.isOnline, presence.lastSeen ? new Date(presence.lastSeen) : undefined);
+        });
+      });
+    } catch (error) {
+      console.error('Error suscribiéndose al estado en línea:', error);
+      return () => {}; // Return empty cleanup function
+    }
   }
 
   // Obtener total de mensajes no leídos del usuario
@@ -1140,6 +1813,62 @@ class ChatService {
     }
   }
 
+  // Obtener o crear un chat entre dos usuarios
+  async getOrCreateChat(user1Id: string, user2Id: string): Promise<string> {
+    try {
+      // Buscar chat existente
+      const chatsRef = collection(db, 'chats');
+      const q = query(
+        chatsRef,
+        where('participants', 'array-contains', user1Id)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      // Buscar chat que contenga ambos usuarios
+      for (const doc of querySnapshot.docs) {
+        const chat = doc.data() as Chat;
+        if (chat.participants.includes(user2Id)) {
+          return doc.id;
+        }
+      }
+      
+      // Si no existe, crear nuevo chat
+      const newChat: Omit<Chat, 'id'> = {
+        participants: [user1Id, user2Id],
+        participantIds: [user1Id, user2Id],
+        lastMessage: null,
+        lastActivity: serverTimestamp() as Timestamp,
+        unreadCount: {
+          [user1Id]: 0,
+          [user2Id]: 0
+        },
+        isActive: true,
+        createdAt: serverTimestamp() as Timestamp,
+        chatType: 'direct'
+      };
+      
+      const docRef = await addDoc(chatsRef, newChat);
+      console.log(`💬 Nuevo chat creado: ${docRef.id} entre ${user1Id} y ${user2Id}`);
+      
+      return docRef.id;
+    } catch (error) {
+      console.error('Error obteniendo o creando chat:', error);
+      throw error;
+    }
+  }
+
+  // Limpiar todos los acknowledgments pendientes
+  private cleanupAllPendingAcknowledgments(): void {
+    console.log(`🧹 Limpiando ${this.pendingAcknowledgments.size} acknowledgments pendientes`);
+    
+    this.pendingAcknowledgments.forEach((ack, messageId) => {
+      this.cleanupPendingAcknowledgment(messageId);
+    });
+    
+    this.pendingAcknowledgments.clear();
+  }
+
   // Limpiar recursos
   cleanup(): void {
     // Limpiar timeouts de typing
@@ -1148,6 +1877,26 @@ class ChatService {
     
     // Limpiar cache
     this.onlineStatusCache.clear();
+    
+    // Nuevo: Limpiar sistema de reintento
+    if (this.retryInterval) {
+      clearInterval(this.retryInterval);
+      this.retryInterval = null;
+    }
+    this.retryQueue.clear();
+    
+    // Limpiar acknowledgments pendientes con cleanup completo
+    this.cleanupAllPendingAcknowledgments();
+    
+    // Limpiar listeners de mensajes
+    this.cleanupMessageListeners();
+    
+    // Limpiar presencia y heartbeat
+    this.clearPresence().catch(error => {
+      console.error('Error limpiando presencia durante cleanup:', error);
+    });
+    
+    console.log('🧹 ChatService cleanup completed');
   }
 }
 

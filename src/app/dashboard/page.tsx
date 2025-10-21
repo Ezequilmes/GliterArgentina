@@ -17,6 +17,7 @@ import {
   Calendar
 } from 'lucide-react';
 
+
 export default function DashboardPage() {
   const { user, loading, initializing } = useAuth();
   const router = useRouter();
@@ -171,7 +172,7 @@ export default function DashboardPage() {
                     variant="secondary"
                     size="lg"
                     className="h-16 flex items-center justify-center"
-                    onClick={() => router.push('/messages')}
+                    onClick={() => router.push('/chat')}
                   >
                     <div className="flex items-center">
                       <MessageCircle className="w-6 h-6 mr-3" />

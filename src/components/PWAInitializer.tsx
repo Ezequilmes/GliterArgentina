@@ -4,40 +4,53 @@ import { useEffect } from 'react';
 import { useServiceWorker, usePushNotifications } from '@/hooks/useServiceWorker';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useToast } from '@/components/ui/Toast';
+import { detectBrowser } from '@/utils/browserDetection';
 
 export function PWAInitializer() {
   const { register, isSupported: swSupported } = useServiceWorker();
   const { requestPermission, subscribe, isSupported: pushSupported } = usePushNotifications();
   const { isOnline } = useNetworkStatus();
   const { addToast } = useToast();
+  const browserInfo = detectBrowser();
 
+  // Note: Service Worker registration is now handled automatically by useServiceWorker hook
+  // No manual registration needed here to avoid conflicts
+
+  // Service Worker cleanup disabled in development to avoid InvalidStateError
   useEffect(() => {
-    // Skip service worker registration in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('PWA Service Worker registration disabled in development');
+      console.log('Service Worker cleanup deshabilitado en desarrollo para evitar InvalidStateError');
       return;
     }
 
-    // Register service worker
-    if (swSupported) {
-      register();
+    // Skip Service Worker operations in WebView/Trae app
+    if (browserInfo.isWebView || browserInfo.isTraeApp) {
+      console.log('🚫 Service Worker operations skipped in WebView/Trae app');
+      return;
     }
-  }, [swSupported, register]);
 
-  // Ensure no stale Service Worker is controlling app during development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        registrations.forEach((reg) => {
-          reg.unregister();
+    // Only clean up Service Workers in production if needed
+    if ('serviceWorker' in navigator) {
+      try {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((reg) => {
+            reg.unregister();
+          });
+        }).catch((error) => {
+          console.warn('No se pudo acceder a Service Worker registrations:', error);
         });
-      });
+      } catch (error) {
+        console.warn('Error al intentar limpiar Service Workers:', error);
+      }
     }
   }, []);
 
   useEffect(() => {
-    // Skip push notification setup in development or when SW not supported/registered
-    if (process.env.NODE_ENV === 'development' || !pushSupported) {
+    // Skip push notification setup in development, WebView, or when SW not supported/registered
+    if (process.env.NODE_ENV === 'development' || !pushSupported || browserInfo.isWebView || browserInfo.isTraeApp) {
+      if (browserInfo.isWebView || browserInfo.isTraeApp) {
+        console.log('🚫 Push notifications skipped in WebView/Trae app');
+      }
       return;
     }
 

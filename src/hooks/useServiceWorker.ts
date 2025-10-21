@@ -26,18 +26,39 @@ interface UseServiceWorkerReturn extends ServiceWorkerState {
   register: () => Promise<void>;
   update: () => Promise<void>;
   unregister: () => Promise<void>;
-  skipWaiting: () => Promise<void>;
+  skipWaiting: () => void;
+  cleanupServiceWorkers: () => Promise<void>;
 }
 
 export function useServiceWorker(): UseServiceWorkerReturn {
-  const [state, setState] = useState<ServiceWorkerState>({
-    isSupported: false,
-    isRegistered: false,
-    isInstalling: false,
-    isWaiting: false,
-    isControlling: false,
-    updateAvailable: false,
-    registration: null,
+  const [state, setState] = useState<ServiceWorkerState>(() => {
+    // En desarrollo, deshabilitar Service Worker por defecto para evitar InvalidStateError
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        isSupported: false,
+        isRegistered: false,
+        isInstalling: false,
+        isWaiting: false,
+        isControlling: false,
+        updateAvailable: false,
+        registration: null,
+      };
+    }
+
+    const isSupported = typeof window !== 'undefined' && 
+                       'serviceWorker' in navigator && 
+                       window.isSecureContext &&
+                       document.readyState !== 'loading';
+    
+    return {
+      isSupported,
+      isRegistered: false,
+      isInstalling: false,
+      isWaiting: false,
+      isControlling: false,
+      updateAvailable: false,
+      registration: null,
+    };
   });
 
   const { addToast } = useToast();
@@ -48,12 +69,89 @@ export function useServiceWorker(): UseServiceWorkerReturn {
     addToastRef.current = addToast;
   }, [addToast]);
 
-  // Check if service workers are supported
+  // Clean up problematic service workers in development
+  const cleanupServiceWorkers = useCallback(async () => {
+    if (process.env.NODE_ENV === 'development' && 'serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+          console.log('Unregistered service worker:', registration.scope);
+        }
+      } catch (error) {
+        console.warn('Failed to cleanup service workers:', error);
+      }
+    }
+  }, []);
+
+  // Detección mejorada de soporte con prevención de InvalidStateError
   useEffect(() => {
-    setState(prev => ({
-      ...prev,
-      isSupported: 'serviceWorker' in navigator,
-    }));
+    // En desarrollo, no verificar soporte para evitar InvalidStateError
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Service Worker deshabilitado en desarrollo para evitar InvalidStateError');
+      return;
+    }
+
+    const checkSupport = async () => {
+      try {
+        // Verificaciones básicas
+        const hasServiceWorker = 'serviceWorker' in navigator;
+        const isSecureContext = window.isSecureContext || location.protocol === 'http:';
+        const isDocumentReady = document.readyState === 'complete';
+        
+        // Verificación adicional: intentar acceder al navigator.serviceWorker
+        let canAccessServiceWorker = false;
+        if (hasServiceWorker && isDocumentReady) {
+          try {
+            // Intentar acceder a getRegistrations para verificar que no hay InvalidStateError
+            await navigator.serviceWorker.getRegistrations();
+            canAccessServiceWorker = true;
+          } catch (error) {
+            console.warn('No se puede acceder a Service Worker registrations:', error);
+            canAccessServiceWorker = false;
+          }
+        }
+        
+        const isSupported = hasServiceWorker && isSecureContext && isDocumentReady && canAccessServiceWorker;
+        
+        setState(prev => ({
+          ...prev,
+          isSupported
+        }));
+        
+        if (!isSupported) {
+          console.log('Service Worker no soportado:', {
+            hasServiceWorker,
+            isSecureContext,
+            isDocumentReady,
+            canAccessServiceWorker
+          });
+        }
+      } catch (error) {
+        console.error('Error verificando soporte de Service Worker:', error);
+        setState(prev => ({
+          ...prev,
+          isSupported: false
+        }));
+      }
+    };
+
+    // Verificar inmediatamente si el documento ya está listo
+    if (document.readyState === 'complete') {
+      checkSupport();
+    } else {
+      // Esperar a que el documento esté completamente listo
+      const handler = () => {
+        if (document.readyState === 'complete') {
+          document.removeEventListener('readystatechange', handler);
+          window.removeEventListener('load', handler);
+          // Delay adicional para asegurar estabilidad
+          setTimeout(checkSupport, 100);
+        }
+      };
+      document.addEventListener('readystatechange', handler);
+      window.addEventListener('load', handler);
+    }
   }, []);
 
   // Register service worker
@@ -63,10 +161,28 @@ export function useServiceWorker(): UseServiceWorkerReturn {
       return;
     }
 
-    // Additional validations to prevent invalid state errors
+    // Enhanced validations to prevent invalid state errors
     if (document.readyState === 'loading') {
       console.warn('Document is still loading, deferring Service Worker registration');
-      return;
+      // Wait for document to be ready
+      return new Promise<void>((resolve) => {
+        const handleReady = () => {
+          document.removeEventListener('DOMContentLoaded', handleReady);
+          window.removeEventListener('load', handleReady);
+          setTimeout(() => {
+            register().then(resolve);
+          }, 100);
+        };
+        
+        if (document.readyState === 'interactive' || document.readyState === 'complete') {
+          setTimeout(() => {
+            register().then(resolve);
+          }, 100);
+        } else {
+          document.addEventListener('DOMContentLoaded', handleReady, { once: true });
+          window.addEventListener('load', handleReady, { once: true });
+        }
+      });
     }
 
     // Check if we're in a secure context
@@ -75,11 +191,31 @@ export function useServiceWorker(): UseServiceWorkerReturn {
       return;
     }
 
+    // Check if already registered
+    if (state.isRegistered || state.isInstalling) {
+      console.log('Service Worker already registered or installing');
+      return;
+    }
+
     try {
       setState(prev => ({ ...prev, isInstalling: true }));
 
+      // Additional check for existing registration
+      const existingRegistration = await navigator.serviceWorker.getRegistration('/');
+      if (existingRegistration) {
+        console.log('Using existing Service Worker registration:', existingRegistration);
+        setState(prev => ({
+          ...prev,
+          isRegistered: true,
+          isInstalling: false,
+          registration: existingRegistration,
+        }));
+        return;
+      }
+
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/',
+        updateViaCache: 'imports'
       });
 
       console.log('Service Worker registered:', registration);
@@ -148,34 +284,71 @@ export function useServiceWorker(): UseServiceWorkerReturn {
     } catch (error) {
       console.error('Service Worker registration failed:', error);
       
-      // Handle specific InvalidStateError
-      if (error instanceof DOMException && error.name === 'InvalidStateError') {
-        console.warn('Document in invalid state, will retry later');
-        setState(prev => ({ 
-          ...prev, 
-          isInstalling: false 
-        }));
-        
-        // Retry after a longer delay
-        setTimeout(() => {
-          if (state.isSupported && !state.isRegistered) {
-            register();
-          }
-        }, 2000);
-        return;
+      setState(prev => ({ ...prev, isInstalling: false }));
+
+      // Handle specific errors with appropriate strategies
+      if (error instanceof Error) {
+        switch (error.name) {
+          case 'InvalidStateError':
+            console.warn('InvalidStateError detected, document may not be ready. Retrying after delay...');
+            
+            addToastRef.current({
+              type: 'warning',
+              title: 'Configurando aplicación',
+              message: 'Reintentando configuración automática...',
+            });
+
+            // Wait longer and ensure document is fully ready
+            setTimeout(async () => {
+              if (document.readyState === 'complete') {
+                try {
+                  await register();
+                } catch (retryError) {
+                  console.error('Retry failed:', retryError);
+                  addToastRef.current({
+                    type: 'error',
+                    title: 'Error de configuración',
+                    message: 'No se pudo configurar la aplicación offline',
+                  });
+                }
+              }
+            }, 3000);
+            break;
+
+          case 'SecurityError':
+            console.error('SecurityError: Service Worker registration blocked by security policy');
+            addToastRef.current({
+              type: 'error',
+              title: 'Error de seguridad',
+              message: 'La configuración offline está bloqueada por políticas de seguridad',
+            });
+            break;
+
+          case 'TypeError':
+            console.error('TypeError: Service Worker script failed to load or parse');
+            addToastRef.current({
+              type: 'error',
+              title: 'Error de carga',
+              message: 'No se pudo cargar la configuración offline',
+            });
+            break;
+
+          default:
+            console.error('Unknown Service Worker registration error:', error);
+            addToastRef.current({
+              type: 'error',
+              title: 'Error de configuración',
+              message: 'No se pudo configurar la aplicación offline',
+            });
+        }
+      } else {
+        console.error('Non-Error object thrown during Service Worker registration:', error);
+        addToastRef.current({
+          type: 'error',
+          title: 'Error inesperado',
+          message: 'Ocurrió un error inesperado durante la configuración',
+        });
       }
-      
-      setState(prev => ({ 
-        ...prev, 
-        isInstalling: false,
-        isRegistered: false 
-      }));
-      
-      addToastRef.current({
-        type: 'error',
-        title: 'Error de instalación',
-        message: 'No se pudo instalar la aplicación offline',
-      });
     }
   }, [state.isSupported]);
 
@@ -233,34 +406,96 @@ export function useServiceWorker(): UseServiceWorkerReturn {
     }
   };
 
-  // Auto-register on mount (disabled in development to avoid InvalidStateError)
+  // Auto-register on mount with enhanced safety and InvalidStateError prevention
   useEffect(() => {
-    // Skip auto-registration in development
+    // En desarrollo, no auto-registrar para evitar InvalidStateError
     if (process.env.NODE_ENV === 'development') {
-      console.log('Service Worker auto-registration disabled in development');
+      console.log('Auto-registro de Service Worker deshabilitado en desarrollo');
       return;
     }
 
-    if (!state.isSupported || state.isRegistered) return;
-
-    const registerWhenReady = () => {
-      // Wait for the window to be fully loaded
-      if (document.readyState !== 'complete') {
-        window.addEventListener('load', registerWhenReady, { once: true });
-        return;
-      }
-      
-      // Additional delay to ensure everything is ready
-      setTimeout(() => {
-        // Double check the state before registering
-        if (state.isSupported && !state.isRegistered) {
-          register();
+    // Enhanced document ready detection with InvalidStateError prevention
+    const registerWhenReady = async () => {
+      try {
+        // Verificar contexto seguro y estado del documento
+        if (!window.isSecureContext && location.protocol !== 'http:') {
+          console.warn('Service Worker requiere contexto seguro (HTTPS)');
+          return;
         }
-      }, 500);
+
+        // Multiple checks to ensure document and environment are ready
+        if (document.readyState === 'complete' && 
+            window.navigator && 
+            'serviceWorker' in navigator &&
+            !state.isRegistered && 
+            !state.isInstalling) {
+          
+          // Wait for any pending operations to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Verify document is still ready after delay
+          if (document.readyState === 'complete') {
+            // Additional delay to ensure all scripts are loaded and DOM is stable
+            setTimeout(() => {
+              register().catch((error) => {
+                console.error('Error en auto-registro:', error);
+              });
+            }, 500);
+          }
+        }
+      } catch (error) {
+        console.error('Error en registerWhenReady:', error);
+      }
     };
 
-    registerWhenReady();
-  }, [state.isSupported, state.isRegistered]);
+    // Handle different document states with better error handling
+    if (document.readyState === 'loading') {
+      // Document still loading, wait for events
+      const handleDOMReady = () => {
+        document.removeEventListener('DOMContentLoaded', handleDOMReady);
+        // Add delay before registering to ensure stability
+        setTimeout(() => {
+          registerWhenReady();
+        }, 200);
+      };
+      
+      const handleWindowLoad = () => {
+        window.removeEventListener('load', handleWindowLoad);
+        // Add delay before registering to ensure stability
+        setTimeout(() => {
+          registerWhenReady();
+        }, 200);
+      };
+
+      document.addEventListener('DOMContentLoaded', handleDOMReady, { once: true });
+      window.addEventListener('load', handleWindowLoad, { once: true });
+      
+      return () => {
+        document.removeEventListener('DOMContentLoaded', handleDOMReady);
+        window.removeEventListener('load', handleWindowLoad);
+      };
+    } else if (document.readyState === 'interactive') {
+      // DOM ready but resources may still be loading
+      const handleWindowLoad = () => {
+        window.removeEventListener('load', handleWindowLoad);
+        // Add delay before registering to ensure stability
+        setTimeout(() => {
+          registerWhenReady();
+        }, 200);
+      };
+      
+      window.addEventListener('load', handleWindowLoad, { once: true });
+      
+      return () => {
+        window.removeEventListener('load', handleWindowLoad);
+      };
+    } else {
+      // Document completely loaded - add extra delay for safety
+      setTimeout(() => {
+        registerWhenReady();
+      }, 300);
+    }
+  }, [register, state.isRegistered, state.isInstalling]);
 
   return {
     ...state,
@@ -268,6 +503,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
     update,
     unregister,
     skipWaiting,
+    cleanupServiceWorkers,
   };
 }
 

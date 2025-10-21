@@ -61,8 +61,17 @@ export function useOnlineStatus(userIds: string[] = []): UseOnlineStatusReturn {
       (userId, isOnline, lastSeen) => {
         setOnlineUsers(prev => {
           const newMap = new Map(prev);
-          newMap.set(userId, { isOnline, lastSeen });
-          return newMap;
+          const currentData = newMap.get(userId);
+          
+          // Solo actualizar si hay cambios reales
+          if (!currentData || 
+              currentData.isOnline !== isOnline || 
+              currentData.lastSeen?.getTime() !== lastSeen?.getTime()) {
+            newMap.set(userId, { isOnline, lastSeen });
+            return newMap;
+          }
+          
+          return prev; // No hay cambios, evitar re-render
         });
       }
     );
@@ -72,49 +81,67 @@ export function useOnlineStatus(userIds: string[] = []): UseOnlineStatusReturn {
         unsubscribeRef.current();
       }
     };
-  }, [userIds]);
+  }, [userIds.join(',')]); // Usar join para comparación estable
 
   // Configurar estado en línea del usuario actual
   useEffect(() => {
     if (!user?.id) return;
 
+    let isActive = true; // Flag para evitar actualizaciones después del cleanup
+
+    // Función interna para actualizar estado
+    const updateOnlineStatus = async (isOnline: boolean) => {
+      if (!isActive || !user?.id) return;
+      
+      try {
+        await chatService.setOnlineStatus(user.id, isOnline);
+      } catch (error) {
+        console.error('Error setting online status:', error);
+      }
+    };
+
     // Marcar como en línea al montar
-    setOnlineStatus(true);
+    updateOnlineStatus(true);
 
     // Actualizar estado cada 30 segundos
     intervalRef.current = setInterval(() => {
-      setOnlineStatus(true);
+      updateOnlineStatus(true);
     }, 30000);
 
     // Manejar eventos de visibilidad de la página
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setOnlineStatus(false);
+        updateOnlineStatus(false);
       } else {
-        setOnlineStatus(true);
+        updateOnlineStatus(true);
       }
     };
 
     // Manejar cierre de ventana/pestaña
     const handleBeforeUnload = () => {
-      setOnlineStatus(false);
+      updateOnlineStatus(false);
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      isActive = false; // Marcar como inactivo
+      
       // Marcar como fuera de línea al desmontar
-      setOnlineStatus(false);
+      if (user?.id) {
+        chatService.setOnlineStatus(user.id, false).catch(console.error);
+      }
       
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
       
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [user?.id, setOnlineStatus]);
+  }, [user?.id]); // Solo depende de user?.id
 
   return {
     onlineUsers,

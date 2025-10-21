@@ -95,12 +95,35 @@ export interface AnalyticsEvents {
 
 class AnalyticsService {
   private isInitialized = false;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor() {
-    // Verificar si Analytics está disponible
-    if (typeof window !== 'undefined' && analytics) {
-      this.isInitialized = true;
+    // Inicializar Analytics de forma asíncrona
+    if (typeof window !== 'undefined') {
+      this.initializeAnalytics();
     }
+  }
+
+  private async initializeAnalytics(): Promise<void> {
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.initializationPromise = new Promise<void>((resolve) => {
+      // Esperar a que Analytics esté disponible
+      const checkAnalytics = () => {
+        if (analytics) {
+          this.isInitialized = true;
+          resolve();
+        } else {
+          // Reintentar después de un breve delay
+          setTimeout(checkAnalytics, 100);
+        }
+      };
+      checkAnalytics();
+    });
+
+    return this.initializationPromise;
   }
 
   /**
@@ -110,17 +133,25 @@ class AnalyticsService {
     eventName: K,
     parameters: AnalyticsEvents[K]
   ): void {
-    if (!this.isInitialized || !analytics) {
-      console.warn('Analytics not initialized');
-      return;
+    // No mostrar warning, simplemente intentar enviar el evento
+    if (typeof window === 'undefined') {
+      return; // No hacer nada en el servidor
     }
 
-    try {
-      logEvent(analytics, eventName, parameters);
-      console.log(`📊 Analytics event: ${eventName}`, parameters);
-    } catch (error) {
-      console.error('Error tracking event:', error);
-    }
+    // Intentar enviar el evento de forma asíncrona
+    this.initializeAnalytics().then(() => {
+      if (this.isInitialized && analytics) {
+        try {
+          logEvent(analytics, eventName, parameters);
+          console.log(`📊 Analytics event: ${eventName}`, parameters);
+        } catch (error) {
+          console.error('Error tracking event:', error);
+        }
+      }
+    }).catch(() => {
+      // Silenciosamente ignorar errores de inicialización de Analytics
+      // para no bloquear la funcionalidad principal de la app
+    });
   }
 
   /**

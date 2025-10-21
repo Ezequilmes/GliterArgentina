@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Card } from '@/components/ui';
 import { Heart, Users, MessageCircle, Shield, Sparkles, Star, ArrowRight, Play } from 'lucide-react';
+import BrowserCompatibility from '@/components/BrowserCompatibility';
 
 
 export default function Home() {
@@ -67,6 +68,9 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* Browser Compatibility Warning */}
+      <BrowserCompatibility />
 
       {/* Hero Section */}
       <main className="relative overflow-hidden">

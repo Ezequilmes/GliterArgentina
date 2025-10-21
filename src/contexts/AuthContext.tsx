@@ -18,6 +18,7 @@ import {
 import { getCurrentLocation } from '@/lib/geolocation';
 import { analyticsService } from '@/services/analyticsService';
 import { useServiceWorkerHandler } from '@/hooks/useServiceWorkerHandler';
+import { chatService } from '@/services/chatService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -134,9 +135,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setAuthUser(authUser);
           const userData: User | null = await loadUserData(authUser);
           setUser(userData);
+          
+          // Inicializar presencia en Realtime Database
+          try {
+            await chatService.initializePresence(authUser.uid);
+            console.log('✅ [AUTH] Presencia inicializada para usuario:', authUser.uid);
+          } catch (error) {
+            console.error('❌ [AUTH] Error inicializando presencia:', error);
+          }
         } else {
           setAuthUser(null);
           setUser(null);
+          
+          // Limpiar presencia cuando el usuario se desautentica
+          try {
+            await chatService.clearPresence();
+            console.log('✅ [AUTH] Presencia limpiada');
+          } catch (error) {
+            console.error('❌ [AUTH] Error limpiando presencia:', error);
+          }
         }
       } catch (error) {
         console.error('💥 [AUTH DEBUG] Error in auth state change:', {
@@ -177,6 +194,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userData: User | null = await loadUserData(authUser);
       setUser(userData);
       setAuthUser(authUser);
+
+      // Inicializar presencia
+      try {
+        await chatService.initializePresence(authUser.uid);
+        console.log('✅ [LOGIN] Presencia inicializada para usuario:', authUser.uid);
+      } catch (error) {
+        console.error('❌ [LOGIN] Error inicializando presencia:', error);
+      }
 
       // Track login event
       analyticsService.trackLogin('email');
@@ -238,6 +263,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userData);
       setAuthUser(authUser);
 
+      // Inicializar presencia
+      try {
+        await chatService.initializePresence(authUser.uid);
+        console.log('✅ [REGISTER] Presencia inicializada para usuario:', authUser.uid);
+      } catch (error) {
+        console.error('❌ [REGISTER] Error inicializando presencia:', error);
+      }
+
       // Track signup event
       analyticsService.trackSignup('email');
       analyticsService.setUserId(authUser.uid);
@@ -267,6 +300,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userData);
       setAuthUser(authUser);
 
+      // Inicializar presencia
+      try {
+        await chatService.initializePresence(authUser.uid);
+        console.log('✅ [GOOGLE LOGIN] Presencia inicializada para usuario:', authUser.uid);
+      } catch (error) {
+        console.error('❌ [GOOGLE LOGIN] Error inicializando presencia:', error);
+      }
+
       // Track Google login event
       analyticsService.trackLogin('google');
       analyticsService.setUserId(authUser.uid);
@@ -293,6 +334,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       // Track logout event before clearing user data
       analyticsService.trackLogout();
+      
+      // Limpiar presencia antes del logout
+      try {
+        await chatService.clearPresence();
+        console.log('✅ [LOGOUT] Presencia limpiada');
+      } catch (error) {
+        console.error('❌ [LOGOUT] Error limpiando presencia:', error);
+      }
       
       await logout();
       setUser(null);

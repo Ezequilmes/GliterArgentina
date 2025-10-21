@@ -68,20 +68,27 @@ export default function RootLayout({
   return (
     <html lang="es" className="h-full" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
-        {process.env.NODE_ENV === 'development' && (
+        {/* Service Worker cleanup disabled in development to avoid InvalidStateError */}
+        {process.env.NODE_ENV === 'production' && (
           <script
             dangerouslySetInnerHTML={{
               __html: `
-                // Cleanup old Vite service workers in development
+                // Cleanup old Vite service workers in production only
                 if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                    for(let registration of registrations) {
-                      if (registration.scope.includes('vite') || registration.scope.includes('@vite')) {
-                        registration.unregister();
-                        console.log('Unregistered old Vite service worker:', registration.scope);
+                  try {
+                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                      for(let registration of registrations) {
+                        if (registration.scope.includes('vite') || registration.scope.includes('@vite')) {
+                          registration.unregister();
+                          console.log('Unregistered old Vite service worker:', registration.scope);
+                        }
                       }
-                    }
-                  });
+                    }).catch(function(error) {
+                      console.warn('Error cleaning up Vite service workers:', error);
+                    });
+                  } catch (error) {
+                    console.warn('Error accessing service worker registrations:', error);
+                  }
                 }
               `,
             }}

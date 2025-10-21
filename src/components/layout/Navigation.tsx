@@ -39,7 +39,7 @@ const navigationItems = [
   },
   {
     name: 'Chats',
-    href: '/messages',
+    href: '/chat',
     icon: MessageCircle
   },
   {

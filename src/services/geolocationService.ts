@@ -1,5 +1,6 @@
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { detectBrowser, getWebViewFallbacks } from '@/utils/browserDetection';
 
 export interface GeolocationData {
   latitude: number;
@@ -22,8 +23,15 @@ export class GeolocationService {
   private lastUpdate: Date | null = null;
   private updateInterval: number = 30000; // 30 seconds
   private isTracking: boolean = false;
+  private browserInfo = detectBrowser();
+  private fallbacks = getWebViewFallbacks();
 
-  constructor(private userId: string) {}
+  constructor(private userId: string) {
+    console.log('🌍 GeolocationService initialized for browser:', this.browserInfo.browserName);
+    if (this.browserInfo.isTraeApp) {
+      console.log('🎯 Trae App detected - using WebView optimizations');
+    }
+  }
 
   /**
    * Start tracking user location
@@ -31,6 +39,16 @@ export class GeolocationService {
   async startTracking(options: GeolocationOptions = {}): Promise<void> {
     if (this.isTracking) {
       return;
+    }
+
+    // Check browser support
+    if (!this.browserInfo.supportsGeolocation) {
+      console.warn('🚫 Geolocation not supported in this browser:', this.browserInfo.browserName);
+      if (this.browserInfo.isTraeApp) {
+        throw new Error('La geolocalización no está disponible en el navegador integrado de Trae. Por favor, abre la aplicación en tu navegador principal para usar esta función.');
+      } else {
+        throw new Error('Geolocation is not supported by this browser');
+      }
     }
 
     if (!navigator.geolocation) {

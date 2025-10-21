@@ -84,7 +84,7 @@ if (typeof self !== 'undefined' && self.addEventListener) {
         url = '/matches';
         break;
       case 'message':
-        url = data.chatId ? `/chat/${data.chatId}` : '/messages';
+        url = data.chatId ? `/chat/${data.chatId}` : '/chat';
         break;
       case 'like':
       case 'super_like':

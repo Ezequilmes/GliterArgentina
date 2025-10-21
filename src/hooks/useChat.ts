@@ -127,35 +127,38 @@ export function useChat(): UseChatReturn {
             setLoading(false);
           }
         },
-        (error) => {
-          console.error('Error en suscripción de mensajes:', error);
-          
-          // Provide more specific error messages based on error type
-          let errorMessage = 'Error al cargar mensajes';
-          
-          try {
-            if (error?.message) {
-              if (error.message.includes('permission') || error.message.includes('denied')) {
-                errorMessage = 'No tienes permisos para acceder a este chat';
-              } else if (error.message.includes('not-found') || error.message.includes('document')) {
-                errorMessage = 'El chat no existe o ha sido eliminado';
-              } else if (error.message.includes('network') || error.message.includes('offline')) {
-                errorMessage = 'Error de conexión. Verifica tu internet';
-              } else if (error.message.includes('unauthenticated') || error.message.includes('auth')) {
-                errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente';
-              } else if (error.message.includes('quota') || error.message.includes('limit')) {
-                errorMessage = 'Límite de uso excedido. Intenta más tarde';
-              } else {
-                errorMessage = `Error al cargar mensajes: ${error.message}`;
+        50, // limitCount
+        {
+          onError: (error: Error) => {
+            console.error('Error en suscripción de mensajes:', error);
+            
+            // Provide more specific error messages based on error type
+            let errorMessage = 'Error al cargar mensajes';
+            
+            try {
+              if (error?.message) {
+                if (error.message.includes('permission') || error.message.includes('denied')) {
+                  errorMessage = 'No tienes permisos para acceder a este chat';
+                } else if (error.message.includes('not-found') || error.message.includes('document')) {
+                  errorMessage = 'El chat no existe o ha sido eliminado';
+                } else if (error.message.includes('network') || error.message.includes('offline')) {
+                  errorMessage = 'Error de conexión. Verifica tu internet';
+                } else if (error.message.includes('unauthenticated') || error.message.includes('auth')) {
+                  errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente';
+                } else if (error.message.includes('quota') || error.message.includes('limit')) {
+                  errorMessage = 'Límite de uso excedido. Intenta más tarde';
+                } else {
+                  errorMessage = `Error al cargar mensajes: ${error.message}`;
+                }
               }
+            } catch (parseError) {
+              console.error('Error parsing error message:', parseError);
+              errorMessage = 'Error desconocido al cargar mensajes';
             }
-          } catch (parseError) {
-            console.error('Error parsing error message:', parseError);
-            errorMessage = 'Error desconocido al cargar mensajes';
+            
+            setError(errorMessage);
+            setLoading(false);
           }
-          
-          setError(errorMessage);
-          setLoading(false);
         }
       );
       
@@ -294,6 +297,16 @@ export function useChat(): UseChatReturn {
     setupMessages();
   }, [currentChat?.id, user?.id, initializing]); // Dependencias específicas en lugar de setupMessages
 
+  // Handle pending chat selection after initialization
+  useEffect(() => {
+    if (!initializing && user?.id && pendingChatIdRef.current) {
+      console.log('🔄 Initialization complete, processing pending chat:', pendingChatIdRef.current);
+      const pendingChatId = pendingChatIdRef.current;
+      pendingChatIdRef.current = null;
+      selectChat(pendingChatId);
+    }
+  }, [initializing, user?.id]);
+
   // Enviar mensaje
   const sendMessage = useCallback(async (
     chatId: string, 
@@ -383,6 +396,13 @@ export function useChat(): UseChatReturn {
 
       setError(null);
 
+      // If still initializing, store the chatId to select later
+      if (initializing) {
+        console.log('🔄 Still initializing, storing chatId for later:', chatId);
+        pendingChatIdRef.current = chatId;
+        return;
+      }
+
       // Validate user is authenticated
       if (!user?.id) {
         console.error('❌ User not authenticated');
@@ -391,10 +411,14 @@ export function useChat(): UseChatReturn {
       }
 
       const chat = chats.find(c => c.id === chatId);
+      console.log('🔍 Looking for chat:', { chatId, foundChat: !!chat, totalChats: chats.length });
+      
       if (chat) {
+        console.log('✅ Chat found, setting as current:', chat.id);
         setCurrentChat(chat);
         pendingChatIdRef.current = null;
       } else {
+        console.log('❌ Chat not found in loaded chats, attempting to create/get it');
         // If chat not found in loaded chats, try to create/get it
         if (chatId.startsWith('direct_')) {
           // Extract userIds from chatId format: direct_userId1_userId2
