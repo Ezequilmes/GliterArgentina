@@ -6,7 +6,7 @@ import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getMessaging } from 'firebase/messaging';
-import { getFirebaseConfig } from './firebase-config';
+import { firebaseConfig } from './firebase-config';
 
 // Configurar logging de Firebase para evitar errores de logType
 if (typeof window !== 'undefined') {
@@ -20,9 +20,6 @@ if (typeof window !== 'undefined') {
     originalConsoleWarn.apply(console, args);
   };
 }
-
-// Obtener configuración de Firebase
-const firebaseConfig = getFirebaseConfig();
 
 // Función para validar la configuración de Firebase
 function validateFirebaseConfig() {
