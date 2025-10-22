@@ -209,5 +209,68 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isOwner(userId);
     }
+    
+    // NUEVAS REGLAS PARA EXCLUSIVOS
+    // Helper function para verificar si el usuario es admin
+    function isAdmin() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Exclusives collection - cards de modelos y masajistas
+    match /exclusives/{exclusiveId} {
+      // Lectura: usuarios autenticados pueden ver cards activas, admins pueden ver todas
+      allow read: if isAuthenticated() && (resource.data.subscriptionStatus == 'active' || isAdmin());
+      
+      // Lista: usuarios autenticados pueden listar exclusivos
+      allow list: if isAuthenticated();
+      
+      // Creación: admins pueden crear con cualquier estado, usuarios normales solo con 'pending'
+      allow create: if isAuthenticated() && (
+        isAdmin() || 
+        request.resource.data.subscriptionStatus == 'pending'
+      );
+      
+      // Actualización y eliminación: solo admins
+      allow update, delete: if isAdmin();
+    }
+    
+    // Promo codes collection - códigos promocionales
+    match /promo_codes/{codeId} {
+      // Lectura: todos pueden leer códigos activos para validación, admins ven todos
+      allow read: if resource.data.active == true || isAdmin();
+      
+      // Escritura: solo admins pueden crear, actualizar y eliminar códigos
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Promo usage logs - registro de uso de códigos promocionales
+    match /promo_usage/{usageId} {
+      // Lectura: solo admins pueden ver logs de uso
+      allow read: if isAdmin();
+      
+      // Creación: usuarios autenticados pueden crear logs cuando usan códigos
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == request.resource.data.userId;
+      
+      // Actualización y eliminación: solo admins
+      allow update, delete: if isAdmin();
+    }
+    
+    // App configuration - configuración general de la app
+    match /app_config/{configId} {
+      // Lectura: configuración pública accesible a todos
+      allow read: if true;
+      
+      // Escritura: solo admins pueden modificar configuración
+      allow write: if isAdmin();
+    }
+    
+    // Analytics collection - estadísticas y métricas
+    match /analytics/{analyticsId} {
+      // Solo admins pueden leer y escribir estadísticas
+      allow read, write: if isAdmin();
+    }
   }
 }

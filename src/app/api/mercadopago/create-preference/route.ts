@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // Configuración para exportación estática
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 export const revalidate = false;
 
 /**

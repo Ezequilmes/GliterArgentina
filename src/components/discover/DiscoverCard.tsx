@@ -113,10 +113,10 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
     <div
       ref={cardRef}
       className={cn(
-        'relative w-full max-w-xs sm:max-w-sm mx-auto',
+        'relative w-full max-w-[280px] sm:max-w-xs md:max-w-sm mx-auto',
         'bg-gradient-to-br from-white via-white to-primary/5',
       'dark:from-gray-900 dark:via-gray-900 dark:to-primary/10',
-      'rounded-2xl sm:rounded-3xl shadow-2xl shadow-primary/10 overflow-hidden',
+      'rounded-xl sm:rounded-2xl md:rounded-3xl shadow-lg sm:shadow-2xl shadow-primary/10',
         'border border-white/20 dark:border-gray-800/50',
         'backdrop-blur-sm',
         'transform transition-all duration-500 ease-out',
@@ -129,7 +129,7 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
     >
       {/* Photo Section */}
       <div 
-        className="relative aspect-[3/4] overflow-hidden rounded-t-2xl sm:rounded-t-3xl cursor-pointer"
+        className="relative aspect-[3/4] overflow-hidden rounded-t-xl sm:rounded-t-2xl md:rounded-t-3xl cursor-pointer"
         onClick={() => onShowProfile?.(user.id)}
       >
         {allPhotos.length > 0 && (
@@ -151,7 +151,7 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
                     e.stopPropagation();
                     handlePrevPhoto();
                   }}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 
+                  className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 
                            bg-gradient-to-r from-black/60 to-black/40 backdrop-blur-sm
                            rounded-full flex items-center justify-center text-white 
                            hover:from-purple-600/80 hover:to-orange-600/80 
@@ -160,14 +160,14 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
                            opacity-0 group-hover:opacity-100 group-hover:translate-x-0
                            -translate-x-2 border border-white/20"
                 >
-                  <ChevronLeft className="w-5 h-5 transition-transform duration-300 hover:-translate-x-0.5" />
+                  <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 hover:-translate-x-0.5" />
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleNextPhoto();
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 
+                  className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 
                            bg-gradient-to-r from-black/60 to-black/40 backdrop-blur-sm
                            rounded-full flex items-center justify-center text-white 
                            hover:from-purple-600/80 hover:to-orange-600/80 
@@ -176,20 +176,20 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
                            opacity-0 group-hover:opacity-100 group-hover:translate-x-0
                            translate-x-2 border border-white/20"
                 >
-                  <ChevronRight className="w-5 h-5 transition-transform duration-300 hover:translate-x-0.5" />
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 hover:translate-x-0.5" />
                 </button>
                 
                 {/* Photo Indicators */}
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 flex space-x-2 
+                <div className="absolute top-3 sm:top-4 left-1/2 -translate-x-1/2 flex space-x-1 sm:space-x-2 
                               animate-in fade-in-0 slide-in-from-top-2 duration-500 delay-100">
                   {allPhotos.map((_, index) => (
                     <div
                       key={index}
                       className={cn(
-                        'h-1 rounded-full transition-all duration-500 cursor-pointer',
+                        'h-0.5 sm:h-1 rounded-full transition-all duration-500 cursor-pointer',
                         index === currentPhotoIndex
-                          ? 'w-8 bg-gradient-to-r from-purple-400 to-orange-400 shadow-lg shadow-purple-500/50 animate-pulse'
-                          : 'w-4 bg-white/60 hover:bg-white/80 hover:w-6 hover:shadow-md'
+                          ? 'w-6 sm:w-8 bg-gradient-to-r from-purple-400 to-orange-400 shadow-lg shadow-purple-500/50 animate-pulse'
+                          : 'w-3 sm:w-4 bg-white/60 hover:bg-white/80 hover:w-5 sm:hover:w-6 hover:shadow-md'
                       )}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -204,32 +204,35 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
         )}
 
         {/* Status Badges */}
-        <div className="absolute top-4 left-4 flex flex-wrap gap-2 z-10 animate-in fade-in-0 slide-in-from-left-4 duration-500 delay-200">
+        <div className="absolute top-3 sm:top-4 left-3 sm:left-4 flex flex-wrap gap-1 sm:gap-2 z-10 animate-in fade-in-0 slide-in-from-left-4 duration-500 delay-200">
           {user.isOnline && (
-            <div className="px-3 py-1 bg-gradient-to-r from-green-400 to-emerald-500 
+            <div className="px-2 py-0.5 sm:px-3 sm:py-1 bg-gradient-to-r from-green-400 to-emerald-500 
                           backdrop-blur-sm rounded-full text-white text-xs font-medium 
                           shadow-lg border border-white/20 flex items-center
                           hover:shadow-xl hover:shadow-green-500/25 transition-all duration-300 hover:scale-105">
-              <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
-              En línea
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full mr-1 sm:mr-2 animate-pulse" />
+              <span className="hidden sm:inline">En línea</span>
+              <span className="sm:hidden">Online</span>
             </div>
           )}
           {user.isPremium && (
-            <div className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 
+            <div className="px-2 py-0.5 sm:px-3 sm:py-1 bg-gradient-to-r from-yellow-400 to-orange-500 
                           backdrop-blur-sm rounded-full text-white text-xs font-medium 
                           shadow-lg border border-white/20 flex items-center
                           hover:shadow-xl hover:shadow-yellow-500/25 transition-all duration-300 hover:scale-105">
-              <Crown className="w-3 h-3 mr-1 animate-pulse" />
-              Premium
+              <Crown className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1 animate-pulse" />
+              <span className="hidden sm:inline">Premium</span>
+              <span className="sm:hidden">Pro</span>
             </div>
           )}
           {user.isVerified && (
-            <div className="px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 
+            <div className="px-2 py-0.5 sm:px-3 sm:py-1 bg-gradient-to-r from-purple-500 to-blue-500 
                           backdrop-blur-sm rounded-full text-white text-xs font-medium 
                           shadow-lg border border-white/20 flex items-center
                           hover:shadow-xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105">
-              <Shield className="w-3 h-3 mr-1" />
-              Verificado
+              <Shield className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
+              <span className="hidden sm:inline">Verificado</span>
+              <span className="sm:hidden">✓</span>
             </div>
           )}
         </div>
@@ -238,40 +241,15 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t 
                       from-black/90 via-black/60 to-transparent transition-opacity duration-300" />
         
-        {/* User Info Overlay */}
-        <div className="absolute bottom-4 left-4 right-4 text-white animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-300">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-white/90 
-                             bg-clip-text text-transparent drop-shadow-lg
-                             hover:from-orange-200 hover:to-purple-200 transition-all duration-300">
-                  {user.name}{user.age ? `, ${user.age}` : ''}
-                </h3>
-                {user.sexualRole && (
-                  <SexualRoleIcon 
-                    role={user.sexualRole as 'active' | 'passive' | 'versatile'} 
-                    size="md"
-                    className="drop-shadow-lg"
-                  />
-                )}
-              </div>
-              {user.distance && (
-                <div className="flex items-center text-sm text-white/90 mt-1 
-                              hover:text-white transition-colors duration-300">
-                  <MapPin className="w-4 h-4 mr-1 text-orange-400 animate-pulse" />
-                  {formatDistance(user.distance)}
-                </div>
-              )}
-            </div>
-            
+        {/* Minimal Info Overlay - Solo botón de información */}
+        <div className="absolute bottom-4 right-4 text-white animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-300">
             {onShowProfile && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onShowProfile(user.id);
                 }}
-                className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full 
+                className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 backdrop-blur-sm rounded-full 
                          flex items-center justify-center text-white 
                          hover:bg-gradient-to-r hover:from-purple-500/80 hover:to-orange-500/80 
                          transition-all duration-300 hover:scale-110 active:scale-95
@@ -280,61 +258,14 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-orange-500 
                               opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full" />
-                <Info className="w-5 h-5 relative z-10 group-hover:rotate-12 transition-transform duration-300" />
+                <Info className="w-4 h-4 sm:w-5 sm:h-5 relative z-10 group-hover:rotate-12 transition-transform duration-300" />
               </button>
             )}
-          </div>
-
-          {/* Interests */}
-          {user.interests && user.interests.length > 0 && (
-            <div className="flex flex-wrap gap-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-500">
-              {user.interests.slice(0, 3).map((interest, index) => (
-                <span
-                  key={index}
-                  className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full 
-                           text-xs text-white border border-white/20
-                           hover:bg-white/30 hover:scale-105 transition-all duration-300
-                           hover:shadow-lg hover:shadow-white/25"
-                  style={{ animationDelay: `${600 + index * 100}ms` }}
-                >
-                  {interest}
-                </span>
-              ))}
-              {user.interests.length > 3 && (
-                <span className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full 
-                               text-xs text-white border border-white/20
-                               hover:bg-white/30 hover:scale-105 transition-all duration-300
-                               hover:shadow-lg hover:shadow-white/25">
-                  +{user.interests.length - 3}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Sexual Role */}
-          {user.sexualRole && (
-            <div className="flex items-center mb-1 sm:mb-2">
-              <div className={cn(
-                'w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full mr-1.5 sm:mr-2 shadow-lg flex-shrink-0',
-                getSexualRoleColor(user.sexualRole)
-              )} />
-              <span className="text-xs sm:text-sm text-white/95 font-medium truncate">
-                {getSexualRoleLabel(user.sexualRole)}
-              </span>
-            </div>
-          )}
-
-          {/* Last Seen */}
-          {!user.isOnline && user.lastSeen && (
-            <p className="text-xs text-white/80 font-medium truncate">
-              {formatLastSeen(user.lastSeen)}
-            </p>
-          )}
         </div>
       </div>
 
       {/* Content Section */}
-      <div className="p-3 sm:p-4 md:p-6 bg-gradient-to-b from-transparent to-white/50 dark:to-gray-900/50 
+      <div className="p-3 sm:p-4 md:p-6 pb-6 sm:pb-8 md:pb-10 bg-gradient-to-b from-transparent to-white/50 dark:to-gray-900/50 
                     backdrop-blur-sm">
         {/* Bio */}
         {user.bio && (
@@ -376,92 +307,118 @@ export const DiscoverCard: React.FC<DiscoverCardProps> = ({
 
         {/* Action Buttons */}
         {showActions && (
-          <div className="flex items-center justify-center space-x-3 sm:space-x-4 md:space-x-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-300">
-            {onPass && (
-              <button
-                onClick={() => handleAction(() => onPass(user.id))}
-                disabled={isLoading}
-                className="relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-red-50 to-red-100 
-                         dark:from-red-900/20 dark:to-red-800/20 
-                         border-2 border-red-200 dark:border-red-700/50 
-                         text-red-500 dark:text-red-400 
-                         hover:from-red-500 hover:to-red-600 hover:text-white 
-                         hover:border-red-500 hover:shadow-xl hover:shadow-red-500/30 
-                         transition-all duration-300 hover:scale-110 active:scale-95
-                         backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed 
-                         flex items-center justify-center group overflow-hidden
-                         before:absolute before:inset-0 before:bg-gradient-to-r before:from-red-500/0 before:to-pink-500/0
-                         before:transition-all before:duration-300 hover:before:from-red-500/10 hover:before:to-pink-500/10
-                         touch-manipulation"
-              >
-                <X className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 transition-all duration-300 group-hover:scale-110 group-hover:rotate-90 relative z-10" />
-                <div className="absolute inset-0 rounded-full bg-red-500/0 group-hover:bg-red-500/5 transition-all duration-300" />
-              </button>
-            )}
+          <div className="flex justify-center gap-6 sm:gap-8 mt-3 sm:mt-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-600 relative z-20">
+            {/* Pass Button */}
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-gray-300 bg-white/90 backdrop-blur-sm
+                       hover:border-red-400 hover:bg-red-50 hover:shadow-lg hover:shadow-red-500/25
+                       transition-all duration-300 hover:scale-125 hover:-translate-y-1 group relative z-30
+                       hover:shadow-2xl hover:shadow-red-500/40"
+              onClick={() => {
+                onPass?.(user.id);
+              }}
+            >
+              <X className="w-4 h-4 sm:w-6 sm:h-6 text-gray-600 group-hover:text-red-500 transition-colors duration-300" />
+            </Button>
 
-            {onSuperLike && (
-              <button
-                onClick={() => handleAction(() => onSuperLike(user.id))}
-                disabled={isLoading}
-                className="relative w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 
-                         dark:from-blue-900/20 dark:to-blue-800/20 
-                         border-2 border-blue-200 dark:border-blue-700/50 
-                         text-blue-500 dark:text-blue-400 
-                         hover:from-blue-500 hover:to-blue-600 hover:text-white 
-                         hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/30 
-                         transition-all duration-300 hover:scale-110 active:scale-95
-                         backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed 
-                         flex items-center justify-center group overflow-hidden
-                         before:absolute before:inset-0 before:bg-gradient-to-r before:from-blue-500/0 before:to-cyan-500/0
-                         before:transition-all before:duration-300 hover:before:from-blue-500/10 hover:before:to-cyan-500/10
-                         touch-manipulation"
-              >
-                <Star className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 relative z-10" />
-                <div className="absolute inset-0 rounded-full bg-blue-500/0 group-hover:bg-blue-500/5 transition-all duration-300" />
-                {/* Sparkle effect */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  {[...Array(3)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="absolute w-1 h-1 bg-white rounded-full animate-ping"
-                      style={{
-                        top: `${20 + i * 20}%`,
-                        left: `${30 + i * 15}%`,
-                        animationDelay: `${i * 0.2}s`,
-                      }}
-                    />
-                  ))}
-                </div>
-              </button>
-            )}
-
-            {onLike && (
-              <button
-                onClick={() => handleAction(() => onLike(user.id))}
-                disabled={isLoading}
-                className="relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-green-50 to-emerald-100 
-                         dark:from-green-900/20 dark:to-emerald-800/20 
-                         border-2 border-green-200 dark:border-green-700/50 
-                         text-green-500 dark:text-green-400 
-                         hover:from-green-500 hover:to-emerald-600 hover:text-white 
-                         hover:border-green-500 hover:shadow-xl hover:shadow-green-500/30 
-                         transition-all duration-300 hover:scale-110 active:scale-95
-                         backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed 
-                         flex items-center justify-center group overflow-hidden
-                         before:absolute before:inset-0 before:bg-gradient-to-r before:from-green-500/0 before:to-emerald-500/0
-                         before:transition-all before:duration-300 hover:before:from-green-500/10 hover:before:to-emerald-500/10
-                         touch-manipulation"
-              >
-                <Heart className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 transition-all duration-300 group-hover:scale-110 group-hover:fill-current relative z-10" />
-                <div className="absolute inset-0 rounded-full bg-green-500/0 group-hover:bg-green-500/5 transition-all duration-300" />
-                {/* Heart pulse effect */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="absolute inset-2 border-2 border-white/30 rounded-full animate-ping" />
-                </div>
-              </button>
-            )}
+            {/* Like Button */}
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-red-50 backdrop-blur-sm
+                       hover:border-pink-500 hover:from-pink-100 hover:to-red-100 hover:shadow-lg hover:shadow-pink-500/25
+                       transition-all duration-300 hover:scale-125 hover:-translate-y-1 group relative overflow-hidden z-30
+                       hover:shadow-2xl hover:shadow-pink-500/40"
+              onClick={() => {
+                onLike?.(user.id);
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-red-500 opacity-0 
+                            group-hover:opacity-20 transition-opacity duration-300" />
+              <Heart className="w-4 h-4 sm:w-6 sm:h-6 text-pink-600 group-hover:text-pink-700 transition-colors duration-300 
+                              group-hover:scale-110 relative z-10" />
+            </Button>
           </div>
         )}
+
+        {/* User Information Section - Después de los botones */}
+        <div className="mt-6 space-y-4 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-300">
+          {/* Nombre, edad y orientación sexual */}
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 
+                           bg-clip-text text-transparent
+                           hover:from-orange-500 hover:to-purple-600 transition-all duration-300">
+                {user.name}{user.age ? `, ${user.age}` : ''}
+              </h3>
+              {user.sexualRole && (
+                <SexualRoleIcon 
+                  role={user.sexualRole as 'active' | 'passive' | 'versatile'} 
+                  size="md"
+                />
+              )}
+            </div>
+            
+            {/* Distancia */}
+            {user.distance && (
+              <div className="flex items-center justify-center text-sm text-gray-600 mb-2
+                            hover:text-gray-800 transition-colors duration-300">
+                <MapPin className="w-4 h-4 mr-1 text-orange-500" />
+                {formatDistance(user.distance)}
+              </div>
+            )}
+
+            {/* Sexual Role */}
+            {user.sexualRole && (
+              <div className="flex items-center justify-center mb-2">
+                <div className={cn(
+                  'w-3 h-3 rounded-full mr-2 shadow-lg flex-shrink-0',
+                  getSexualRoleColor(user.sexualRole)
+                )} />
+                <span className="text-sm text-gray-700 font-medium">
+                  {getSexualRoleLabel(user.sexualRole)}
+                </span>
+              </div>
+            )}
+
+            {/* Last Seen */}
+            {!user.isOnline && user.lastSeen && (
+              <p className="text-xs text-gray-500 font-medium">
+                {formatLastSeen(user.lastSeen)}
+              </p>
+            )}
+          </div>
+
+          {/* Biography */}
+          {user.bio && (
+            <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-500">
+              <p className="text-gray-700 text-sm leading-relaxed text-center
+                          hover:text-gray-900 transition-colors duration-300">
+                {user.bio}
+              </p>
+            </div>
+          )}
+
+          {/* Interests */}
+          {user.interests && user.interests.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-500">
+              {user.interests.map((interest, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1 bg-gradient-to-r from-orange-100 to-purple-100 
+                           rounded-full text-xs text-gray-700 border border-orange-200
+                           hover:from-orange-200 hover:to-purple-200 hover:scale-105 
+                           transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/25"
+                  style={{ animationDelay: `${600 + index * 100}ms` }}
+                >
+                  {interest}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

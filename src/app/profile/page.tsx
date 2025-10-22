@@ -12,6 +12,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserStats } from '@/hooks/useUserStats';
 import { getUserProfilePhoto } from '@/lib/userUtils';
+import PromoCodeInput from '@/components/PromoCodeInput';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -235,6 +236,15 @@ export default function ProfilePage() {
                     {user.isVerified ? 'Ver estado' : 'Verificar'}
                   </button>
                 </div>
+              </div>
+
+              {/* Códigos Promocionales */}
+              <div className="bg-white rounded-xl p-4 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Códigos Promocionales</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  ¿Tienes un código promocional? Ingrésalo aquí para obtener beneficios especiales.
+                </p>
+                <PromoCodeInput />
               </div>
             </div>
           </div>

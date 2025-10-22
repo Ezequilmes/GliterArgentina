@@ -7,22 +7,24 @@ import type { UserDistance } from '@/types';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { getUserProfilePhoto } from '@/lib/userUtils';
+import SexualRoleIcon from '@/components/ui/SexualRoleIcon';
+import UserDetailModal from './UserDetailModal';
 
 interface ProfileGridProps {
   users: UserDistance[];
-  onLike?: (userId: string) => void;
-  onSuperLike?: (userId: string) => void;
-  onBlock?: (userId: string) => void;
-  onStartChat?: (userId: string) => void;
+  onLike?: (userId: string) => Promise<void>;
+  onSuperLike?: (userId: string) => Promise<void>;
+  onBlock?: (userId: string) => Promise<void>;
+  onStartChat?: (userId: string) => Promise<void>;
   className?: string;
 }
 
 interface ProfileCardProps {
   userDistance: UserDistance;
-  onLike?: (userId: string) => void;
-  onSuperLike?: (userId: string) => void;
-  onBlock?: (userId: string) => void;
-  onStartChat?: (userId: string) => void;
+  onLike?: (userId: string) => Promise<void>;
+  onSuperLike?: (userId: string) => Promise<void>;
+  onBlock?: (userId: string) => Promise<void>;
+  onStartChat?: (userId: string) => Promise<void>;
   onClick?: () => void;
 }
 
@@ -35,183 +37,146 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   onClick
 }) => {
   const { user, distance } = userDistance;
-  const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const getDisplayAge = () => {
-    return user.age || 'N/A';
+    return user.age ? `${user.age}` : '';
   };
 
-  const handleAction = async (e: React.MouseEvent, action: () => void) => {
+  const handleAction = async (e: React.MouseEvent, action: () => Promise<void>) => {
     e.stopPropagation();
-    if (isLoading) return; // Evitar múltiples clics
-    
+    console.log('🔥 ProfileCard: handleAction called', { userId: user.id, action: action.name });
     setIsLoading(true);
     try {
       await action();
+      console.log('✅ ProfileCard: action completed successfully');
     } catch (error) {
-      console.error('Error en la acción:', error);
-      // Aquí podrías agregar una notificación de error al usuario si es necesario
+      console.error('❌ ProfileCard: Error en acción:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div
-      className={cn(
-        "relative bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer",
-        "transform transition-all duration-300 hover:scale-105 hover:shadow-xl",
-        "group"
-      )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={onClick}
-    >
-      {/* Profile Image */}
-      <div className="relative aspect-[4/5] overflow-hidden">
-        {getUserProfilePhoto(user) ? (
-          <Image
-            src={getUserProfilePhoto(user) || ''}
-            alt={user.name}
-            fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageLoaded(false)}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-            <div className="text-gray-500 text-4xl">👤</div>
-          </div>
+    <>
+      <div
+        className={cn(
+          "relative bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden cursor-pointer",
+          "transform transition-all duration-200 hover:shadow-lg active:scale-95",
+          "aspect-[3/5] sm:aspect-[3/4]" // Hacer las cards más altas en móviles
         )}
-        
-        {/* Loading skeleton */}
-        {!imageLoaded && (
-          <div className="absolute inset-0 bg-gray-200 animate-pulse" />
-        )}
-
-        {/* Premium badge */}
-        {user.isPremium && (
-          <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white px-2 py-1 rounded-full text-xs font-semibold">
-            ✨ Premium
-          </div>
-        )}
-
-        {/* Online indicator */}
-        {user.isOnline && (
-          <div className="absolute top-2 left-2 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-        )}
-
-        {/* Action buttons overlay */}
-        <div className={cn(
-          "absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center",
-          "transition-opacity duration-300",
-          isHovered ? "opacity-100" : "opacity-0"
-        )}>
-          <div className="flex space-x-3">
-            {/* Chat button */}
-            <button
-              onClick={(e) => handleAction(e, () => onStartChat?.(user.id))}
-              disabled={isLoading}
-              className={cn(
-                "bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110",
-                isLoading && "opacity-50 cursor-not-allowed"
-              )}
-              title="Iniciar chat"
-            >
-              <MessageCircle size={20} />
-            </button>
-
-            {/* Like button */}
-            <button
-              onClick={(e) => handleAction(e, () => onLike?.(user.id))}
-              disabled={isLoading}
-              className={cn(
-                "bg-pink-500 hover:bg-pink-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110",
-                isLoading && "opacity-50 cursor-not-allowed"
-              )}
-              title="Dar like"
-            >
-              <Heart size={20} />
-            </button>
-
-            {/* Super like button */}
-            <button
-              onClick={(e) => handleAction(e, () => onSuperLike?.(user.id))}
-              disabled={isLoading}
-              className={cn(
-                "bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110",
-                isLoading && "opacity-50 cursor-not-allowed"
-              )}
-              title="Super like"
-            >
-              <Star size={20} />
-            </button>
-
-            {/* Block button */}
-            <button
-              onClick={(e) => handleAction(e, () => onBlock?.(user.id))}
-              disabled={isLoading}
-              className={cn(
-                "bg-red-500 hover:bg-red-600 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-110",
-                isLoading && "opacity-50 cursor-not-allowed"
-              )}
-              title="Bloquear usuario"
-            >
-              <Ban size={20} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* User info */}
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-lg text-gray-900 truncate">
-            {user.name || 'Usuario'}
-          </h3>
-          {user.age && (
-            <span className="text-gray-600 text-sm flex items-center">
-              <Calendar size={14} className="mr-1" />
-              {getDisplayAge()}
-            </span>
+        onClick={() => setShowModal(true)}
+      >
+        {/* Profile Image - Ocupa toda la card */}
+        <div className="relative w-full h-full overflow-hidden">
+          {getUserProfilePhoto(user) ? (
+            <Image
+              src={getUserProfilePhoto(user) || ''}
+              alt={user.name}
+              fill
+              className="object-cover"
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(false)}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center">
+              <div className="text-gray-500 dark:text-gray-400 text-2xl sm:text-3xl">👤</div>
+            </div>
           )}
-        </div>
+          
+          {/* Loading skeleton */}
+          {!imageLoaded && (
+            <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />
+          )}
 
-        {/* Distance */}
-        <div className="flex items-center text-gray-500 text-sm mb-2">
-          <MapPin size={14} className="mr-1" />
-          <span>{Math.round(distance)} km</span>
-        </div>
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-        {/* Bio preview */}
-        {user.bio && (
-          <p className="text-gray-600 text-sm line-clamp-2 mb-2">
-            {user.bio}
-          </p>
-        )}
-
-        {/* Interests */}
-        {user.interests && user.interests.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {user.interests.slice(0, 3).map((interest, index) => (
-              <span
-                key={index}
-                className="bg-pink-100 text-pink-700 px-2 py-1 rounded-full text-xs"
-              >
-                {interest}
-              </span>
-            ))}
-            {user.interests.length > 3 && (
-              <span className="text-gray-500 text-xs">
-                +{user.interests.length - 3}
-              </span>
+          {/* Action buttons en las esquinas */}
+          {/* Like - Esquina superior izquierda */}
+          <button
+            onClick={(e) => handleAction(e, async () => await onLike?.(user.id))}
+            disabled={isLoading}
+            className={cn(
+              "absolute top-2 left-2 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 bg-pink-500/80 hover:bg-pink-500 text-white rounded-full",
+              "flex items-center justify-center transition-all duration-200 backdrop-blur-sm",
+              "shadow-lg hover:shadow-xl transform hover:scale-110 active:scale-95",
+              isLoading && "opacity-50 cursor-not-allowed"
             )}
+            title="Like"
+          >
+            <Heart size={12} className="sm:w-4 sm:h-4 md:w-5 md:h-5" />
+          </button>
+
+          {/* Chat - Esquina superior derecha */}
+          <button
+            onClick={(e) => handleAction(e, async () => await onStartChat?.(user.id))}
+            disabled={isLoading}
+            className={cn(
+              "absolute top-2 right-2 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 bg-blue-500/80 hover:bg-blue-500 text-white rounded-full",
+              "flex items-center justify-center transition-all duration-200 backdrop-blur-sm",
+              "shadow-lg hover:shadow-xl transform hover:scale-110 active:scale-95",
+              isLoading && "opacity-50 cursor-not-allowed"
+            )}
+            title="Chat"
+          >
+            <MessageCircle size={12} className="sm:w-4 sm:h-4 md:w-5 md:h-5" />
+          </button>
+
+          {/* Premium badge */}
+          {user.isPremium && (
+            <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold shadow-lg">
+              PREMIUM
+            </div>
+          )}
+
+          {/* Online indicator */}
+          {user.isOnline && (
+            <div className="absolute top-2 left-1/2 transform -translate-x-1/2 translate-y-6 w-2 h-2 bg-green-500 rounded-full border border-white shadow-lg"></div>
+          )}
+
+          {/* User info overlay - Solo información básica */}
+          <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-2 text-white">
+            <div className="text-center">
+              <div className="flex items-center justify-center space-x-1 mb-1">
+                <h3 className="font-semibold text-base sm:text-sm truncate max-w-[120px] sm:max-w-[80px]">
+                  {user.name || 'Usuario'}
+                </h3>
+                {user.sexualRole && (
+                  <SexualRoleIcon 
+                    role={user.sexualRole as 'active' | 'passive' | 'versatile'} 
+                    size="sm"
+                    className="text-white"
+                  />
+                )}
+                <span className="text-sm sm:text-xs font-medium">
+                  {getDisplayAge()}
+                </span>
+              </div>
+              
+              {/* Distance */}
+              <div className="flex items-center justify-center text-sm sm:text-xs text-white/80">
+                <MapPin size={12} className="sm:w-2.5 sm:h-2.5 mr-1" />
+                <span>{Math.round(distance)} km</span>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
       </div>
-    </div>
+      
+      {/* Modal */}
+      <UserDetailModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        userDistance={userDistance}
+        onLike={onLike}
+        onSuperLike={onSuperLike}
+        onBlock={onBlock}
+        onStartChat={onStartChat}
+      />
+    </>
   );
 };
 
@@ -231,13 +196,13 @@ export const ProfileGrid: React.FC<ProfileGridProps> = ({
 
   if (users.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-gray-400 text-6xl mb-4">💔</div>
-        <h3 className="text-xl font-semibold text-gray-700 mb-2">
-          No hay más perfiles
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="text-6xl mb-4">🔍</div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          No hay usuarios cerca
         </h3>
-        <p className="text-gray-500">
-          Intenta ajustar tus filtros para ver más personas
+        <p className="text-gray-600 dark:text-gray-400 max-w-sm">
+          Intenta ajustar tus filtros o ampliar tu radio de búsqueda para encontrar más personas.
         </p>
       </div>
     );
@@ -245,7 +210,7 @@ export const ProfileGrid: React.FC<ProfileGridProps> = ({
 
   return (
     <div className={cn(
-      "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+      "grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-3 md:gap-4",
       className
     )}>
       {users.map((userDistance) => (

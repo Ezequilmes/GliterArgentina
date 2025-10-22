@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Timestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { User, AuthContextType, LoginForm, RegisterForm } from '@/types';
 import { 
   signIn, 
@@ -19,6 +21,7 @@ import { getCurrentLocation } from '@/lib/geolocation';
 import { analyticsService } from '@/services/analyticsService';
 import { useServiceWorkerHandler } from '@/hooks/useServiceWorkerHandler';
 import { chatService } from '@/services/chatService';
+import MobileLoadingScreen from '@/components/ui/MobileLoadingScreen';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -41,9 +44,75 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [initializing, setInitializing] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Manejar service worker
   useServiceWorkerHandler();
+
+  // Detectar si es dispositivo móvil
+  const isMobileDevice = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (window.innerWidth <= 768 && 'ontouchstart' in window);
+  };
+
+  // Función para logging de eventos de autenticación
+  const logAuthEvent = async (event: string, data: any = {}) => {
+    const logData = {
+      event,
+      timestamp: new Date().toISOString(),
+      isMobile: isMobileDevice(),
+      userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'unknown',
+      viewport: typeof window !== 'undefined' ? {
+        width: window.innerWidth,
+        height: window.innerHeight
+      } : null,
+      connection: typeof navigator !== 'undefined' && 'connection' in navigator ? {
+        effectiveType: (navigator as any).connection?.effectiveType,
+        downlink: (navigator as any).connection?.downlink,
+        rtt: (navigator as any).connection?.rtt
+      } : null,
+      ...data
+    };
+
+    console.log(`🔍 [AUTH EVENT] ${event}:`, logData);
+
+    // En producción, enviar a servicio de logging
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        await fetch('/api/log-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(logData)
+        });
+      } catch (error) {
+        console.warn('Failed to send auth log:', error);
+      }
+    }
+  };
+
+  // Función de reintento para autenticación - más conservadora
+  const retryAuth = async () => {
+    if (retryCount >= 2) { // Reducido de 3 a 2 intentos
+      setAuthError('Error de conexión persistente. Por favor, verifica tu conexión a internet.');
+      return;
+    }
+
+    setRetryCount(prev => prev + 1);
+    setAuthError(null);
+    setLoading(true);
+    setInitializing(true);
+
+    await logAuthEvent('auth_retry_attempt', { retryCount: retryCount + 1 });
+
+    // Solo recargar en el último intento y solo si es un error crítico
+    if (retryCount >= 1) {
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000); // Aumentado el delay
+    }
+  };
 
   // Función para cargar datos del usuario
   const loadUserData = async (authUser: AuthUser): Promise<User | null> => {
@@ -116,76 +185,139 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Efecto para escuchar cambios de autenticación
   useEffect(() => {
-    console.log('🔍 [AUTH DEBUG] Setting up auth state listener...');
+    let mounted = true;
     
-    // Timeout de seguridad para evitar carga infinita
-    const initTimeout = setTimeout(() => {
-      if (initializing) {
-        console.warn('⏰ [AUTH DEBUG] Auth initialization timeout - setting initializing to false');
-        setInitializing(false);
-        setLoading(false);
-      }
-    }, 10000); // 10 segundos timeout
-
-    const unsubscribe = onAuthStateChange(async (authUser) => {
-      setLoading(true);
+    const setupAuth = async () => {
+      await logAuthEvent('auth_setup_start', { isMobile: isMobileDevice() });
       
-      try {
-        if (authUser) {
-          setAuthUser(authUser);
-          const userData: User | null = await loadUserData(authUser);
-          setUser(userData);
-          
-          // Inicializar presencia en Realtime Database
-          try {
-            await chatService.initializePresence(authUser.uid);
-            console.log('✅ [AUTH] Presencia inicializada para usuario:', authUser.uid);
-          } catch (error) {
-            console.error('❌ [AUTH] Error inicializando presencia:', error);
+      // Timeout más tolerante para móviles
+      const timeoutDuration = isMobileDevice() ? 25000 : 15000; // Aumentado significativamente
+      
+      const initTimeout = setTimeout(() => {
+        if (mounted && initializing) {
+          logAuthEvent('auth_timeout', { 
+            timeoutDuration,
+            isMobile: isMobileDevice(),
+            retryCount 
+          });
+          // Solo mostrar error de timeout si no hay usuario autenticado
+          if (!authUser) {
+            setAuthError('Conexión lenta detectada. Reintentando...');
           }
-        } else {
-          setAuthUser(null);
-          setUser(null);
-          
-          // Limpiar presencia cuando el usuario se desautentica
-          try {
-            await chatService.clearPresence();
-            console.log('✅ [AUTH] Presencia limpiada');
-          } catch (error) {
-            console.error('❌ [AUTH] Error limpiando presencia:', error);
-          }
+          setInitializing(false);
+          setLoading(false);
         }
+      }, timeoutDuration);
+
+      try {
+        if (!auth) {
+          throw new Error('Firebase Auth no está disponible');
+        }
+
+        const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+          if (!mounted) return;
+          
+          setLoading(true);
+          setAuthError(null);
+          
+          try {
+            await logAuthEvent('auth_state_change', { 
+              hasUser: !!authUser,
+              userId: authUser?.uid,
+              isMobile: isMobileDevice()
+            });
+
+            if (authUser) {
+              setAuthUser(authUser as AuthUser);
+              const userData: User | null = await loadUserData(authUser as AuthUser);
+              setUser(userData);
+              
+              // Inicializar presencia en Realtime Database
+              try {
+                await chatService.initializePresence(authUser.uid);
+                await logAuthEvent('presence_initialized', { userId: authUser.uid });
+              } catch (error) {
+                await logAuthEvent('presence_init_error', { 
+                  userId: authUser.uid, 
+                  error: error instanceof Error ? error.message : 'Unknown error'
+                });
+              }
+            } else {
+              setAuthUser(null);
+              setUser(null);
+              
+              // Limpiar presencia cuando el usuario se desautentica
+              try {
+                await chatService.clearPresence();
+                await logAuthEvent('presence_cleared');
+              } catch (error) {
+                await logAuthEvent('presence_clear_error', { 
+                  error: error instanceof Error ? error.message : 'Unknown error'
+                });
+              }
+            }
+          } catch (error) {
+            await logAuthEvent('auth_state_error', {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              stack: error instanceof Error ? error.stack : undefined,
+              isMobile: isMobileDevice()
+            });
+            
+            // Si el error es porque Firebase no está disponible en el servidor, no es un error crítico
+            if (error instanceof Error && error.message.includes('Firebase no está disponible en el servidor')) {
+              console.log('🔄 [AUTH DEBUG] Firebase not available on server - this is expected during SSR');
+            } else {
+              setAuthError(error instanceof Error ? error.message : 'Error de autenticación desconocido');
+            }
+            
+            setAuthUser(null);
+            setUser(null);
+          } finally {
+            if (mounted) {
+              setLoading(false);
+              setInitializing(false);
+              clearTimeout(initTimeout);
+            }
+          }
+        });
+
+        return () => {
+          unsubscribe();
+          clearTimeout(initTimeout);
+        };
       } catch (error) {
-        console.error('💥 [AUTH DEBUG] Error in auth state change:', {
-          error: error,
-          message: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date().toISOString()
+        await logAuthEvent('auth_setup_error', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          isMobile: isMobileDevice()
         });
         
-        // Si el error es porque Firebase no está disponible en el servidor, no es un error crítico
-        if (error instanceof Error && error.message.includes('Firebase no está disponible en el servidor')) {
-          console.log('🔄 [AUTH DEBUG] Firebase not available on server - this is expected during SSR');
+        if (mounted) {
+          setAuthError(error instanceof Error ? error.message : 'Error de configuración de autenticación');
+          setInitializing(false);
+          setLoading(false);
         }
-        
-        setAuthUser(null);
-        setUser(null);
-      } finally {
-        setLoading(false);
-        setInitializing(false);
-        clearTimeout(initTimeout);
       }
-    });
-
-    return () => {
-      unsubscribe();
-      clearTimeout(initTimeout);
     };
-  }, []);
+
+    const cleanup = setupAuth();
+    
+    return () => {
+      mounted = false;
+      cleanup.then(cleanupFn => cleanupFn?.());
+    };
+  }, [retryCount]);
 
   // Función de login
   const login = async (data: LoginForm): Promise<void> => {
     setLoading(true);
+    setAuthError(null);
+    
     try {
+      await logAuthEvent('login_attempt', { 
+        email: data.email,
+        isMobile: isMobileDevice()
+      });
+
       const authUser = await signIn({
         email: data.email,
         password: data.password
@@ -195,13 +327,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userData);
       setAuthUser(authUser);
 
-      // Inicializar presencia
-      try {
-        await chatService.initializePresence(authUser.uid);
-        console.log('✅ [LOGIN] Presencia inicializada para usuario:', authUser.uid);
-      } catch (error) {
-        console.error('❌ [LOGIN] Error inicializando presencia:', error);
-      }
+      // La presencia se inicializa automáticamente en setupAuth
 
       // Track login event
       analyticsService.trackLogin('email');
@@ -215,8 +341,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
           location_country: userData.location?.country
         });
       }
+
+      await logAuthEvent('login_success', { 
+        userId: authUser.uid,
+        hasUserData: !!userData
+      });
     } catch (error) {
-      console.error('Login error:', error);
+      await logAuthEvent('login_error', {
+        email: data.email,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isMobile: isMobileDevice()
+      });
+      
+      setAuthError(error instanceof Error ? error.message : 'Error de inicio de sesión');
       throw error;
     } finally {
       setLoading(false);
@@ -226,7 +363,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Función de registro
   const register = async (data: RegisterForm): Promise<void> => {
     setLoading(true);
+    setAuthError(null);
+    
     try {
+      await logAuthEvent('register_attempt', { 
+        email: data.email,
+        age: data.age,
+        gender: data.gender,
+        isMobile: isMobileDevice()
+      });
+
       // Obtener ubicación actual
       let location = {
         latitude: -34.6037,
@@ -243,8 +389,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           city: currentLocation.city || 'Buenos Aires',
           country: currentLocation.country || 'Argentina'
         };
+        await logAuthEvent('location_obtained', { location });
       } catch (locationError) {
-        console.warn('Could not get current location, using default:', locationError);
+        await logAuthEvent('location_error', { 
+          error: locationError instanceof Error ? locationError.message : 'Unknown error'
+        });
       }
 
       const authUser = await signUp({
@@ -263,13 +412,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userData);
       setAuthUser(authUser);
 
-      // Inicializar presencia
-      try {
-        await chatService.initializePresence(authUser.uid);
-        console.log('✅ [REGISTER] Presencia inicializada para usuario:', authUser.uid);
-      } catch (error) {
-        console.error('❌ [REGISTER] Error inicializando presencia:', error);
-      }
+      // La presencia se inicializa automáticamente en setupAuth
 
       // Track signup event
       analyticsService.trackSignup('email');
@@ -283,8 +426,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
           location_country: userData.location?.country
         });
       }
+
+      await logAuthEvent('register_success', { 
+        userId: authUser.uid,
+        hasUserData: !!userData
+      });
     } catch (error) {
-      console.error('Register error:', error);
+      await logAuthEvent('register_error', {
+        email: data.email,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isMobile: isMobileDevice()
+      });
+      
+      setAuthError(error instanceof Error ? error.message : 'Error de registro');
       throw error;
     } finally {
       setLoading(false);
@@ -294,19 +448,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Función de login con Google
   const loginWithGoogle = async (): Promise<void> => {
     setLoading(true);
+    setAuthError(null);
+    
     try {
+      await logAuthEvent('google_login_attempt', { 
+        isMobile: isMobileDevice()
+      });
+
       const authUser = await signInWithGoogle();
       const userData: User | null = await loadUserData(authUser);
       setUser(userData);
       setAuthUser(authUser);
 
-      // Inicializar presencia
-      try {
-        await chatService.initializePresence(authUser.uid);
-        console.log('✅ [GOOGLE LOGIN] Presencia inicializada para usuario:', authUser.uid);
-      } catch (error) {
-        console.error('❌ [GOOGLE LOGIN] Error inicializando presencia:', error);
-      }
+      // La presencia se inicializa automáticamente en setupAuth
 
       // Track Google login event
       analyticsService.trackLogin('google');
@@ -320,8 +474,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
           location_country: userData.location?.country
         });
       }
+
+      await logAuthEvent('google_login_success', { 
+        userId: authUser.uid,
+        hasUserData: !!userData
+      });
     } catch (error) {
-      console.error('Google login error:', error);
+      await logAuthEvent('google_login_error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isMobile: isMobileDevice()
+      });
+      
+      setAuthError(error instanceof Error ? error.message : 'Error de inicio de sesión con Google');
       throw error;
     } finally {
       setLoading(false);
@@ -331,23 +495,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Función de logout
   const handleLogout = async (): Promise<void> => {
     setLoading(true);
+    setAuthError(null);
+    
     try {
-      // Track logout event before clearing user data
-      analyticsService.trackLogout();
-      
-      // Limpiar presencia antes del logout
-      try {
-        await chatService.clearPresence();
-        console.log('✅ [LOGOUT] Presencia limpiada');
-      } catch (error) {
-        console.error('❌ [LOGOUT] Error limpiando presencia:', error);
+      await logAuthEvent('logout_attempt', { 
+        userId: authUser?.uid,
+        isMobile: isMobileDevice()
+      });
+
+      if (authUser) {
+        // Limpiar presencia antes del logout
+        try {
+          await chatService.clearPresence();
+          await logAuthEvent('logout_presence_cleaned', { userId: authUser.uid });
+        } catch (error) {
+          await logAuthEvent('logout_presence_error', { 
+            userId: authUser.uid,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
       }
-      
+
       await logout();
       setUser(null);
       setAuthUser(null);
+
+      // Track logout event
+      analyticsService.trackLogout();
+      
+      await logAuthEvent('logout_success', {});
     } catch (error) {
-      console.error('Logout error:', error);
+      await logAuthEvent('logout_error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isMobile: isMobileDevice()
+      });
+      
+      setAuthError(error instanceof Error ? error.message : 'Error al cerrar sesión');
       throw error;
     } finally {
       setLoading(false);
@@ -357,19 +540,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Función para restablecer contraseña
   const handleResetPassword = async (email: string): Promise<void> => {
     try {
+      await logAuthEvent('reset_password_attempt', { 
+        email,
+        isMobile: isMobileDevice()
+      });
+
       await resetPassword(email);
+      
+      await logAuthEvent('reset_password_success', { email });
     } catch (error) {
-      console.error('Reset password error:', error);
+      await logAuthEvent('reset_password_error', {
+        email,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isMobile: isMobileDevice()
+      });
+      
       throw error;
     }
   };
 
   // Función para cambiar contraseña
   const handleChangePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+    if (!authUser) {
+      throw new Error('No user authenticated');
+    }
+
     try {
+      await logAuthEvent('change_password_attempt', { 
+        userId: authUser.uid,
+        isMobile: isMobileDevice()
+      });
+
       await changePassword(currentPassword, newPassword);
+      
+      await logAuthEvent('change_password_success', { userId: authUser.uid });
     } catch (error) {
-      console.error('Change password error:', error);
+      await logAuthEvent('change_password_error', {
+        userId: authUser.uid,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isMobile: isMobileDevice()
+      });
+      
       throw error;
     }
   };
@@ -427,9 +638,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshUser,
   };
 
+  // Renderizado condicional para dispositivos móviles - solo en casos de error o timeout prolongado
+  if (isMobileDevice() && authError && retryCount > 0) {
+    return (
+      <MobileLoadingScreen
+         isLoading={loading || initializing}
+         error={authError}
+         onRetry={retryAuth}
+       />
+    );
+  }
+
   return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+     <AuthContext.Provider value={value}>
+       {children}
+     </AuthContext.Provider>
+   );
+ };

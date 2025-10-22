@@ -16,10 +16,11 @@ export function PWAInitializer() {
   // Note: Service Worker registration is now handled automatically by useServiceWorker hook
   // No manual registration needed here to avoid conflicts
 
-  // Service Worker cleanup disabled in development to avoid InvalidStateError
+  // Service Worker initialization and cleanup
   useEffect(() => {
+    // Skip Service Worker operations in development to avoid InvalidStateError
     if (process.env.NODE_ENV === 'development') {
-      console.log('Service Worker cleanup deshabilitado en desarrollo para evitar InvalidStateError');
+      console.log('Service Worker operations disabled in development');
       return;
     }
 
@@ -29,21 +30,28 @@ export function PWAInitializer() {
       return;
     }
 
-    // Only clean up Service Workers in production if needed
+    // Only clean up OLD/INVALID Service Workers, not our current one
     if ('serviceWorker' in navigator) {
       try {
         navigator.serviceWorker.getRegistrations().then((registrations) => {
           registrations.forEach((reg) => {
-            reg.unregister();
+            // Only unregister old Vite or webpack service workers, not our current Gliter SW
+            const scope = reg.scope || '';
+            if (scope.includes('vite') || scope.includes('@vite') || scope.includes('webpack')) {
+              console.log('Cleaning up old service worker:', scope);
+              reg.unregister().catch((error) => {
+                console.warn('Failed to unregister old service worker:', error);
+              });
+            }
           });
         }).catch((error) => {
-          console.warn('No se pudo acceder a Service Worker registrations:', error);
+          console.warn('Could not access Service Worker registrations:', error);
         });
       } catch (error) {
-        console.warn('Error al intentar limpiar Service Workers:', error);
+        console.warn('Error accessing Service Workers:', error);
       }
     }
-  }, []);
+  }, [browserInfo.isWebView, browserInfo.isTraeApp]);
 
   useEffect(() => {
     // Skip push notification setup in development, WebView, or when SW not supported/registered

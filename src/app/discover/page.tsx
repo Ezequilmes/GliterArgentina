@@ -43,6 +43,7 @@ export default function DiscoverPage() {
   console.log('📍 Geolocation:', { location, locationLoading, locationError, permissionState, retryCount });
   
   const [currentUserData, setCurrentUserData] = useState<User | null>(null);
+  
   const [users, setUsers] = useState<UserDistance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -287,7 +288,12 @@ export default function DiscoverPage() {
   };
 
   const handleLike = async (userId: string) => {
-    if (!user) return;
+    console.log('🔥 BUTTON PRESSED: LIKE BUTTON CLICKED!', { userId, timestamp: new Date().toISOString() });
+    console.log('💖 DiscoverPage: handleLike called', { userId, currentUser: user?.id });
+    if (!user) {
+      console.log('❌ No user authenticated, returning early');
+      return;
+    }
     
     setActionFeedback({ action: 'like', status: 'loading' });
     
@@ -337,7 +343,12 @@ export default function DiscoverPage() {
   };
 
   const handleSuperLike = async (userId: string) => {
-    if (!user) return;
+    console.log('🔥 BUTTON PRESSED: SUPER LIKE BUTTON CLICKED!', { userId, timestamp: new Date().toISOString() });
+    console.log('⭐ DiscoverPage: handleSuperLike called', { userId, currentUser: user?.id });
+    if (!user) {
+      console.log('❌ No user authenticated, returning early');
+      return;
+    }
     
     setActionFeedback({ action: 'superlike', status: 'loading' });
     
@@ -362,7 +373,12 @@ export default function DiscoverPage() {
   };
 
   const handleBlock = async (userId: string) => {
-    if (!user) return;
+    console.log('🔥 BUTTON PRESSED: BLOCK BUTTON CLICKED!', { userId, timestamp: new Date().toISOString() });
+    console.log('🚫 DiscoverPage: handleBlock called', { userId, currentUser: user?.id });
+    if (!user) {
+      console.log('❌ No user authenticated, returning early');
+      return;
+    }
     
     try {
       await userService.blockUser(user.id, userId);
@@ -376,7 +392,12 @@ export default function DiscoverPage() {
   };
 
   const handleStartChat = async (userId: string) => {
-    if (!user) return;
+    console.log('🔥 BUTTON PRESSED: START CHAT BUTTON CLICKED!', { userId, timestamp: new Date().toISOString() });
+    console.log('💬 DiscoverPage: handleStartChat called', { userId, currentUser: user?.id });
+    if (!user) {
+      console.log('❌ No user authenticated, returning early');
+      return;
+    }
     
     try {
       // Crear o obtener chat directamente sin verificar match
@@ -682,8 +703,8 @@ export default function DiscoverPage() {
 
           {/* Current User Card */}
           {currentUserData && (
-            <div className="flex justify-center mb-4 sm:mb-6 animate-in slide-in-from-bottom-4 duration-500 delay-400">
-              <div className="w-full max-w-sm px-4 sm:px-0">
+            <div className="hidden sm:flex justify-center mb-4 sm:mb-6 animate-in slide-in-from-bottom-4 duration-500 delay-400">
+              <div className="w-full max-w-md sm:max-w-sm px-4 sm:px-0">
                 <div className="bg-gradient-to-r from-primary to-secondary p-1 rounded-2xl shadow-lg 
                               hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 
                               hover:scale-[1.02] group">

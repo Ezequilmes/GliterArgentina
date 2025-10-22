@@ -20,28 +20,22 @@ export function detectBrowser(): BrowserInfo {
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   const isClient = typeof window !== 'undefined';
   
-  // Detect WebView patterns
+  // Detect WebView patterns - more conservative approach
   const isWebView = isClient && (
-    // Android WebView
-    /wv\)|\.0\.0\.0/.test(userAgent) ||
-    // iOS WebView
-    /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(userAgent) ||
-    // Generic WebView indicators
+    // Only detect explicit WebView indicators, not version patterns
     /WebView/i.test(userAgent) ||
-    // Trae app specific detection
-    /Trae/i.test(userAgent) ||
-    // Other embedded browser patterns
-    /embedded|inapp|webview/i.test(userAgent)
+    // Android WebView with explicit wv indicator
+    /Android.*wv\)/.test(userAgent) ||
+    // iOS WebView without Safari in user agent
+    /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(userAgent) && !/CriOS|FxiOS|EdgiOS/.test(userAgent)
   );
 
-  // Detect Trae app specifically
+  // Detect Trae app specifically - only through explicit markers
   const isTraeApp = isClient && (
-    /Trae/i.test(userAgent) ||
-    // Check for Trae-specific window properties
+    // Only detect if explicitly marked as Trae app through user agent or window properties
+    /TraeApp/i.test(userAgent) ||
     (window as any).TraeApp ||
-    (window as any).trae ||
-    // Check for specific app context
-    window.location.hostname.includes('trae')
+    (window as any).trae
   );
 
   const isMobile = isClient && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
@@ -66,7 +60,13 @@ export function detectBrowser(): BrowserInfo {
 
   // Test API support
   const supportsServiceWorker = isClient && 'serviceWorker' in navigator && !isWebView;
-  const supportsNotifications = isClient && 'Notification' in window && !isWebView;
+  const supportsNotifications = isClient && !isWebView && (() => {
+    try {
+      return typeof window !== 'undefined' && 'Notification' in window && typeof window.Notification !== 'undefined';
+    } catch {
+      return false;
+    }
+  })();
   const supportsGeolocation = isClient && 'geolocation' in navigator;
   const supportsLocalStorage = isClient && (() => {
     try {

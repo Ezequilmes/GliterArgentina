@@ -79,14 +79,23 @@ export function useChat(): UseChatReturn {
       setOtherUserTyping(false);
       lastMessageDoc.current = undefined;
       
-      // Limpiar suscripciones
-      if (unsubscribeMessagesRef.current) {
-        unsubscribeMessagesRef.current();
-        unsubscribeMessagesRef.current = null;
+      // Limpiar suscripciones con manejo de errores
+      try {
+        if (unsubscribeMessagesRef.current) {
+          unsubscribeMessagesRef.current();
+          unsubscribeMessagesRef.current = null;
+        }
+      } catch (error) {
+        console.warn('Error cleaning up messages subscription:', error);
       }
-      if (unsubscribeTypingRef.current) {
-        unsubscribeTypingRef.current();
-        unsubscribeTypingRef.current = null;
+      
+      try {
+        if (unsubscribeTypingRef.current) {
+          unsubscribeTypingRef.current();
+          unsubscribeTypingRef.current = null;
+        }
+      } catch (error) {
+        console.warn('Error cleaning up typing subscription:', error);
       }
       return;
     }
@@ -95,12 +104,23 @@ export function useChat(): UseChatReturn {
       setLoading(true);
       setError(null);
       
-      // Limpiar suscripciones anteriores
-      if (unsubscribeMessagesRef.current) {
-        unsubscribeMessagesRef.current();
+      // Limpiar suscripciones anteriores con manejo de errores
+      try {
+        if (unsubscribeMessagesRef.current) {
+          unsubscribeMessagesRef.current();
+          unsubscribeMessagesRef.current = null;
+        }
+      } catch (error) {
+        console.warn('Error cleaning up previous messages subscription:', error);
       }
-      if (unsubscribeTypingRef.current) {
-        unsubscribeTypingRef.current();
+      
+      try {
+        if (unsubscribeTypingRef.current) {
+          unsubscribeTypingRef.current();
+          unsubscribeTypingRef.current = null;
+        }
+      } catch (error) {
+        console.warn('Error cleaning up previous typing subscription:', error);
       }
       
       // Suscribirse a mensajes
@@ -189,27 +209,82 @@ export function useChat(): UseChatReturn {
   // Limpiar suscripciones al desmontar
   useEffect(() => {
     return () => {
-      if (unsubscribeChatsRef.current) {
-        unsubscribeChatsRef.current();
+      // Cleanup with error handling to prevent Firestore state issues
+      try {
+        if (unsubscribeChatsRef.current) {
+          unsubscribeChatsRef.current();
+          unsubscribeChatsRef.current = null;
+        }
+      } catch (error) {
+        console.warn('Error cleaning up chats subscription:', error);
       }
-      if (unsubscribeMessagesRef.current) {
-        unsubscribeMessagesRef.current();
+      
+      try {
+        if (unsubscribeMessagesRef.current) {
+          unsubscribeMessagesRef.current();
+          unsubscribeMessagesRef.current = null;
+        }
+      } catch (error) {
+        console.warn('Error cleaning up messages subscription:', error);
       }
-      if (unsubscribeTypingRef.current) {
-        unsubscribeTypingRef.current();
+      
+      try {
+        if (unsubscribeTypingRef.current) {
+          unsubscribeTypingRef.current();
+          unsubscribeTypingRef.current = null;
+        }
+      } catch (error) {
+        console.warn('Error cleaning up typing subscription:', error);
       }
+      
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
       }
     };
+  }, []);
+
+  // Enhanced cleanup function for listeners
+  const cleanupListeners = useCallback(() => {
+    try {
+      if (unsubscribeChatsRef.current) {
+        unsubscribeChatsRef.current();
+        unsubscribeChatsRef.current = null;
+      }
+    } catch (error) {
+      console.warn('Error cleaning up chats subscription:', error);
+    }
+    
+    try {
+      if (unsubscribeMessagesRef.current) {
+        unsubscribeMessagesRef.current();
+        unsubscribeMessagesRef.current = null;
+      }
+    } catch (error) {
+      console.warn('Error cleaning up messages subscription:', error);
+    }
+    
+    try {
+      if (unsubscribeTypingRef.current) {
+        unsubscribeTypingRef.current();
+        unsubscribeTypingRef.current = null;
+      }
+    } catch (error) {
+      console.warn('Error cleaning up typing subscription:', error);
+    }
   }, []);
 
   // Configurar chats cuando el usuario esté disponible y autenticado
   useEffect(() => {
     // No ejecutar si no hay usuario autenticado o si aún está inicializando
     if (!user?.id || initializing) {
+      // Clean up any existing listeners when user is not available
+      cleanupListeners();
       return;
     }
+
+    // Clean up existing listeners before setting up new ones
+    cleanupListeners();
 
     setLoading(true);
     setError(null);

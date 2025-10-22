@@ -6,7 +6,7 @@ export function middleware(request: NextRequest) {
 
   // Detect WebView and mobile app browsers
   const isWebView = /wv|WebView|Android.*Version\/.*Chrome|iPhone.*Mobile.*Safari|iPad.*Mobile.*Safari/.test(userAgent);
-  const isTraeApp = /Trae|TraeApp/i.test(userAgent);
+  const isTraeApp = /TraeApp/i.test(userAgent); // Only detect explicit TraeApp, not generic "Trae"
   const isMobile = /Mobile|Android|iPhone|iPad/.test(userAgent);
 
   // Add headers for WebView compatibility

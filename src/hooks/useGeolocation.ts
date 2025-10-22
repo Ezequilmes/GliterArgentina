@@ -43,6 +43,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
   const [isWatching, setIsWatching] = useState(false);
   
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check geolocation permissions
   const checkPermissions = useCallback(async (): Promise<PermissionState> => {
@@ -89,6 +90,11 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
 
       setRetryCount(attempt + 1);
       
+      // Clear any existing timeout
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+      
       retryTimeoutRef.current = setTimeout(() => {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -119,7 +125,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
           },
           {
             enableHighAccuracy,
-            timeout,
+            timeout: Math.min(timeout, 15000), // Cap timeout at 15 seconds
             maximumAge
           }
         );
@@ -150,21 +156,30 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
       setError(null);
       setRetryCount(0);
 
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
       // Timeout para casos donde la solicitud no resuelve
-      const timeoutId = setTimeout(() => {
-        const error = 'Tiempo de espera agotado. No se pudo obtener la ubicación.';
+      timeoutRef.current = setTimeout(() => {
+        const error = 'Tiempo de espera agotado. Verifica tu conexión y permisos de ubicación.';
         setError(error);
         setLoading(false);
         reject(new Error(error));
-      }, timeout + 1000); // 1s más que el timeout de geolocalización
+      }, Math.min(timeout + 2000, 20000)); // Cap total timeout at 20 seconds
 
       try {
         const location = await retryGetLocation(0);
-        clearTimeout(timeoutId);
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
         resolve(location);
       } catch (err) {
-        clearTimeout(timeoutId);
-        const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido al obtener ubicación';
         setError(errorMessage);
         setLoading(false);
         reject(new Error(errorMessage));

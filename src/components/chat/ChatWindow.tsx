@@ -1,15 +1,20 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useChat } from '@/hooks/useChat';
-import { useOnlineStatus } from '@/hooks/useOnlineStatus';
-import { useRealtime } from '@/hooks/useRealtime';
-import { useSounds } from '@/hooks/useSounds';
+import { useAuth } from '../../contexts/AuthContext';
+import { useChat } from '../../hooks/useChat';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useRealtime } from '../../hooks/useRealtime';
+import { useSounds } from '../../hooks/useSounds';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
-import { Avatar, Button, Badge, Loading } from '@/components/ui';
-import { getUserProfilePhoto } from '@/lib/userUtils';
+import Avatar from '../ui/Avatar';
+import Button from '../ui/Button';
+import Badge from '../ui/Badge';
+import Loading from '../ui/Loading';
+import { getUserProfilePhoto } from '../../lib/userUtils';
+import NotificationManager from '../notifications/NotificationManager';
+import useNotificationSettings from '../../hooks/useNotificationSettings';
 import { 
   ArrowDown, 
   ArrowLeft, 
@@ -25,8 +30,8 @@ import {
   X,
   Edit3
 } from 'lucide-react';
-import { ChatMessage as ChatMessageType } from '@/services/chatService';
-import { PopulatedChat } from '@/types';
+import { ChatMessage as ChatMessageType } from '../../services/chatService';
+import { PopulatedChat } from '../../types';
 
 export interface ChatWindowProps {
   chat: PopulatedChat;
@@ -50,6 +55,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     selectChat
   } = useChat();
   const { playReceiveChatSound, playVoipCallSound } = useSounds();
+  const { effectsSettings } = useNotificationSettings();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -149,17 +155,31 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     scrollToBottom();
   }, [messages.length, scrollToBottom]);
 
-  // Detectar nuevos mensajes y reproducir sonido de recepción
+  // Detectar nuevos mensajes y activar notificaciones
   useEffect(() => {
     if (messages.length > previousMessageCount && previousMessageCount > 0) {
       // Verificar si el último mensaje no es del usuario actual
       const lastMessage = messages[messages.length - 1];
       if (lastMessage && lastMessage.senderId !== user?.id) {
-        playReceiveChatSound();
+        // Activar notificaciones usando el sistema global
+        if (typeof window !== 'undefined' && window.notificationManager) {
+          window.notificationManager.showNewMessageNotification({
+            senderName: otherUser?.name || 'Usuario',
+            message: lastMessage.content,
+            soundEnabled: effectsSettings.soundEnabled,
+            visualEnabled: effectsSettings.visualEnabled,
+            isChatOpen: true // El chat está abierto
+          });
+        }
+        
+        // Mantener el sonido original como fallback
+        if (effectsSettings.soundEnabled) {
+          playReceiveChatSound();
+        }
       }
     }
     setPreviousMessageCount(messages.length);
-  }, [messages.length, messages, user?.id, playReceiveChatSound, previousMessageCount]);
+  }, [messages.length, messages, user?.id, playReceiveChatSound, previousMessageCount, otherUser?.name, effectsSettings.soundEnabled]);
 
   // Configurar listeners de scroll
   useEffect(() => {
@@ -238,9 +258,10 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background">
-      {/* Header del chat */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-card">
+    <NotificationManager>
+      <div className="flex flex-col h-screen bg-background">
+        {/* Header del chat */}
+        <div className="flex items-center justify-between p-4 border-b border-border bg-card shrink-0">
         <div className="flex items-center space-x-3">
           {onBack && (
             <Button
@@ -357,10 +378,14 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
         </div>
       </div>
 
-      {/* Área de mensajes */}
+      {/* Área de mensajes con altura fija y scroll */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+        style={{ 
+          maxHeight: 'calc(100vh - 140px)', // Altura fija: pantalla completa menos header (80px) y input (60px)
+          height: 'calc(100vh - 140px)'
+        }}
         onScroll={handleScroll}
       >
         {/* Indicador de carga para mensajes anteriores */}
@@ -444,13 +469,12 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
         )}
         
         {/* Referencia para auto-scroll */}
-
         <div ref={messagesEndRef} />
       </div>
 
       {/* Botón de scroll hacia abajo */}
       {showScrollButton && (
-        <div className="absolute bottom-20 right-6">
+        <div className="absolute bottom-20 right-6 z-10">
           <Button
             variant="secondary"
             size="sm"
@@ -462,8 +486,8 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
         </div>
       )}
 
-      {/* Input de mensaje */}
-      <div className="border-t border-border bg-card">
+      {/* Input de mensaje - siempre visible en la parte inferior */}
+      <div className="border-t border-border bg-card shrink-0 sticky bottom-0">
         <ChatInput 
           chatId={chat.id}
           otherUserId={otherUser.id}
@@ -497,6 +521,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </NotificationManager>
   );
 }

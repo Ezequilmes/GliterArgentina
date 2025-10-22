@@ -545,8 +545,28 @@ export function usePushNotifications() {
   const { addToast } = useToast();
 
   useEffect(() => {
-    setIsSupported('Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window);
-    setPermission(Notification.permission);
+    const checkSupport = () => {
+      try {
+        return typeof window !== 'undefined' && 
+               'Notification' in window && 
+               typeof window.Notification !== 'undefined' &&
+               'serviceWorker' in navigator && 
+               'PushManager' in window;
+      } catch {
+        return false;
+      }
+    };
+    
+    const getPermission = () => {
+      try {
+        return typeof window !== 'undefined' && window.Notification ? window.Notification.permission : 'default';
+      } catch {
+        return 'default';
+      }
+    };
+    
+    setIsSupported(checkSupport());
+    setPermission(getPermission());
   }, []);
 
   const requestPermission = async (): Promise<NotificationPermission> => {
@@ -556,7 +576,12 @@ export function usePushNotifications() {
     }
 
     try {
-      const result = await Notification.requestPermission();
+      if (typeof window === 'undefined' || !window.Notification) {
+        console.warn('Notification API not available');
+        return 'denied';
+      }
+      
+      const result = await window.Notification.requestPermission();
       setPermission(result);
       
       // No mostrar toast aquí para evitar duplicados

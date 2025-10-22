@@ -952,13 +952,17 @@ class ChatService {
     }
   }
 
-  // Nuevo: Limpiar listeners de mensajes
+  // Nuevo: Limpiar listeners de mensajes con manejo de errores
   cleanupMessageListeners(chatId?: string): void {
     if (chatId) {
       // Limpiar listener específico
       const listenerInfo = this.messageListeners.get(chatId);
       if (listenerInfo) {
-        listenerInfo.unsubscribe();
+        try {
+          listenerInfo.unsubscribe();
+        } catch (error) {
+          console.warn(`Error cleaning up message listener for chat ${chatId}:`, error);
+        }
         this.messageListeners.delete(chatId);
       }
       
@@ -966,13 +970,21 @@ class ChatService {
       const paginatedKey = `${chatId}_paginated`;
       const paginatedListener = this.messageListeners.get(paginatedKey);
       if (paginatedListener) {
-        paginatedListener.unsubscribe();
+        try {
+          paginatedListener.unsubscribe();
+        } catch (error) {
+          console.warn(`Error cleaning up paginated listener for chat ${chatId}:`, error);
+        }
         this.messageListeners.delete(paginatedKey);
       }
     } else {
       // Limpiar todos los listeners
-      this.messageListeners.forEach((listenerInfo) => {
-        listenerInfo.unsubscribe();
+      this.messageListeners.forEach((listenerInfo, key) => {
+        try {
+          listenerInfo.unsubscribe();
+        } catch (error) {
+          console.warn(`Error cleaning up message listener for key ${key}:`, error);
+        }
       });
       this.messageListeners.clear();
     }
@@ -1858,45 +1870,71 @@ class ChatService {
     }
   }
 
-  // Limpiar todos los acknowledgments pendientes
+  // Limpiar todos los acknowledgments pendientes con manejo de errores
   private cleanupAllPendingAcknowledgments(): void {
     console.log(`🧹 Limpiando ${this.pendingAcknowledgments.size} acknowledgments pendientes`);
     
     this.pendingAcknowledgments.forEach((ack, messageId) => {
-      this.cleanupPendingAcknowledgment(messageId);
+      try {
+        this.cleanupPendingAcknowledgment(messageId);
+      } catch (error) {
+        console.warn(`Error cleaning up acknowledgment for message ${messageId}:`, error);
+      }
     });
     
     this.pendingAcknowledgments.clear();
   }
 
-  // Limpiar recursos
+  // Limpiar recursos con manejo robusto de errores
   cleanup(): void {
-    // Limpiar timeouts de typing
-    this.typingTimeouts.forEach(timeout => clearTimeout(timeout));
-    this.typingTimeouts.clear();
-    
-    // Limpiar cache
-    this.onlineStatusCache.clear();
-    
-    // Nuevo: Limpiar sistema de reintento
-    if (this.retryInterval) {
-      clearInterval(this.retryInterval);
-      this.retryInterval = null;
+    try {
+      // Limpiar timeouts de typing
+      this.typingTimeouts.forEach((timeout, key) => {
+        try {
+          clearTimeout(timeout);
+        } catch (error) {
+          console.warn(`Error clearing typing timeout for ${key}:`, error);
+        }
+      });
+      this.typingTimeouts.clear();
+      
+      // Limpiar cache
+      this.onlineStatusCache.clear();
+      
+      // Nuevo: Limpiar sistema de reintento
+      if (this.retryInterval) {
+        try {
+          clearInterval(this.retryInterval);
+        } catch (error) {
+          console.warn('Error clearing retry interval:', error);
+        }
+        this.retryInterval = null;
+      }
+      this.retryQueue.clear();
+      
+      // Limpiar acknowledgments pendientes con cleanup completo
+      try {
+        this.cleanupAllPendingAcknowledgments();
+      } catch (error) {
+        console.warn('Error during acknowledgments cleanup:', error);
+      }
+      
+      // Limpiar listeners de mensajes
+      try {
+        this.cleanupMessageListeners();
+      } catch (error) {
+        console.warn('Error during message listeners cleanup:', error);
+      }
+      
+      // Limpiar presencia y heartbeat
+      this.clearPresence().catch(error => {
+        console.error('Error limpiando presencia durante cleanup:', error);
+      });
+      
+      console.log('🧹 ChatService cleanup completed');
+    } catch (error) {
+      console.error('Error during ChatService cleanup:', error);
     }
-    this.retryQueue.clear();
-    
-    // Limpiar acknowledgments pendientes con cleanup completo
-    this.cleanupAllPendingAcknowledgments();
-    
-    // Limpiar listeners de mensajes
-    this.cleanupMessageListeners();
-    
-    // Limpiar presencia y heartbeat
-    this.clearPresence().catch(error => {
-      console.error('Error limpiando presencia durante cleanup:', error);
-    });
-    
-    console.log('🧹 ChatService cleanup completed');
   }
 }
 

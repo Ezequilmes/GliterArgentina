@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AppLayout, Header } from '@/components/layout';
-import { Card, Button, Switch, Slider, Select, Badge } from '@/components/ui';
+import { Card, Button, Switch, Slider, Select, Badge, Modal } from '@/components/ui';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import PushNotificationSetup from '@/components/notifications/PushNotificationSetup';
 import { analyticsService } from '@/services/analyticsService';
+import { userService } from '@/lib/firestore';
+import { User } from '@/types';
 import { 
   MapPin, 
   Users, 
@@ -45,12 +47,82 @@ export default function SettingsPage() {
   const [soundNotifications, setSoundNotifications] = useState(true);
   const [vibrationNotifications, setVibrationNotifications] = useState(true);
 
+  // Blocked users states
+  const [isBlockedUsersModalOpen, setIsBlockedUsersModalOpen] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
+  const [isLoadingBlockedUsers, setIsLoadingBlockedUsers] = useState(false);
+  const [isUnblocking, setIsUnblocking] = useState<string | null>(null);
+
   const handleAgeRangeChange = (values: number[]) => {
     setAgeRange(values);
   };
 
   const handleDistanceChange = (values: number[]) => {
     setMaxDistance(values);
+  };
+
+  // Load blocked users when modal opens
+  const loadBlockedUsers = async () => {
+    if (!user) return;
+    
+    setIsLoadingBlockedUsers(true);
+    try {
+      const blockedUserIds = await userService.getBlockedUsers(user.id);
+      console.log('🚫 Blocked user IDs:', blockedUserIds);
+      
+      if (blockedUserIds.length > 0) {
+        const blockedUsersData = await Promise.all(
+          blockedUserIds.map(async (userId) => {
+            try {
+              return await userService.getUser(userId);
+            } catch (error) {
+              console.error(`Error loading blocked user ${userId}:`, error);
+              return null;
+            }
+          })
+        );
+        
+        // Filter out null values (users that couldn't be loaded)
+        const validBlockedUsers = blockedUsersData.filter((user): user is User => user !== null);
+        setBlockedUsers(validBlockedUsers);
+        console.log('🚫 Loaded blocked users:', validBlockedUsers);
+      } else {
+        setBlockedUsers([]);
+      }
+    } catch (error) {
+      console.error('Error loading blocked users:', error);
+      setBlockedUsers([]);
+    } finally {
+      setIsLoadingBlockedUsers(false);
+    }
+  };
+
+  // Handle opening blocked users modal
+  const handleOpenBlockedUsersModal = () => {
+    console.log('🔓 Opening blocked users modal');
+    setIsBlockedUsersModalOpen(true);
+    loadBlockedUsers();
+  };
+
+  // Handle unblocking a user
+  const handleUnblockUser = async (blockedUserId: string) => {
+    if (!user) return;
+    
+    console.log('🔓 Unblocking user:', blockedUserId);
+    setIsUnblocking(blockedUserId);
+    
+    try {
+      await userService.unblockUser(user.id, blockedUserId);
+      
+      // Remove user from blocked users list
+      setBlockedUsers(prev => prev.filter(u => u.id !== blockedUserId));
+      
+      console.log('✅ User unblocked successfully');
+    } catch (error) {
+      console.error('❌ Error unblocking user:', error);
+    } finally {
+      setIsUnblocking(null);
+    }
   };
 
   return (
@@ -257,7 +329,11 @@ export default function SettingsPage() {
                 Configuración de privacidad
               </Button>
               
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={handleOpenBlockedUsersModal}
+              >
                 <Users className="w-4 h-4 mr-3" />
                 Usuarios bloqueados
               </Button>
@@ -421,6 +497,91 @@ export default function SettingsPage() {
           isOpen={isChangePasswordModalOpen}
           onClose={() => setIsChangePasswordModalOpen(false)}
         />
+
+        {/* Blocked Users Modal */}
+        <Modal
+          isOpen={isBlockedUsersModalOpen}
+          onClose={() => setIsBlockedUsersModalOpen(false)}
+          title="Usuarios bloqueados"
+          size="md"
+        >
+          <div className="space-y-4">
+            {isLoadingBlockedUsers ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <span className="ml-3 text-muted-foreground">Cargando usuarios bloqueados...</span>
+              </div>
+            ) : blockedUsers.length === 0 ? (
+              <div className="text-center py-8">
+                <Shield className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  No hay usuarios bloqueados
+                </h3>
+                <p className="text-muted-foreground">
+                  No has bloqueado a ningún usuario todavía.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Tienes {blockedUsers.length} usuario{blockedUsers.length !== 1 ? 's' : ''} bloqueado{blockedUsers.length !== 1 ? 's' : ''}
+                </p>
+                
+                {blockedUsers.map((blockedUser) => (
+                  <div
+                    key={blockedUser.id}
+                    className="flex items-center justify-between p-4 border border-border rounded-lg"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                        {blockedUser.photos && blockedUser.photos.length > 0 ? (
+                          <img
+                            src={blockedUser.photos[0]}
+                            alt={blockedUser.name}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-lg font-semibold text-primary">
+                            {blockedUser.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium text-foreground">
+                          {blockedUser.name}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">
+                          {blockedUser.age} años
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleUnblockUser(blockedUser.id)}
+                      disabled={isUnblocking === blockedUser.id}
+                      className="text-primary hover:text-primary-foreground hover:bg-primary"
+                    >
+                      {isUnblocking === blockedUser.id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                          Desbloqueando...
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="w-4 h-4 mr-2" />
+                          Desbloquear
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
       </AppLayout>
     </ProtectedRoute>
   );

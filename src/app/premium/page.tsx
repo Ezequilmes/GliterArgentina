@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Crown, Star, Heart, Zap, Check, ArrowLeft, Loader2 } from 'lucide-react';
+import { Crown, Star, Heart, Zap, Check, ArrowLeft, Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { Card } from '@/components/ui';
 import { toast } from 'react-hot-toast';
@@ -87,42 +87,42 @@ export default function PremiumPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 dark:from-gray-900 dark:via-purple-900/20 dark:to-indigo-900/20">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
           <Link
             href="/dashboard"
             className="flex items-center text-gray-800 dark:text-indigo-300 hover:text-gray-900 dark:hover:text-indigo-100 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Volver
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+            <span className="text-sm sm:text-base">Volver</span>
           </Link>
           
           {user?.isPremium && (
-            <div className="flex items-center bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-full">
-              <Crown className="w-4 h-4 mr-2" />
-              <span className="font-medium">Premium Activo</span>
+            <div className="flex items-center bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 sm:px-4 sm:py-2 rounded-full">
+              <Crown className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="font-medium text-xs sm:text-sm">Premium Activo</span>
             </div>
           )}
         </div>
 
         {/* Hero Section */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full mb-6">
-            <Crown className="w-10 h-10 text-white" />
+        <div className="text-center mb-8 sm:mb-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full mb-4 sm:mb-6">
+            <Crown className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
           </div>
           
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
             Gliter <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Premium</span>
           </h1>
           
-          <p className="text-xl text-gray-700 dark:text-indigo-300 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-gray-700 dark:text-indigo-300 max-w-2xl mx-auto px-4">
             Desbloquea todo el potencial de Gliter y encuentra conexiones más rápido
           </p>
         </div>
 
         {/* Features Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-12">
           {[
             {
               icon: Star,
@@ -149,12 +149,12 @@ export default function PremiumPage() {
               color: 'text-purple-500',
             },
           ].map((feature, index) => (
-            <Card key={index} variant="default" padding="lg" className="text-center">
-              <feature.icon className={`w-8 h-8 ${feature.color} mx-auto mb-4`} />
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            <Card key={index} variant="default" padding="lg" className="text-center p-3 sm:p-4 md:p-6">
+              <feature.icon className={`w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 ${feature.color} mx-auto mb-2 sm:mb-3 md:mb-4`} />
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1 sm:mb-2 text-sm sm:text-base">
                 {feature.title}
               </h3>
-              <p className="text-sm text-gray-700 dark:text-indigo-300">
+              <p className="text-xs sm:text-sm text-gray-700 dark:text-indigo-300 leading-relaxed">
                 {feature.description}
               </p>
             </Card>
@@ -163,11 +163,11 @@ export default function PremiumPage() {
 
         {/* Pricing Plans */}
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-gray-100 mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-900 dark:text-gray-100 mb-6 sm:mb-8">
             Elige tu plan
           </h2>
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
             {PREMIUM_PLANS.map((plan, index) => {
               const isPopular = index === 1; // Plan trimestral como popular
               const savings = index > 0 ? getSavingsPercentage(plan.price, plan.duration) : 0;
@@ -177,43 +177,43 @@ export default function PremiumPage() {
                   key={plan.id}
                   variant={isPopular ? "gold" : "default"}
                   padding="lg"
-                  className={`relative ${isPopular ? 'ring-2 ring-yellow-400 scale-105' : ''}`}
+                  className={`relative p-4 sm:p-6 ${isPopular ? 'ring-2 ring-yellow-400 sm:scale-105' : ''}`}
                 >
                   {isPopular && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-1 rounded-full text-sm font-medium">
+                    <div className="absolute -top-2 sm:-top-3 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-0.5 sm:px-4 sm:py-1 rounded-full text-xs sm:text-sm font-medium">
                         Más Popular
                       </span>
                     </div>
                   )}
                   
                   <div className="text-center">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                       {plan.name}
                     </h3>
                     
-                    <div className="mb-4">
-                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    <div className="mb-3 sm:mb-4">
+                      <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
                         {formatPrice(plan.price)}
                       </div>
-                      <div className="text-sm text-indigo-700 dark:text-indigo-300">
+                      <div className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300">
                         {getMonthlyPrice(plan.price, plan.duration)}/mes
                       </div>
                       {savings > 0 && (
-                        <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                        <div className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">
                           Ahorra {savings}%
                         </div>
                       )}
                     </div>
                     
-                    <p className="text-gray-700 dark:text-indigo-300 mb-6">
+                    <p className="text-gray-700 dark:text-indigo-300 mb-4 sm:mb-6 text-sm sm:text-base">
                       {plan.description}
                     </p>
                     
-                    <div className="space-y-3 mb-6">
+                    <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                       {plan.features.map((feature, featureIndex) => (
-                        <div key={featureIndex} className="flex items-center text-sm">
-                          <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
+                        <div key={featureIndex} className="flex items-center text-xs sm:text-sm">
+                          <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 mr-2 sm:mr-3 flex-shrink-0" />
                           <span className="text-gray-700 dark:text-indigo-200">{feature}</span>
                         </div>
                       ))}
@@ -222,21 +222,21 @@ export default function PremiumPage() {
                     <Button
                       onClick={() => handlePurchase(plan.id)}
                       disabled={loading === plan.id || user?.isPremium}
-                      className={`w-full ${
+                      className={`w-full py-2 sm:py-3 px-4 sm:px-6 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
                         isPopular
-                          ? 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600'
-                          : 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600'
-                      } text-white border-0`}
+                          ? 'bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white shadow-lg hover:shadow-xl'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      } ${loading === plan.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {loading === plan.id ? (
                         <div className="flex items-center justify-center">
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-2"></div>
                           Procesando...
                         </div>
                       ) : user?.isPremium ? (
-                        'Ya eres Premium'
+                        'Plan Activo'
                       ) : (
-                        'Seleccionar Plan'
+                        `Seleccionar ${plan.name}`
                       )}
                     </Button>
                   </div>
@@ -247,16 +247,21 @@ export default function PremiumPage() {
         </div>
 
         {/* Security Notice */}
-        <div className="max-w-2xl mx-auto mt-12 text-center">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Pagos seguros con MercadoPago
-            </h3>
-            <p className="text-sm text-gray-700 dark:text-indigo-300">
-              Todos los pagos son procesados de forma segura por MercadoPago. 
-              Puedes cancelar tu suscripción en cualquier momento desde la configuración.
-            </p>
-          </div>
+        <div className="max-w-2xl mx-auto mt-8 sm:mt-12">
+          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 p-4 sm:p-6">
+            <div className="flex items-start space-x-3 sm:space-x-4">
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1 sm:mb-2 text-sm sm:text-base">
+                  Pago 100% Seguro
+                </h3>
+                <p className="text-blue-800 dark:text-blue-200 text-xs sm:text-sm leading-relaxed">
+                  Todos los pagos son procesados de forma segura por MercadoPago. 
+                  Tus datos financieros están protegidos con encriptación de nivel bancario.
+                </p>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
     </div>

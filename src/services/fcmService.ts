@@ -175,7 +175,12 @@ export class FCMService {
     }
 
     try {
-      const permission = await Notification.requestPermission();
+      if (typeof window === 'undefined' || !window.Notification) {
+        console.warn('FCM: Notification API not available');
+        return false;
+      }
+      
+      const permission = await window.Notification.requestPermission();
       console.log('FCM: Notification permission:', permission);
       return permission === 'granted';
     } catch (error) {
@@ -251,10 +256,14 @@ export class FCMService {
   }
 
   getPermissionStatus(): NotificationPermission | null {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
+    try {
+      if (typeof window === 'undefined' || !window.Notification) {
+        return null;
+      }
+      return window.Notification.permission;
+    } catch {
       return null;
     }
-    return Notification.permission;
   }
 
   // Método para enviar el token al servidor

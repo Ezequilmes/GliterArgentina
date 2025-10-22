@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 
-// Configuración para exportación estática
-export const dynamic = 'force-static';
-export const revalidate = false;
+// Configuración para rutas dinámicas
+export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/webhooks/mercadopago

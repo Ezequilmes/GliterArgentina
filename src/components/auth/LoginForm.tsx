@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
@@ -23,6 +23,27 @@ export default function LoginForm() {
 
   const { login } = useAuth();
   const router = useRouter();
+
+  // AUTO LOGIN TEMPORAL PARA TESTING - REMOVER EN PRODUCCIÓN
+  useEffect(() => {
+    const autoLogin = async () => {
+      try {
+        console.log('🔄 Intentando login automático...');
+        await login({
+          email: 'eventos3.0@hotmail.com',
+          password: 'Amarilla15'
+        });
+        console.log('✅ Login automático exitoso!');
+        router.push('/discover');
+      } catch (error) {
+        console.error('❌ Error en login automático:', error);
+      }
+    };
+
+    // Ejecutar login automático después de 1 segundo
+    const timer = setTimeout(autoLogin, 1000);
+    return () => clearTimeout(timer);
+  }, [login, router]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginFormType> = {};

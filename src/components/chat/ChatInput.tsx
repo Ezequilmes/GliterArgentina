@@ -396,53 +396,53 @@ export function ChatInput({
 
       {/* Attachments Menu */}
       {showAttachments && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 mx-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-4">
-            <div className="grid grid-cols-4 gap-3">
+        <div className="absolute bottom-full left-0 right-0 mb-2 mx-2 sm:mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
               <button
                 onClick={() => imageInputRef.current?.click()}
-                className="flex flex-col items-center p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                className="flex flex-col items-center p-2 sm:p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors min-h-[60px] sm:min-h-auto"
                 disabled={isUploading}
               >
-                <ImageIcon className="w-6 h-6 text-blue-500 mb-1" />
+                <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 mb-1" />
                 <span className="text-xs text-gray-700 dark:text-gray-300">Imagen</span>
               </button>
               
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center p-3 rounded-xl bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                className="flex flex-col items-center p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors min-h-[60px] sm:min-h-auto"
                 disabled={isUploading}
               >
-                <Paperclip className="w-6 h-6 text-green-500 mb-1" />
+                <Paperclip className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 mb-1" />
                 <span className="text-xs text-gray-700 dark:text-gray-300">Archivo</span>
               </button>
               
               <button
                 onClick={handleLocationShare}
-                className="flex flex-col items-center p-3 rounded-xl bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                className="flex flex-col items-center p-2 sm:p-3 rounded-xl bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors min-h-[60px] sm:min-h-auto"
                 disabled={isUploading}
               >
-                <MapPin className="w-6 h-6 text-red-500 mb-1" />
+                <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 mb-1" />
                 <span className="text-xs text-gray-700 dark:text-gray-300">Ubicación</span>
               </button>
               
               <button
                 onClick={() => setShowAttachments(false)}
-                className="flex flex-col items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-700/30 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                className="flex flex-col items-center p-2 sm:p-3 rounded-xl bg-gray-50 dark:bg-gray-700/30 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors min-h-[60px] sm:min-h-auto"
               >
-                <X className="w-6 h-6 text-gray-500 mb-1" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500 mb-1" />
                 <span className="text-xs text-gray-700 dark:text-gray-300">Cerrar</span>
               </button>
             </div>
             
             {/* Emojis rápidos */}
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex flex-wrap gap-2">
+            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-wrap gap-1 sm:gap-2">
                 {popularEmojis.map((emoji, index) => (
                   <button
                     key={index}
                     onClick={() => handleEmojiClick(emoji)}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-lg"
+                    className="w-8 h-8 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-base sm:text-lg"
                   >
                     {emoji}
                   </button>
@@ -454,14 +454,14 @@ export function ChatInput({
       )}
 
       {/* Input Container */}
-      <div className="flex items-end space-x-2 p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+      <div className="flex items-end space-x-2 p-3 sm:p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
         {/* Attachment Button */}
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setShowAttachments(!showAttachments)}
           disabled={disabled || isUploading}
-          className="shrink-0 p-2 rounded-full"
+          className="shrink-0 p-2 sm:p-2 rounded-full w-10 h-10 sm:w-auto sm:h-auto"
         >
           <Plus className={cn(
             "w-5 h-5 transition-transform",
@@ -479,8 +479,8 @@ export function ChatInput({
             placeholder={placeholder}
             disabled={disabled || isUploading}
             rows={1}
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100"
-            style={{ minHeight: '48px', maxHeight: '120px' }}
+            className="w-full px-3 py-2 sm:px-4 sm:py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 text-sm sm:text-base"
+            style={{ minHeight: '40px', maxHeight: '120px' }}
           />
           
           {/* Upload progress overlay */}
@@ -498,9 +498,9 @@ export function ChatInput({
           <Button
             onClick={handleSendMessage}
             disabled={disabled || isUploading}
-            className="shrink-0 w-12 h-12 rounded-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg"
+            className="shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
         ) : (
           <button
@@ -511,7 +511,7 @@ export function ChatInput({
             onTouchEnd={stopRecording}
             disabled={disabled || isUploading}
             className={cn(
-              "shrink-0 w-12 h-12 rounded-full transition-all flex items-center justify-center",
+              "shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all flex items-center justify-center",
               isRecording 
                 ? "bg-red-500 hover:bg-red-600 text-white" 
                 : "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600",
@@ -519,7 +519,7 @@ export function ChatInput({
             )}
           >
             <Mic className={cn(
-              "w-5 h-5",
+              "w-4 h-4 sm:w-5 sm:h-5",
               isRecording ? "text-white animate-pulse" : "text-gray-600 dark:text-gray-300"
             )} />
           </button>
@@ -531,7 +531,7 @@ export function ChatInput({
           size="sm"
           onClick={() => setShowAttachments(!showAttachments)}
           disabled={disabled || isUploading}
-          className="shrink-0 p-2 rounded-full"
+          className="shrink-0 p-2 sm:p-2 rounded-full w-10 h-10 sm:w-auto sm:h-auto"
         >
           <Smile className="w-5 h-5" />
         </Button>

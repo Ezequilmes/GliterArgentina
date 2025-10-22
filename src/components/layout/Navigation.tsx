@@ -19,7 +19,8 @@ import {
   Shield,
   Bell,
   Zap,
-  X
+  X,
+  Star
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -41,6 +42,11 @@ const navigationItems = [
     name: 'Chats',
     href: '/chat',
     icon: MessageCircle
+  },
+  {
+    name: 'Exclusivos',
+    href: '/exclusivos',
+    icon: Star
   },
   {
     name: 'Perfil',
@@ -115,9 +121,9 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
 
   return (
     <div className={cn("fixed top-0 left-0 right-0 z-50 bg-primary px-4 sm:px-6 py-3 sm:py-4 shadow-lg", className)}>
-      <div className="flex items-center justify-between">
-        {/* Logo/Title */}
-        <div className="flex items-center space-x-3 sm:space-x-4">
+      <div className="flex items-center justify-between sm:justify-between">
+        {/* Logo/Title - Hidden on mobile */}
+        <div className="hidden sm:flex items-center space-x-3 sm:space-x-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center p-1">
             <img 
               src="/berenjena.svg" 
@@ -128,8 +134,8 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
           <h1 className="text-xl sm:text-2xl font-bold text-white">Gliter</h1>
         </div>
         
-        {/* Navigation Buttons */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
+        {/* Navigation Buttons - Centered on mobile */}
+        <div className="flex items-center space-x-1 sm:space-x-3 mx-auto sm:mx-0">
           {navigationItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -137,36 +143,38 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'w-11 h-11 sm:w-10 sm:h-10 backdrop-blur-sm rounded-lg flex items-center justify-center transition-colors touch-manipulation',
+                  'w-9 h-9 sm:w-10 sm:h-10 backdrop-blur-sm rounded-lg flex items-center justify-center transition-colors touch-manipulation',
                   isActive
                     ? 'bg-white/30 text-white'
                     : 'bg-white/20 text-white/80 hover:bg-white/30 hover:text-white active:bg-white/40'
                 )}
               >
-                <item.icon className="w-5 h-5 sm:w-5 sm:h-5" />
+                <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
             );
           })}
           
           {/* Notification Badge */}
-          <NotificationBadge
-            onClick={() => setIsNotificationCenterOpen(true)}
-            size="md"
-            variant="ghost"
-          />
+          <div className="w-9 h-9 sm:w-10 sm:h-10">
+            <NotificationBadge
+              onClick={() => setIsNotificationCenterOpen(true)}
+              size="sm"
+              variant="ghost"
+            />
+          </div>
           
           {/* Dropdown Menu */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className={cn(
-                'w-11 h-11 sm:w-10 sm:h-10 backdrop-blur-sm rounded-lg flex items-center justify-center transition-colors touch-manipulation',
+                'w-9 h-9 sm:w-10 sm:h-10 backdrop-blur-sm rounded-lg flex items-center justify-center transition-colors touch-manipulation',
                 isDropdownOpen
                   ? 'bg-white/30 text-white'
                   : 'bg-white/20 text-white/80 hover:bg-white/30 hover:text-white active:bg-white/40'
               )}
             >
-              {isDropdownOpen ? <X className="w-5 h-5 sm:w-5 sm:h-5" /> : <Menu className="w-5 h-5 sm:w-5 sm:h-5" />}
+              {isDropdownOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
 
             {/* Dropdown Content */}

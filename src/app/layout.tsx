@@ -68,32 +68,59 @@ export default function RootLayout({
   return (
     <html lang="es" className="h-full" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
-        {/* Service Worker cleanup disabled in development to avoid InvalidStateError */}
-        {process.env.NODE_ENV === 'production' && (
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                // Cleanup old Vite service workers in production only
-                if ('serviceWorker' in navigator) {
+        {/* Enhanced Service Worker management for mobile browsers */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Enhanced Service Worker management for mobile browsers
+              (function() {
+                // Skip in development to avoid InvalidStateError
+                if (typeof window === 'undefined' || !window.location) return;
+                
+                // Detect mobile browser vs installed PWA
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                                   window.navigator.standalone ||
+                                   document.referrer.includes('android-app://');
+                
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                // Only run cleanup in production and not in standalone mode
+                if (${process.env.NODE_ENV === 'production'} && !isStandalone && 'serviceWorker' in navigator) {
                   try {
-                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                      for(let registration of registrations) {
-                        if (registration.scope.includes('vite') || registration.scope.includes('@vite')) {
-                          registration.unregister();
-                          console.log('Unregistered old Vite service worker:', registration.scope);
-                        }
-                      }
-                    }).catch(function(error) {
-                      console.warn('Error cleaning up Vite service workers:', error);
-                    });
+                    // Add delay for mobile browsers to ensure DOM is ready
+                    const cleanup = function() {
+                      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                        registrations.forEach(function(registration) {
+                          // Only cleanup old Vite service workers, not our current ones
+                          if (registration.scope.includes('vite') || 
+                              registration.scope.includes('@vite') ||
+                              registration.scope.includes('webpack')) {
+                            registration.unregister().then(function() {
+                              console.log('Cleaned up old service worker:', registration.scope);
+                            }).catch(function(error) {
+                              console.warn('Failed to unregister service worker:', error);
+                            });
+                          }
+                        });
+                      }).catch(function(error) {
+                        console.warn('Error accessing service worker registrations:', error);
+                      });
+                    };
+                    
+                    // Delay cleanup on mobile browsers
+                    if (isMobile) {
+                      setTimeout(cleanup, 1000);
+                    } else {
+                      cleanup();
+                    }
                   } catch (error) {
-                    console.warn('Error accessing service worker registrations:', error);
+                    console.warn('Service worker cleanup error:', error);
                   }
                 }
-              `,
-            }}
-          />
-        )}
+              })();
+            `,
+          }}
+        />
       </head>
       <body className={`${inter.variable} font-sans antialiased h-full bg-background text-foreground`}>
         <ErrorBoundary>
