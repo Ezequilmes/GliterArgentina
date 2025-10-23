@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserProfilePhoto, userHasPhotos } from '@/lib/userUtils';
 import { NotificationBadge, NotificationCenter } from '@/components/notifications';
+import { FollowInstagramButton } from '@/components/ui';
 import {
   Home,
   Heart,
@@ -126,7 +127,7 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
         <div className="hidden sm:flex items-center space-x-3 sm:space-x-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center p-1">
             <img 
-              src="/berenjena.svg" 
+              src="/logo.svg" 
               alt="Gliter Logo" 
               className="w-full h-full object-contain"
             />
@@ -202,6 +203,13 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                      </div>
                    </div>
                  </div>
+
+                {/* Instagram Follow Button */}
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                  <FollowInstagramButton 
+                    onClick={() => setIsDropdownOpen(false)}
+                  />
+                </div>
 
                 {/* Menu Items */}
                 <div className="py-2">

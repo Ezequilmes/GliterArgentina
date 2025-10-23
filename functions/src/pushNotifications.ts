@@ -87,7 +87,6 @@ export const onMessageCreated = onDocumentCreated(
         notification: {
           title: `💬 ${senderName}`,
           body: messagePreview,
-          icon: senderAvatar || '/icons/icon-192x192.png',
         },
         data: {
           type: 'message',
@@ -111,6 +110,7 @@ export const onMessageCreated = onDocumentCreated(
             badge: '/icons/icon-144x144.png',
             vibrate: [200, 100, 200],
             requireInteraction: true,
+            silent: false,
             tag: 'message',
             actions: [
               {
@@ -190,7 +190,6 @@ export const sendMatchNotification = onCall(async (request) => {
       notification: {
         title: '💖 ¡Nuevo match!',
         body: `¡Hiciste match con ${matchName}!`,
-        icon: matchAvatar || '/icons/icon-192x192.png',
       },
       data: {
         type: 'match',
@@ -207,6 +206,7 @@ export const sendMatchNotification = onCall(async (request) => {
           badge: '/icons/icon-144x144.png',
           vibrate: [200, 100, 200],
           requireInteraction: true,
+          silent: false,
           tag: 'match',
         },
         fcm_options: {
@@ -258,7 +258,6 @@ export const sendLikeNotification = onCall(async (request) => {
       notification: {
         title,
         body,
-        icon: likerAvatar || '/icons/icon-192x192.png',
       },
       data: {
         type: isSuper ? 'super_like' : 'like',
@@ -275,10 +274,11 @@ export const sendLikeNotification = onCall(async (request) => {
           badge: '/icons/icon-144x144.png',
           vibrate: [200, 100, 200],
           requireInteraction: true,
+          silent: false,
           tag: isSuper ? 'super_like' : 'like',
         },
         fcm_options: {
-          link: '/discover',
+          link: '/likes',
         },
       },
     };

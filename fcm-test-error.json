@@ -1,0 +1,10 @@
+{
+  "token": "clyUfr1Af5tIE2lrs6Tmfm:APA91bFZXnlvKcQtVVi64ruADzSRkPsWKtRSvaB9l4olHSrZsv7DUmBwU_GHaFjuu-MPOdvVg4HXDanVPhCctNF7Gvd55gGpoWxsYOJjqJQsWL_rnzxfAbw",
+  "timestamp": "2025-10-22T22:39:47.687Z",
+  "statusCode": 400,
+  "error": {
+    "error": "Token no registrado",
+    "details": "Requested entity was not found."
+  },
+  "status": "error"
+}

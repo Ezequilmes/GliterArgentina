@@ -17,6 +17,9 @@ interface ProfileGridProps {
   onBlock?: (userId: string) => Promise<void>;
   onStartChat?: (userId: string) => Promise<void>;
   className?: string;
+  userSuperLikes?: number;
+  userIsPremium?: boolean;
+  onShowPremiumModal?: () => void;
 }
 
 interface ProfileCardProps {
@@ -26,6 +29,9 @@ interface ProfileCardProps {
   onBlock?: (userId: string) => Promise<void>;
   onStartChat?: (userId: string) => Promise<void>;
   onClick?: () => void;
+  userSuperLikes?: number;
+  userIsPremium?: boolean;
+  onShowPremiumModal?: () => void;
 }
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
@@ -34,7 +40,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   onSuperLike,
   onBlock,
   onStartChat,
-  onClick
+  onClick,
+  userSuperLikes = 0,
+  userIsPremium = false,
+  onShowPremiumModal
 }) => {
   const { user, distance } = userDistance;
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -45,9 +54,17 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     return user.age ? `${user.age}` : '';
   };
 
-  const handleAction = async (e: React.MouseEvent, action: () => Promise<void>) => {
+  const handleAction = async (e: React.MouseEvent, action: () => Promise<void>, actionType?: string) => {
     e.stopPropagation();
-    console.log('🔥 ProfileCard: handleAction called', { userId: user.id, action: action.name });
+    console.log('🔥 ProfileCard: handleAction called', { userId: user.id, action: action.name, actionType });
+    
+    // Verificar créditos para super like
+    if (actionType === 'superlike' && !userIsPremium && userSuperLikes <= 0) {
+      console.log('⚠️ ProfileCard: No hay créditos de super like disponibles');
+      onShowPremiumModal?.();
+      return;
+    }
+    
     setIsLoading(true);
     try {
       await action();
@@ -97,7 +114,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           {/* Action buttons en las esquinas */}
           {/* Like - Esquina superior izquierda */}
           <button
-            onClick={(e) => handleAction(e, async () => await onLike?.(user.id))}
+            onClick={(e) => handleAction(e, async () => await onLike?.(user.id), 'like')}
             disabled={isLoading}
             className={cn(
               "absolute top-2 left-2 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 bg-pink-500/80 hover:bg-pink-500 text-white rounded-full",
@@ -112,7 +129,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
           {/* Chat - Esquina superior derecha */}
           <button
-            onClick={(e) => handleAction(e, async () => await onStartChat?.(user.id))}
+            onClick={(e) => handleAction(e, async () => await onStartChat?.(user.id), 'chat')}
             disabled={isLoading}
             className={cn(
               "absolute top-2 right-2 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 bg-blue-500/80 hover:bg-blue-500 text-white rounded-full",
@@ -175,6 +192,9 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         onSuperLike={onSuperLike}
         onBlock={onBlock}
         onStartChat={onStartChat}
+        userSuperLikes={userSuperLikes}
+        userIsPremium={userIsPremium}
+        onShowPremiumModal={onShowPremiumModal}
       />
     </>
   );
@@ -186,7 +206,10 @@ export const ProfileGrid: React.FC<ProfileGridProps> = ({
   onSuperLike,
   onBlock,
   onStartChat,
-  className
+  className,
+  userSuperLikes = 0,
+  userIsPremium = false,
+  onShowPremiumModal
 }) => {
   const router = useRouter();
 
@@ -222,6 +245,9 @@ export const ProfileGrid: React.FC<ProfileGridProps> = ({
           onBlock={onBlock}
           onStartChat={onStartChat}
           onClick={() => handleProfileClick(userDistance.user.id)}
+          userSuperLikes={userSuperLikes}
+          userIsPremium={userIsPremium}
+          onShowPremiumModal={onShowPremiumModal}
         />
       ))}
     </div>

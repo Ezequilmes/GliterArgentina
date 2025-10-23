@@ -1,4 +1,4 @@
-runtime: nodejs20
+runtime: nodejs24
 entrypoint: npm run start
 
 env:
@@ -8,13 +8,29 @@ env:
     value: "1"
   - key: PORT
     value: "8080"
+  # Firebase Admin SDK Configuration
+  - key: FIREBASE_PROJECT_ID
+    value: gliter-argentina
+  - key: FIREBASE_CLIENT_EMAIL
+    value: firebase-adminsdk-fbsvc@gliter-argentina.iam.gserviceaccount.com
+  - key: FIREBASE_PRIVATE_KEY
+    value: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCT5m2ivVfl7/mU\nsrJgmfmgc8GNBG2Z1uXufM594PPXWudmvVtzn4NKDdqGpVyXgwYrkMvHs0Uw7Lx2\n1Ny5ySdywqZTC5u1wpJvyDFLsTLmclpLTKqt9KdldgXPa4DWgYeSUf1yL6eQNFjr\nSp45Mx5cv4ZZH9+PujlIXxR63H5ZFz+34Yobb7ORh8v6p6BKOYNE9jV9Ip+KDngC\nEUUZ+09vcKqzQdPhDUySqbL92bgc3m9HlPdYRf8tLhQmhqC9J7WzUfNVZ7j9tu6Z\nznKtb2gQ0dB5/NNeOgWiE5Qb2K4BOd5LVCayNdXyU3jTRMTNRFqLvERPdS294ms7\nxEt0TH6FAgMBAAECggEAAi61jJ/6JtK5zlutCFdlU1yPQoc08ymfEXvxKR2Iw54G\ntExUMo/Wm7ZkyeAGo9a4tdZdvMfqBreLmBOlNoRKddCmVys17u1HhL5BxKHsBByz\ntTuU+NsCHbFrkwdn/+JVROUQVh8avCTwRffp1KLAOTKl/HUyXZgsJbj/dUkBKqEz\nM/wJJrQPQEaGfSx2ChfCokHMprUVVtO/X5eE2JcwtScB/zT8neq3wIHCnTMsRNH/\nK8cXbYHzgI+eeKW3tOP8/MP7tLY6w4QG8Gs/TaMpumlDoe50V37Gxr56o3DEmKXX\n6ZlNVHP7XT/zCPTz6EzmDxpsrS8ydwgTruJ+57ATWQKBgQDGjqpngRHBaJ9IXCcm\njCR+mQRhKTZuQY1RKFb2nJXAbUcG9MeD4yBz4KCW/us7GKmKE5oPEqH3uHJq2n6g\nMy1kkx9Hzczjk858RntdA+d94gNAlM2EM6PUSGSuxEppQah8D5V44b/xLZmlHBea\na6nKDHewee1vXrdsBZFizvFoLQKBgQC+sAu1UsW5xn54ctC3L5Y/rRZcspV2541i\nwyrZK7NwFCDSCLv2w8xUi0B3+OZKXqVx6fH8Klz5F5DhJa+gYA6wIoWfA7TTfut7\nDaIs1UijxX8/LAnvMvAfm+0id88zrK3NadvFrmgLZkAdo7kljKYjhd42tuEF2Zvi\nbyzanJTOuQKBgQCuXkE1bjp6f/dJY2waRP4TkysubDPZtYV13RgpsC8ucojqifHg\nV4h7WquMjsdi+XCByl8Dl5hXZEpOnhyPcQIPDchtlUS2Imo15uuVLsWPXfj/MO4e\nh/76gKyycbzrHHbqpADezFl0YlhIkBgGS0ArKLG/cAPcRvCLU4Ruok+L7QKBgFtq\n1MIiI47TvXALQ0p/Mt3mIjFgoE03501w2Yrx632Q+McYztwXtE7Xz5l0pxsCUvjQ\numU0/guhI6D8yzzssD363uqEAV3fnA8LUzOBMOjq1v03JLAbUIkm3MHIhHp2j4BJ\n/sW/vjuw0o4jHrEEw+WF2SmL9UczswsUV4GazbBpAoGAANy6mqhqYzrDpsEmcrRT\nplzdvKzFtkR8p6gtuPM171lxzhs+MY2Xvi2U27DK5ZH8AAE/NA9dQHS1XZZo2yaN\nIGNqjVjVWXNju8S3bN+vkpTsf5S/KkwMIXWmF+xc4prYTtkgq7rZZ5tldDUcxFRr\ns5YafRmUksDpB7V3i4osZSU=\n-----END PRIVATE KEY-----\n"
+  # MercadoPago Configuration
+  - key: MERCADOPAGO_ACCESS_TOKEN
+    value: APP_USR-2100654215920021-090302-fcde5bf150a88e7b9f2223ca0dd2a1e0-93900446
+  - key: MERCADOPAGO_CLIENT_ID
+    value: "2100654215920021"
+  - key: MERCADOPAGO_CLIENT_SECRET
+    value: XZo9vgAxYEmGKD1XiWzv2keT7DT5nOvh
+  - key: MERCADOPAGO_WEBHOOK_SECRET
+    value: 6123b18eb72dba618750cb40a49ea1d26440e748bcf25dd13ce08f8a5fcfe2f2
 
 build:
   command: |
     echo ">>> Cleaning node state"
     rm -rf node_modules package-lock.json pnpm-lock.yaml
-    echo ">>> Installing production deps"
-    npm ci --omit=dev
+    echo ">>> Installing all dependencies for build"
+    npm install
     echo ">>> Type-check"
     npm run type-check
     echo ">>> Run build"

@@ -40,7 +40,7 @@ export default function Home() {
             <Link href="/" className="flex items-center space-x-3 group">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center p-2 group-hover:scale-105 transition-transform duration-300">
                 <img 
-                  src="/berenjena.svg" 
+                  src="/logo.svg" 
                   alt="Gliter Logo" 
                   className="w-8 h-8"
                 />
@@ -96,7 +96,7 @@ export default function Home() {
             </h1>
             
             <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in-up animation-delay-200">
-              Conecta con personas auténticas cerca de ti. Más de <span className="font-semibold text-purple-600">10,000 usuarios</span> ya encontraron el amor en Gliter.
+              Sin anuncios, Sin distracciones. Conectá con personas reales cerca tuyo y descubrí nuevas conexiones a tu medida.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-fade-in-up animation-delay-400">
@@ -236,7 +236,7 @@ export default function Home() {
             <div className="flex items-center justify-center space-x-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
                 <img 
-                  src="/berenjena.svg" 
+                  src="/logo.svg" 
                   alt="Gliter Logo" 
                   className="w-6 h-6"
                 />

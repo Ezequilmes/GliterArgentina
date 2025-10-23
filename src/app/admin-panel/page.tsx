@@ -33,7 +33,9 @@ import {
   Crown,
   Upload,
   Image,
-  Edit
+  Edit,
+  Bell,
+  Send
 } from 'lucide-react';
 import { storageService } from '@/lib/storage';
 
@@ -71,11 +73,56 @@ interface User {
   premiumUntil?: any;
 }
 
+interface ExclusiveRegistration {
+  id: string;
+  name: string;
+  whatsapp: string;
+  type: 'modelo' | 'masajista';
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
+  updatedAt: any;
+}
+
+interface NotificationForm {
+  title: string;
+  message: string;
+  targetType: 'all' | 'premium' | 'specific';
+  targetUsers: string[];
+  icon: string;
+  link: string;
+}
+
+interface NotificationHistory {
+  id: string;
+  title: string;
+  message: string;
+  targetType: string;
+  targetUsers: string[] | null;
+  icon: string;
+  link: string | null;
+  sentBy: string;
+  sentAt: string;
+  totalTokens: number;
+  successCount: number;
+  failureCount: number;
+  failedTokens: string[];
+}
+
+interface UserForNotification {
+  id: string;
+  name: string;
+  email: string;
+  isPremium: boolean;
+  createdAt: string;
+  lastActive: string;
+}
+
 export default function AdminPanel() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [exclusiveCards, setExclusiveCards] = useState<ExclusiveCard[]>([]);
+  const [exclusiveRegistrations, setExclusiveRegistrations] = useState<ExclusiveRegistration[]>([]);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [newPromoCode, setNewPromoCode] = useState({
@@ -101,6 +148,22 @@ export default function AdminPanel() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+
+  // Estados para notificaciones
+  const [notificationForm, setNotificationForm] = useState<NotificationForm>({
+    title: '',
+    message: '',
+    targetType: 'all',
+    targetUsers: [],
+    icon: '/logo.svg',
+    link: ''
+  });
+  const [notificationHistory, setNotificationHistory] = useState<NotificationHistory[]>([]);
+  const [usersForNotification, setUsersForNotification] = useState<UserForNotification[]>([]);
+  const [sendingNotification, setSendingNotification] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   
   // Estados para edición
@@ -148,6 +211,22 @@ export default function AdminPanel() {
         ...doc.data()
       })) as PromoCode[];
       setPromoCodes(codes);
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin]);
+
+  // Cargar registros exclusivos
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const q = query(collection(db, 'exclusive-registrations'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const registrations = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as ExclusiveRegistration[];
+      setExclusiveRegistrations(registrations);
     });
 
     return () => unsubscribe();
@@ -217,6 +296,28 @@ export default function AdminPanel() {
     }
   };
 
+  const approveRegistration = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'exclusive-registrations', id), {
+        status: 'approved',
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error al aprobar registro:', error);
+    }
+  };
+
+  const rejectRegistration = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'exclusive-registrations', id), {
+        status: 'rejected',
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error al rechazar registro:', error);
+    }
+  };
+
   const createPromoCode = async () => {
     try {
       if (!newPromoCode.code || !newPromoCode.expires) return;
@@ -261,6 +362,110 @@ export default function AdminPanel() {
       console.error('Error al cambiar estado del código:', error);
     }
   };
+
+  // Funciones para notificaciones
+  const loadNotificationHistory = async () => {
+    if (!user?.email) return;
+    
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(`/api/admin/notifications-history?adminEmail=${user.email}&limit=50`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setNotificationHistory(data.notifications);
+      }
+    } catch (error) {
+      console.error('Error al cargar historial de notificaciones:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const loadUsersForNotification = async () => {
+    if (!user?.email) return;
+    
+    setLoadingUsers(true);
+    try {
+      const response = await fetch(`/api/admin/users-list?adminEmail=${user.email}&search=${userSearch}&limit=100`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setUsersForNotification(data.users);
+      }
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const sendNotification = async () => {
+    if (!user?.email || !notificationForm.title || !notificationForm.message) return;
+    
+    setSendingNotification(true);
+    try {
+      const response = await fetch('/api/admin/send-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...notificationForm,
+          adminEmail: user.email
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`Notificación enviada exitosamente a ${data.stats.successCount} usuarios`);
+        setNotificationForm({
+          title: '',
+          message: '',
+          targetType: 'all',
+          targetUsers: [],
+          icon: '/logo.svg',
+          link: ''
+        });
+        loadNotificationHistory(); // Recargar historial
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error al enviar notificación:', error);
+      alert('Error al enviar notificación');
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  const handleUserSelection = (userId: string, selected: boolean) => {
+    if (selected) {
+      setNotificationForm(prev => ({
+        ...prev,
+        targetUsers: [...prev.targetUsers, userId]
+      }));
+    } else {
+      setNotificationForm(prev => ({
+        ...prev,
+        targetUsers: prev.targetUsers.filter(id => id !== userId)
+      }));
+    }
+  };
+
+  // Cargar datos cuando se selecciona la pestaña de notificaciones
+  useEffect(() => {
+    if (isAdmin) {
+      loadNotificationHistory();
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin && notificationForm.targetType === 'specific') {
+      loadUsersForNotification();
+    }
+  }, [isAdmin, notificationForm.targetType, userSearch]);
 
   // Funciones para edición de perfiles exclusivos
   const startEditing = (card: ExclusiveCard) => {
@@ -443,10 +648,14 @@ export default function AdminPanel() {
         </div>
 
         <Tabs defaultValue="exclusives" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="exclusives" className="flex items-center gap-2">
               <Crown className="h-4 w-4" />
               Exclusivos
+            </TabsTrigger>
+            <TabsTrigger value="registrations" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Registros
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -455,6 +664,10 @@ export default function AdminPanel() {
             <TabsTrigger value="promos" className="flex items-center gap-2">
               <Gift className="h-4 w-4" />
               Códigos Promo
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Notificaciones
             </TabsTrigger>
             <TabsTrigger value="stats" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
@@ -691,6 +904,60 @@ export default function AdminPanel() {
             </div>
           </TabsContent>
 
+          <TabsContent value="registrations" className="space-y-6">
+            <div className="grid gap-4">
+              <h2 className="text-xl font-semibold">Registros de Exclusivos</h2>
+              {exclusiveRegistrations.map((registration) => (
+                <Card key={registration.id} className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-2">
+                      <h3 className="font-semibold text-lg">{registration.name}</h3>
+                      <p className="text-gray-600">WhatsApp: {registration.whatsapp}</p>
+                      <p className="text-gray-600">Tipo: {registration.type}</p>
+                      <p className="text-sm text-gray-500">
+                        Registrado: {registration.createdAt?.toDate?.()?.toLocaleDateString() || 'Fecha no disponible'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant={
+                          registration.status === 'pending' ? 'secondary' :
+                          registration.status === 'approved' ? 'default' : 'error'
+                        }
+                      >
+                        {registration.status === 'pending' ? 'Pendiente' :
+                         registration.status === 'approved' ? 'Aprobado' : 'Rechazado'}
+                      </Badge>
+                      {registration.status === 'pending' && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => approveRegistration(registration.id)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => rejectRegistration(registration.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {exclusiveRegistrations.length === 0 && (
+                <Card className="p-8 text-center">
+                  <p className="text-gray-500">No hay registros de exclusivos</p>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
           <TabsContent value="users" className="space-y-6">
             <div className="grid gap-4">
               <h2 className="text-xl font-semibold">Gestión de Usuarios</h2>
@@ -824,6 +1091,177 @@ export default function AdminPanel() {
                   <p className="text-xs text-gray-600">
                     Total: {promoCodes.length}
                   </p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="notifications" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Formulario de envío de notificaciones */}
+              <Card className="p-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Send className="h-5 w-5" />
+                    Enviar Notificación
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Título</label>
+                    <Input
+                      value={notificationForm.title}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNotificationForm(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Título de la notificación"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Mensaje</label>
+                    <textarea
+                      className="w-full p-3 border rounded-lg resize-none"
+                      rows={3}
+                      value={notificationForm.message}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotificationForm(prev => ({ ...prev, message: e.target.value }))}
+                      placeholder="Contenido del mensaje"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Destinatarios</label>
+                    <select
+                      className="w-full p-3 border rounded-lg"
+                      value={notificationForm.targetType}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNotificationForm(prev => ({ 
+                        ...prev, 
+                        targetType: e.target.value as 'all' | 'premium' | 'specific',
+                        targetUsers: []
+                      }))}
+                    >
+                      <option value="all">Todos los usuarios</option>
+                      <option value="premium">Solo usuarios premium</option>
+                      <option value="specific">Usuarios específicos</option>
+                    </select>
+                  </div>
+                  
+                  {notificationForm.targetType === 'specific' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Buscar usuarios</label>
+                      <Input
+                        value={userSearch}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserSearch(e.target.value)}
+                        placeholder="Buscar por nombre o email"
+                      />
+                      
+                      {loadingUsers ? (
+                        <div className="text-center py-4">Cargando usuarios...</div>
+                      ) : (
+                        <div className="mt-2 max-h-40 overflow-y-auto border rounded-lg">
+                          {usersForNotification.map(user => (
+                            <div
+                              key={user.id}
+                              className={`p-2 cursor-pointer hover:bg-gray-50 flex items-center justify-between ${
+                                notificationForm.targetUsers.includes(user.id) ? 'bg-blue-50' : ''
+                              }`}
+                              onClick={() => handleUserSelection(user.id, !notificationForm.targetUsers.includes(user.id))}
+                            >
+                              <div>
+                                <div className="font-medium">{user.name}</div>
+                                <div className="text-sm text-gray-600">{user.email}</div>
+                              </div>
+                              {user.isPremium && <Badge>Premium</Badge>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {notificationForm.targetUsers.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-sm font-medium">Usuarios seleccionados: {notificationForm.targetUsers.length}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Icono (opcional)</label>
+                    <Input
+                      value={notificationForm.icon}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNotificationForm(prev => ({ ...prev, icon: e.target.value }))}
+                      placeholder="URL del icono"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Enlace (opcional)</label>
+                    <Input
+                      value={notificationForm.link}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNotificationForm(prev => ({ ...prev, link: e.target.value }))}
+                      placeholder="URL de destino al hacer clic"
+                    />
+                  </div>
+                  
+                  <Button
+                    onClick={sendNotification}
+                    disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
+                    className="w-full"
+                  >
+                    {sendingNotification ? 'Enviando...' : 'Enviar Notificación'}
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              {/* Historial de notificaciones */}
+              <Card className="p-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="h-5 w-5" />
+                    Historial de Notificaciones
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingHistory ? (
+                    <div className="text-center py-8">Cargando historial...</div>
+                  ) : notificationHistory.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      No hay notificaciones enviadas
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {notificationHistory.map(notification => (
+                        <div key={notification.id} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium">{notification.title}</h4>
+                              <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                <span>Enviado: {new Date(notification.sentAt).toLocaleString()}</span>
+                                <span>Tipo: {
+                                  notification.targetType === 'all' ? 'Todos' :
+                                  notification.targetType === 'premium' ? 'Premium' : 'Específicos'
+                                }</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-4 mt-3 text-sm">
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <span>Exitosos: {notification.successCount}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                              <span>Fallidos: {notification.failureCount}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <span>Total: {notification.totalTokens}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

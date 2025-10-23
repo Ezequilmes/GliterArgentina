@@ -220,6 +220,18 @@ export function useServiceWorker(): UseServiceWorkerReturn {
 
       console.log('Service Worker registered:', registration);
 
+      // Register Firebase Messaging Service Worker
+      try {
+        const firebaseRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/firebase-cloud-messaging-push-scope',
+          updateViaCache: 'imports'
+        });
+        console.log('Firebase Messaging Service Worker registered:', firebaseRegistration);
+      } catch (firebaseError) {
+        console.error('Firebase Messaging Service Worker registration failed:', firebaseError);
+        // Continue even if Firebase SW fails to register
+      }
+
       setState(prev => ({
         ...prev,
         isRegistered: true,

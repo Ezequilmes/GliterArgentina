@@ -33,6 +33,8 @@ export class FCMService {
   }
 
   private async initializeMessaging() {
+    console.log('FCM: Starting messaging initialization...');
+    
     if (typeof window === 'undefined') {
       console.log('FCM: Running on server side, skipping initialization');
       return;
@@ -40,6 +42,7 @@ export class FCMService {
 
     try {
       // Verificar si Firebase Messaging está soportado
+      console.log('FCM: Checking Firebase Messaging support...');
       const firebaseSupported = await isSupported();
       
       if (!firebaseSupported) {
@@ -47,12 +50,23 @@ export class FCMService {
         this.isSupported = false;
         return;
       }
+      console.log('FCM: Firebase Messaging is supported');
 
       // Verificar si el navegador soporta todas las características necesarias
       const hasServiceWorker = 'serviceWorker' in navigator;
       const hasNotifications = 'Notification' in window;
       const hasPushManager = 'PushManager' in window;
       const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+
+      console.log('FCM: Browser compatibility check:', {
+        hasServiceWorker,
+        hasNotifications,
+        hasPushManager,
+        isSecureContext,
+        protocol: location.protocol,
+        hostname: location.hostname,
+        userAgent: navigator.userAgent.substring(0, 100) + '...'
+      });
 
       if (!hasServiceWorker) {
         console.warn('FCM: Service Workers not supported');
@@ -78,9 +92,13 @@ export class FCMService {
         return;
       }
 
+      console.log('FCM: All compatibility checks passed, initializing Firebase Messaging...');
+
       // Solo inicializar Firebase Messaging si todo está soportado
       this.messaging = getMessaging(app);
       this.isSupported = true;
+      
+      console.log('FCM: Firebase Messaging instance created successfully');
       
       // Configurar listener para mensajes en primer plano
       this.setupForegroundMessageListener();
@@ -88,6 +106,13 @@ export class FCMService {
       console.log('FCM: Messaging initialized successfully');
     } catch (error) {
       console.error('FCM: Error initializing messaging:', error);
+      if (error instanceof Error) {
+        console.error('FCM: Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+      }
       this.isSupported = false;
       this.messaging = null;
     }
@@ -193,41 +218,66 @@ export class FCMService {
     // Esperar a que la inicialización termine
     await this.initializationPromise;
     
+    console.log('FCM: Getting registration token - Environment:', {
+      isProduction: process.env.NODE_ENV === 'production',
+      protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
+      hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+      isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+      messagingAvailable: !!this.messaging,
+      isSupported: this.isSupported
+    });
+    
     if (!this.messaging || !this.isSupported) {
-      console.warn('FCM: Messaging not available');
+      console.warn('FCM: Messaging not available - messaging:', !!this.messaging, 'isSupported:', this.isSupported);
       return null;
     }
 
     try {
       // Verificar permisos
+      console.log('FCM: Requesting notification permission...');
       const hasPermission = await this.requestPermission();
       if (!hasPermission) {
         console.warn('FCM: Notification permission denied');
         return null;
       }
+      console.log('FCM: Notification permission granted');
 
       // Verificar si el push service está disponible
       if (!('PushManager' in window)) {
         console.warn('FCM: Push messaging is not supported');
         return null;
       }
+      console.log('FCM: PushManager is available');
+
+      // Verificar VAPID key
+      const finalVapidKey = vapidKey || process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      console.log('FCM: Using VAPID key:', finalVapidKey ? finalVapidKey.substring(0, 20) + '...' : 'undefined');
 
       // Obtener token de registro
+      console.log('FCM: Requesting registration token from Firebase...');
       const token = await getToken(this.messaging, {
-        vapidKey: vapidKey || process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
+        vapidKey: finalVapidKey
       });
 
       if (token) {
         this.currentToken = token;
-        console.log('FCM: Registration token obtained:', token.substring(0, 20) + '...');
+        console.log('FCM: Registration token obtained successfully:', token.substring(0, 20) + '...');
+        console.log('FCM: Token length:', token.length);
         return token;
       } else {
-        console.warn('FCM: No registration token available');
+        console.warn('FCM: No registration token available - Firebase returned null/undefined');
         return null;
       }
     } catch (error) {
       // Manejar errores específicos de push service
       if (error instanceof Error) {
+        console.error('FCM: Detailed error information:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+          isProduction: process.env.NODE_ENV === 'production'
+        });
+        
         if (error.message.includes('push service not available') || 
             error.message.includes('Registration failed') ||
             error.message.includes('unsupported-browser')) {

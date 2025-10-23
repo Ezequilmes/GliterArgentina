@@ -1,6 +1,13 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+
+// Interfaz para NetworkInformation (no está incluida en TypeScript por defecto)
+interface NetworkInformation {
+  effectiveType?: 'slow-2g' | '2g' | '3g' | '4g';
+  downlink?: number;
+  rtt?: number;
+}
 import { Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -21,6 +28,7 @@ import { getCurrentLocation } from '@/lib/geolocation';
 import { analyticsService } from '@/services/analyticsService';
 import { useServiceWorkerHandler } from '@/hooks/useServiceWorkerHandler';
 import { chatService } from '@/services/chatService';
+import { fcmService } from '@/services/fcmService';
 import MobileLoadingScreen from '@/components/ui/MobileLoadingScreen';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,9 +77,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         height: window.innerHeight
       } : null,
       connection: typeof navigator !== 'undefined' && 'connection' in navigator ? {
-        effectiveType: (navigator as any).connection?.effectiveType,
-        downlink: (navigator as any).connection?.downlink,
-        rtt: (navigator as any).connection?.rtt
+        effectiveType: (navigator as Navigator & { connection?: NetworkInformation }).connection?.effectiveType,
+        downlink: (navigator as Navigator & { connection?: NetworkInformation }).connection?.downlink,
+        rtt: (navigator as Navigator & { connection?: NetworkInformation }).connection?.rtt
       } : null,
       ...data
     };
@@ -111,6 +119,97 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setTimeout(() => {
         window.location.reload();
       }, 2000); // Aumentado el delay
+    }
+  };
+
+  // Función para generar automáticamente token FCM
+  const generateFCMTokenAutomatically = async (userId: string) => {
+    try {
+      await logAuthEvent('fcm_auto_generation_start', { userId });
+      
+      // Verificar que el usuario esté autenticado en Firebase Auth
+      if (!auth.currentUser) {
+        await logAuthEvent('fcm_user_not_authenticated', { userId });
+        console.warn('FCM: Usuario no autenticado en Firebase Auth, esperando...');
+        return;
+      }
+
+      // Verificar que el token de autenticación esté disponible
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        if (!idToken) {
+          await logAuthEvent('fcm_no_auth_token', { userId });
+          console.warn('FCM: No se pudo obtener el token de autenticación');
+          return;
+        }
+        console.log('FCM: Usuario autenticado correctamente, token disponible');
+      } catch (authError) {
+        await logAuthEvent('fcm_auth_token_error', { 
+          userId, 
+          error: authError instanceof Error ? authError.message : 'Unknown auth error' 
+        });
+        console.warn('FCM: Error al verificar autenticación:', authError);
+        return;
+      }
+      
+      // Verificar si las notificaciones están soportadas
+      const isSupported = await fcmService.isNotificationSupported();
+      if (!isSupported) {
+        await logAuthEvent('fcm_not_supported', { userId });
+        return;
+      }
+
+      // Verificar el estado actual de los permisos
+      const currentPermission = fcmService.getPermissionStatus();
+      
+      // Si ya están denegados, no intentar solicitar
+      if (currentPermission === 'denied') {
+        await logAuthEvent('fcm_permission_denied', { userId });
+        return;
+      }
+
+      // Si ya están concedidos, obtener el token directamente
+      if (currentPermission === 'granted') {
+        try {
+          const existingToken = await fcmService.getRegistrationToken();
+          if (existingToken) {
+            await fcmService.saveTokenToServer(userId, existingToken);
+            await logAuthEvent('fcm_existing_token_saved', { userId, hasToken: !!existingToken });
+            return;
+          }
+        } catch (error) {
+          await logAuthEvent('fcm_existing_token_error', { 
+            userId, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          });
+        }
+      }
+
+      // Si los permisos están en 'default', solicitar automáticamente
+      if (currentPermission === 'default' || currentPermission === null) {
+        try {
+          const hasPermission = await fcmService.requestPermission();
+          if (hasPermission) {
+            const token = await fcmService.getRegistrationToken();
+            if (token) {
+              await fcmService.saveTokenToServer(userId, token);
+              await logAuthEvent('fcm_auto_token_generated', { userId, hasToken: !!token });
+            }
+          } else {
+            await logAuthEvent('fcm_permission_auto_denied', { userId });
+          }
+        } catch (error) {
+          await logAuthEvent('fcm_auto_generation_error', { 
+            userId, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          });
+        }
+      }
+    } catch (error) {
+      await logAuthEvent('fcm_auto_generation_critical_error', { 
+        userId, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
     }
   };
 
@@ -242,6 +341,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
                   error: error instanceof Error ? error.message : 'Unknown error'
                 });
               }
+
+              // Generar automáticamente token FCM para notificaciones push
+              // Se ejecuta en background para no bloquear la autenticación
+              setTimeout(() => {
+                generateFCMTokenAutomatically(authUser.uid).catch(error => {
+                  console.warn('Error en generación automática de token FCM:', error);
+                });
+              }, 2000); // Delay de 2 segundos para permitir que la autenticación se complete
             } else {
               setAuthUser(null);
               setUser(null);
@@ -623,6 +730,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextType = {
     user,
+    authUser,
     loading,
     initializing,
     isAuthenticated,

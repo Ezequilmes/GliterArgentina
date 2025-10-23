@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import { AuthUser } from '@/lib/auth';
 
 // Tipos de usuario
 export interface User {
@@ -35,6 +36,7 @@ export interface User {
   passedUsers?: string[];
   superLikedUsers?: string[];
   receivedSuperLikes?: string[];
+  superLikes?: number;
   matches?: string[];
   settings?: UserSettings;
 }
@@ -240,6 +242,7 @@ export interface ProfileForm {
 // Tipos de contexto
 export interface AuthContextType {
   user: User | null;
+  authUser: AuthUser | null;
   loading: boolean;
   initializing: boolean;
   isAuthenticated: boolean;

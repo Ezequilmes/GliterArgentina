@@ -269,9 +269,20 @@ class ChatService {
     // Reestablecer listeners de mensajes
     this.messageListeners.forEach((listenerInfo, chatId) => {
       console.log(`🔄 Reestableciendo listener para chat ${chatId}`);
+      
+      // Limpiar el listener anterior antes de crear uno nuevo
+      try {
+        listenerInfo.unsubscribe();
+      } catch (error) {
+        console.warn(`Error limpiando listener para ${chatId}:`, error);
+      }
+      
       // Los listeners de Firestore se reestablecen automáticamente
       // pero podemos forzar una reconexión si es necesario
     });
+    
+    // Limpiar el mapa de listeners para evitar conflictos
+    this.messageListeners.clear();
   }
 
   // Nuevo: Agregar mensaje a cola de reintento
@@ -827,6 +838,20 @@ class ChatService {
       
       if (limitCount <= 0 || limitCount > 100) {
         throw new Error('Límite debe estar entre 1 y 100');
+      }
+
+      // Prevenir múltiples listeners para el mismo chat
+      const listenerKey = options?.startAfter ? `${chatId}_paginated` : chatId;
+      const existingListener = this.messageListeners.get(listenerKey);
+      
+      if (existingListener) {
+        console.log(`⚠️  Ya existe un listener activo para el chat ${listenerKey}, limpiando...`);
+        try {
+          existingListener.unsubscribe();
+        } catch (error) {
+          console.warn(`Error limpiando listener existente para ${listenerKey}:`, error);
+        }
+        this.messageListeners.delete(listenerKey);
       }
 
       const messagesRef = collection(db, 'chats', chatId, 'messages');

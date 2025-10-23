@@ -44,7 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={cn(
-      'flex items-center justify-between h-14 sm:h-16 px-4 sm:px-6 border-b animate-slide-in-down transition-all duration-300',
+      'flex items-center justify-between h-12 sm:h-14 px-4 sm:px-6 border-b animate-slide-in-down transition-all duration-300',
       transparent 
         ? 'bg-transparent border-transparent' 
         : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800',

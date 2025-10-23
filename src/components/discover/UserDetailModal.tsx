@@ -17,6 +17,9 @@ interface UserDetailModalProps {
   onBlock?: (userId: string) => void;
   onSuperLike?: (userId: string) => void;
   onStartChat?: (userId: string) => void;
+  userSuperLikes?: number;
+  userIsPremium?: boolean;
+  onShowPremiumModal?: () => void;
 }
 
 export const UserDetailModal: React.FC<UserDetailModalProps> = ({
@@ -26,7 +29,10 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
   onLike,
   onBlock,
   onSuperLike,
-  onStartChat
+  onStartChat,
+  userSuperLikes = 0,
+  userIsPremium = false,
+  onShowPremiumModal
 }) => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
@@ -213,7 +219,14 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             )}
             
             <button
-              onClick={() => onSuperLike?.(user.id)}
+              onClick={() => {
+                // Verificar créditos para super like
+                if (!userIsPremium && userSuperLikes <= 0) {
+                  onShowPremiumModal?.();
+                  return;
+                }
+                onSuperLike?.(user.id);
+              }}
               className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-full flex items-center justify-center transition-all shadow-md hover:shadow-lg"
             >
               <Star className="w-5 h-5 text-white" />

@@ -190,7 +190,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
         request.auth.uid == resource.data.userId;
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && 
+      allow update, delete: if isAuthenticated() && 
         request.auth.uid == resource.data.userId;
     }
     
@@ -271,6 +271,21 @@ service cloud.firestore {
     match /analytics/{analyticsId} {
       // Solo admins pueden leer y escribir estadísticas
       allow read, write: if isAdmin();
+    }
+    
+    // Exclusive registrations - registros del formulario de exclusivos
+    match /exclusive-registrations/{registrationId} {
+      // Lectura: solo admins pueden ver los registros
+      allow read: if isAdmin();
+      
+      // Creación: cualquier usuario puede enviar un registro
+      allow create: if true;
+      
+      // Actualización: solo admins pueden cambiar el estado (aprobar/rechazar)
+      allow update: if isAdmin();
+      
+      // Eliminación: solo admins pueden eliminar registros
+      allow delete: if isAdmin();
     }
   }
 }

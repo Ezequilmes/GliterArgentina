@@ -1,0 +1,5 @@
+{
+  "example": "Copia tu token FCM aquí",
+  "format": "El token debe tener aproximadamente 152 caracteres",
+  "instructions": "Obtén el token desde http://localhost:3001/test-fcm"
+}

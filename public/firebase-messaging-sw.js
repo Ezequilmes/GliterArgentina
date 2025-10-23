@@ -17,7 +17,7 @@ if (typeof self === 'undefined' || typeof importScripts === 'undefined') {
     projectId: "gliter-argentina",
     storageBucket: "gliter-argentina.firebasestorage.app",
     messagingSenderId: "1084162955705",
-    appId: "1:1084162955705:web:362b67d495109dff24fe68"
+    appId: "1:1084162955705:web:25bb32180d1bdaf724fe68"
   };
 
   // Initialize Firebase only if firebase is available

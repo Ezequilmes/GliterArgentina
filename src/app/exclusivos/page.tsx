@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { ExclusiveRegistrationForm } from '@/components/ui';
 
 interface ExclusiveCard {
   id: string;
@@ -122,7 +123,7 @@ export default function ExclusivosPage() {
               <Crown className="h-8 w-8 text-purple-600" />
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Gliter Exclusivos</h1>
-                <p className="text-gray-600">Modelos y masajistas premium</p>
+                <p className="text-gray-600">Modelos y Masajistas Premium</p>
               </div>
             </div>
             <Link href="/dashboard">
@@ -146,20 +147,9 @@ export default function ExclusivosPage() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600">{exclusiveCards.length}</div>
-            <div className="text-sm text-gray-600">Perfiles Activos</div>
-          </Card>
-          <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-pink-600">{exclusiveCards.filter(c => c.featured).length}</div>
-            <div className="text-sm text-gray-600">Destacados</div>
-          </Card>
-          <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-indigo-600">24/7</div>
-            <div className="text-sm text-gray-600">Disponibilidad</div>
-          </Card>
+        {/* Registration Form */}
+        <div className="mb-8">
+          <ExclusiveRegistrationForm />
         </div>
 
         {/* Grid de Cards */}

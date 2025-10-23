@@ -18,6 +18,9 @@ interface DiscoverStackProps {
   isLoading?: boolean;
   hasMore?: boolean;
   className?: string;
+  userSuperLikes?: number;
+  userIsPremium?: boolean;
+  onShowPremiumModal?: () => void;
 }
 
 export const DiscoverStack: React.FC<DiscoverStackProps> = ({
@@ -29,7 +32,10 @@ export const DiscoverStack: React.FC<DiscoverStackProps> = ({
   onLoadMore,
   isLoading = false,
   hasMore = true,
-  className
+  className,
+  userSuperLikes = 0,
+  userIsPremium = false,
+  onShowPremiumModal
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -53,6 +59,15 @@ export const DiscoverStack: React.FC<DiscoverStackProps> = ({
   }, [currentIndex, users.length, hasMore, onLoadMore, isLoading]);
 
   const handleAction = (action: 'like' | 'pass' | 'superlike', userDistance: UserDistance) => {
+    // Verificar créditos de super likes antes de ejecutar
+    if (action === 'superlike') {
+      if (!userIsPremium && userSuperLikes <= 0) {
+        // Mostrar modal premium si no hay créditos
+        onShowPremiumModal?.();
+        return;
+      }
+    }
+
     setLastAction({ type: action, userDistance });
     
     // Call the appropriate callback

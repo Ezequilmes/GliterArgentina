@@ -10,6 +10,8 @@ import { Button, Loading } from '@/components/ui';
 import { SuperLikeCounter, PremiumModal } from '@/components/premium';
 import { LocationStatus } from '@/components/location';
 import { useToast } from '@/components/ui/Toast';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import ActionFeedback from '@/components/ui/ActionFeedback';
 import { UserCard } from '@/components/profile';
 import { Settings, Filter, MapPin, User as UserIcon, MessageCircle, Users, Shield, RefreshCw, AlertCircle, Check, AlertTriangle } from 'lucide-react';
@@ -48,6 +50,8 @@ export default function DiscoverPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [userSuperLikes, setUserSuperLikes] = useState(0);
+  const [userIsPremium, setUserIsPremium] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{
     action: 'like' | 'pass' | 'superlike' | null;
     status: 'idle' | 'loading' | 'success' | 'error';
@@ -152,6 +156,8 @@ export default function DiscoverPage() {
         // Load current user data
         const userData = await userService.getUser(user.id);
         setCurrentUserData(userData);
+        setUserSuperLikes(userData?.superLikes || 0);
+        setUserIsPremium(userData?.isPremium || false);
         console.log('👤 [DiscoverPage] Current user data loaded:', userData?.name);
 
         // Load nearby users
@@ -344,9 +350,17 @@ export default function DiscoverPage() {
 
   const handleSuperLike = async (userId: string) => {
     console.log('🔥 BUTTON PRESSED: SUPER LIKE BUTTON CLICKED!', { userId, timestamp: new Date().toISOString() });
-    console.log('⭐ DiscoverPage: handleSuperLike called', { userId, currentUser: user?.id });
+    console.log('⭐ DiscoverPage: handleSuperLike called', { userId, currentUser: user?.id, userSuperLikes, userIsPremium });
+    
     if (!user) {
       console.log('❌ No user authenticated, returning early');
+      return;
+    }
+    
+    // Verificar si el usuario tiene créditos disponibles o es premium
+    if (!userIsPremium && userSuperLikes <= 0) {
+      console.log('❌ No super likes available, showing premium modal');
+      setShowPremiumModal(true);
       return;
     }
     
@@ -359,6 +373,11 @@ export default function DiscoverPage() {
       const superLikedUser = users.find(u => u.user.id === userId);
       if (superLikedUser) {
         analyticsService.trackSuperLike(superLikedUser.user.age, superLikedUser.distance);
+      }
+      
+      // Actualizar créditos locales después del super like
+      if (!userIsPremium) {
+        setUserSuperLikes(prev => Math.max(0, prev - 1));
       }
       
       // Remove user from the list
@@ -657,9 +676,9 @@ export default function DiscoverPage() {
   return (
     <ProtectedRoute requireAuth>
       <AppLayout>
-        <div className="space-y-4 sm:space-y-6 px-4 sm:px-6 lg:px-8 animate-in fade-in-0 duration-500">
+        <div className="space-y-4 sm:space-y-6 px-4 sm:px-6 lg:px-8 animate-in fade-in-0 duration-500 pt-8">
           {/* Header */}
-          <div className="animate-in slide-in-from-top-4 duration-500 delay-100">
+          <div className="animate-in slide-in-from-top-2 duration-500 delay-100">
             <Header
               title="Descubrir"
               subtitle="Encuentra personas increíbles cerca de ti"
@@ -692,7 +711,7 @@ export default function DiscoverPage() {
           </div>
 
           {/* Location Info */}
-          <div className="flex flex-col items-center space-y-2 px-4 animate-in slide-in-from-bottom-4 duration-500 delay-300">
+          <div className="flex flex-col items-center space-y-0 px-4 animate-in slide-in-from-bottom-1 duration-500 delay-200">
             <div className="flex items-center justify-center text-xs sm:text-sm text-muted-foreground 
                           hover:text-foreground transition-colors duration-300 text-center">
               <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-primary animate-pulse flex-shrink-0" />
@@ -703,7 +722,7 @@ export default function DiscoverPage() {
 
           {/* Current User Card */}
           {currentUserData && (
-            <div className="hidden sm:flex justify-center mb-4 sm:mb-6 animate-in slide-in-from-bottom-4 duration-500 delay-400">
+            <div className="hidden sm:flex justify-center mb-1 sm:mb-2 animate-in slide-in-from-bottom-2 duration-500 delay-400">
               <div className="w-full max-w-md sm:max-w-sm px-4 sm:px-0">
                 <div className="bg-gradient-to-r from-primary to-secondary p-1 rounded-2xl shadow-lg 
                               hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 
@@ -739,7 +758,7 @@ export default function DiscoverPage() {
 
           {/* Discover Stack */}
           <div className="flex-1 flex flex-col items-center justify-center px-4 
-                        animate-in fade-in-0 slide-in-from-bottom-6 duration-700 delay-500">
+                        animate-in fade-in-0 slide-in-from-bottom-2 duration-700 delay-200">
             <div className="w-full max-w-7xl transform transition-all duration-500 
                           hover:scale-[1.01] group">
               {users.length > 0 ? (
@@ -758,6 +777,9 @@ export default function DiscoverPage() {
                     onSuperLike={handleSuperLike}
                     onBlock={handleBlock}
                     onStartChat={handleStartChat}
+                    userSuperLikes={userSuperLikes}
+                    userIsPremium={userIsPremium}
+                    onShowPremiumModal={() => setShowPremiumModal(true)}
                     className="px-4"
                   />
                 </>

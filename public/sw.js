@@ -234,7 +234,63 @@ async function syncFileUploads() {
   }
 }
 
-// Push notification handling
+// Firebase Messaging configuration
+let messaging;
+
+// Import Firebase scripts
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+
+// Initialize Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyD3zP5p9q2m5x8w2tY8zK9p5q2m5x8w2tY",
+  authDomain: "gliter-argentina.firebaseapp.com",
+  projectId: "gliter-argentina",
+  storageBucket: "gliter-argentina.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abcdefghijklmnopqrstuvwxyz123456"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+// Initialize messaging
+messaging = firebase.messaging();
+
+// Handle background messages
+messaging.onBackgroundMessage((payload) => {
+  console.log('Background message received:', payload);
+  
+  // Extract notification data
+  const notificationTitle = payload.notification?.title || 'Gliter Argentina';
+  const notificationOptions = {
+    body: payload.notification?.body || 'Tienes una nueva notificación',
+    icon: payload.notification?.icon || '/icons/icon-192x192.png',
+    badge: '/icons/icon-144x144.png',
+    vibrate: [200, 100, 200],
+    data: payload.data || {},
+    requireInteraction: true,
+    silent: false,
+    tag: payload.data?.type || 'general'
+  };
+  
+  // Add actions based on notification type
+  if (payload.data?.type === 'message') {
+    notificationOptions.actions = [
+      { action: 'reply', title: '💬 Responder' },
+      { action: 'open', title: '👀 Ver chat' },
+      { action: 'close', title: '❌ Cerrar' }
+    ];
+  } else if (payload.data?.type === 'match') {
+    notificationOptions.actions = [
+      { action: 'open', title: '💖 Ver matches' },
+      { action: 'close', title: '❌ Cerrar' }
+    ];
+  }
+  
+  return self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Push notification handling (fallback for non-Firebase notifications)
 self.addEventListener('push', (event) => {
   console.log('Push notification received:', event);
   

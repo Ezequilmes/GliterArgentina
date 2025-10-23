@@ -156,7 +156,7 @@ export default function RegisterForm() {
         <div className="text-center space-y-2">
           <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 p-3 sm:p-3.5 md:p-4">
             <img 
-              src="/berenjena.svg" 
+              src="/logo.svg" 
               alt="Gliter Logo" 
               className="w-full h-full object-contain"
             />

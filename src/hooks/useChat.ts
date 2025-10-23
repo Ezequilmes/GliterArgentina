@@ -18,7 +18,7 @@ export interface UseChatReturn {
   otherUserTyping: boolean;
   
   // Actions
-  sendMessage: (chatId: string, content: string, type?: ChatMessage['type'], replyTo?: string, metadata?: any) => Promise<void>;
+  sendMessage: (chatId: string, content: string, type?: ChatMessage['type'], replyTo?: string, metadata?: Record<string, unknown>) => Promise<void>;
   createChat: (participantId: string) => Promise<string>;
   startChat: (otherUserId: string) => Promise<string>;
   selectChat: (chatId: string | null) => Promise<void>;
@@ -388,7 +388,7 @@ export function useChat(): UseChatReturn {
     content: string, 
     type: ChatMessage['type'] = 'text',
     replyTo?: string,
-    metadata?: any
+    metadata?: Record<string, unknown>
   ) => {
     if (!chatId || !user?.id || !content.trim()) return;
     
