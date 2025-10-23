@@ -67,38 +67,6 @@ Firebase App Hosting ofrece integración completa con el ecosistema Firebase y d
 
 ---
 
-### 2. 🌐 Vercel (Alternativa)
-
-Vercel es la plataforma oficial de Next.js y ofrece una excelente experiencia para aplicaciones Next.js.
-
-#### Pasos para Desplegar en Vercel:
-
-1. **Conectar con Vercel**:
-   - Ve a [vercel.com](https://vercel.com)
-   - Conecta tu cuenta de GitHub/GitLab/Bitbucket
-   - Importa tu repositorio
-
-2. **Configurar variables de entorno**:
-   ```env
-   # Mercado Pago
-   NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=tu_public_key_aqui
-   MERCADOPAGO_ACCESS_TOKEN=tu_access_token_aqui
-   
-   # Configuración de la app
-   NEXT_PUBLIC_APP_URL=https://tu-app.vercel.app
-   
-   # Webhooks
-   WEBHOOK_SECRET=tu_webhook_secret_aqui
-   ```
-
-#### ✅ Ventajas de Vercel:
-- Despliegue automático desde Git
-- CDN global
-- Optimizaciones automáticas para Next.js
-- Preview deployments
-
----
-
 ### 3. 🐳 Docker + Cloud Provider
 
 #### Dockerfile:
@@ -367,7 +335,6 @@ Para soporte técnico:
 - **Documentación**: [Next.js Docs](https://nextjs.org/docs)
 - **Mercado Pago**: [Documentación de API](https://www.mercadopago.com.ar/developers)
 - **Firebase App Hosting**: [Documentación de Despliegue](https://firebase.google.com/docs/app-hosting)
-- **Vercel**: [Documentación de Despliegue](https://vercel.com/docs)
 
 ---
 

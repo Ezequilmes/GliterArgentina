@@ -27,8 +27,7 @@
         "node_modules",
         ".git",
         "firebase-debug.log",
-        ".trae",
-        ".vercel"
+        ".trae"
       ],
       "alwaysDeployFromSource": true
     }
