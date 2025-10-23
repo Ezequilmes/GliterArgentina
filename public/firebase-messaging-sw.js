@@ -10,23 +10,26 @@ try {
 if (typeof self === 'undefined' || typeof importScripts === 'undefined') {
   console.error('[firebase-messaging-sw.js] Not running in service worker context');
 } else {
-  // Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyBDaKVYlJSfIJ7nKeIkTEWSmhlB1Soqay0",
-    authDomain: "gliter-argentina.firebaseapp.com",
-    projectId: "gliter-argentina",
-    storageBucket: "gliter-argentina.firebasestorage.app",
-    messagingSenderId: "1084162955705",
-    appId: "1:1084162955705:web:25bb32180d1bdaf724fe68"
-  };
+  // Firebase configuration will be received from main app
+  let firebaseConfig = null;
+  let messaging = null;
 
-  // Initialize Firebase only if firebase is available
-  if (typeof firebase !== 'undefined') {
-    try {
-      firebase.initializeApp(firebaseConfig);
-      
-      // Initialize Firebase Cloud Messaging and get a reference to the service
-      const messaging = firebase.messaging();
+  // Listen for configuration from main app
+  self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+      firebaseConfig = event.data.config;
+      initializeFirebaseMessaging();
+    }
+  });
+
+  function initializeFirebaseMessaging() {
+    // Initialize Firebase only if firebase is available and config is set
+    if (typeof firebase !== 'undefined' && firebaseConfig) {
+      try {
+        firebase.initializeApp(firebaseConfig);
+        
+        // Initialize Firebase Cloud Messaging and get a reference to the service
+        messaging = firebase.messaging();
 
       // Handle background messages
       messaging.onBackgroundMessage((payload) => {
@@ -115,4 +118,10 @@ if (typeof self !== 'undefined' && self.addEventListener) {
       })
     );
   });
+
+      } catch (error) {
+        console.error('[firebase-messaging-sw.js] Error initializing Firebase:', error);
+      }
+    }
+  }
 }

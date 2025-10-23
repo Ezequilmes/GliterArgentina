@@ -242,22 +242,41 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
 // Initialize Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyD3zP5p9q2m5x8w2tY8zK9p5q2m5x8w2tY",
-  authDomain: "gliter-argentina.firebaseapp.com",
-  projectId: "gliter-argentina",
-  storageBucket: "gliter-argentina.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdefghijklmnopqrstuvwxyz123456"
-};
+// Configuration will be received from main app
+let firebaseConfig = null;
+let messaging = null;
 
-firebase.initializeApp(firebaseConfig);
+// Listen for configuration from main app
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+    firebaseConfig = event.data.config;
+    initializeFirebase();
+  }
+});
 
-// Initialize messaging
-messaging = firebase.messaging();
+function initializeFirebase() {
+  if (!firebaseConfig) {
+    console.warn('Firebase config not available in service worker');
+    return;
+  }
+  
+  try {
+    firebase.initializeApp(firebaseConfig);
+    messaging = firebase.messaging();
+    setupBackgroundMessageHandler();
+  } catch (error) {
+    console.error('Failed to initialize Firebase in service worker:', error);
+  }
+}
 
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
+function setupBackgroundMessageHandler() {
+  if (!messaging) {
+    console.warn('Messaging not initialized, cannot setup background message handler');
+    return;
+  }
+
+  // Handle background messages
+  messaging.onBackgroundMessage((payload) => {
   console.log('Background message received:', payload);
   
   // Extract notification data
@@ -288,7 +307,8 @@ messaging.onBackgroundMessage((payload) => {
   }
   
   return self.registration.showNotification(notificationTitle, notificationOptions);
-});
+  });
+}
 
 // Push notification handling (fallback for non-Firebase notifications)
 self.addEventListener('push', (event) => {

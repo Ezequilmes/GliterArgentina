@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/Toast';
+import { firebaseConfig } from '@/lib/firebase-config';
 
 // Declaración de tipos para Background Sync API
 declare global {
@@ -227,6 +228,14 @@ export function useServiceWorker(): UseServiceWorkerReturn {
           updateViaCache: 'imports'
         });
         console.log('Firebase Messaging Service Worker registered:', firebaseRegistration);
+        
+        // Send Firebase config to firebase messaging service worker
+        if (firebaseRegistration.active) {
+          firebaseRegistration.active.postMessage({
+            type: 'FIREBASE_CONFIG',
+            config: firebaseConfig
+          });
+        }
       } catch (firebaseError) {
         console.error('Firebase Messaging Service Worker registration failed:', firebaseError);
         // Continue even if Firebase SW fails to register
@@ -238,6 +247,14 @@ export function useServiceWorker(): UseServiceWorkerReturn {
         isInstalling: false,
         registration,
       }));
+
+      // Send Firebase config to service worker
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'FIREBASE_CONFIG',
+          config: firebaseConfig
+        });
+      }
 
       // Listen for updates
       registration.addEventListener('updatefound', () => {

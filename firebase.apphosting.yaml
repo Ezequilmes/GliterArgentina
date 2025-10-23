@@ -1,4 +1,4 @@
-runtime: nodejs24
+runtime: nodejs20
 entrypoint: npm run start
 
 env:
@@ -29,11 +29,11 @@ build:
   command: |
     echo ">>> Cleaning node state"
     rm -rf node_modules package-lock.json pnpm-lock.yaml
-    echo ">>> Installing all dependencies for build"
-    npm install
+    echo ">>> Installing dependencies with npm ci"
+    npm ci --omit=dev
     echo ">>> Type-check"
     npm run type-check
-    echo ">>> Run build"
+    echo ">>> Building Next.js app"
     npm run build
   environment:
     - key: NODE_ENV

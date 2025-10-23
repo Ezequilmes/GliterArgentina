@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Firebase App Hosting configuration
+  output: 'standalone',
   trailingSlash: true,
   eslint: {
     ignoreDuringBuilds: true,
@@ -9,6 +11,14 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/v0/b/**',
+      },
+    ],
   },
   // Fix workspace root detection warning
   outputFileTracingRoot: __dirname,
