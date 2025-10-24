@@ -1,8 +1,8 @@
-import { getMessaging, getToken, onMessage, MessagePayload, isSupported } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, MessagePayload, isSupported, type Messaging } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import app, { db } from '@/lib/firebase';
-import { notificationService } from './notificationService';
+import app, { db } from '../lib/firebase';
+import { notificationService, type Notification } from './notificationService';
 
 export interface FCMNotificationPayload {
   title: string;
@@ -11,12 +11,12 @@ export interface FCMNotificationPayload {
   image?: string;
   badge?: string;
   tag?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 export class FCMService {
   private static instance: FCMService;
-  private messaging: any = null;
+  private messaging: Messaging | null = null;
   private currentToken: string | null = null;
   private isSupported: boolean = false;
   private initializationPromise: Promise<void> | null = null;
@@ -95,6 +95,9 @@ export class FCMService {
       console.log('FCM: All compatibility checks passed, initializing Firebase Messaging...');
 
       // Solo inicializar Firebase Messaging si todo está soportado
+      if (!app) {
+        throw new Error('Firebase app is not initialized');
+      }
       this.messaging = getMessaging(app);
       this.isSupported = true;
       
@@ -125,6 +128,9 @@ export class FCMService {
       onMessage(this.messaging, (payload: MessagePayload) => {
         console.log('FCM: Message received in foreground:', payload);
         
+        // Reproducir sonido para mensajes nuevos
+        this.playNotificationSound(payload);
+        
         // Mostrar notificación personalizada cuando la app está en primer plano
         this.showNotification(payload);
         
@@ -136,10 +142,27 @@ export class FCMService {
     }
   }
 
+  private playNotificationSound(payload: MessagePayload) {
+    try {
+      const messageType = payload.data?.type;
+      
+      // Reproducir sonido específico para mensajes
+      if (messageType === 'message') {
+        const audio = new Audio('/sounds/newMessage.mp3');
+        audio.volume = 0.8;
+        audio.play().catch(error => {
+          console.warn('FCM: Could not play notification sound:', error);
+        });
+      }
+    } catch (error) {
+      console.error('FCM: Error playing notification sound:', error);
+    }
+  }
+
   private async showNotification(payload: MessagePayload) {
     if (!('Notification' in window)) return;
 
-    const { title, body, icon, image } = payload.notification || {};
+    const { title, body, icon } = payload.notification || {};
     
     if (title && body) {
       try {
@@ -161,7 +184,7 @@ export class FCMService {
               title: 'Cerrar'
             }
           ]
-        } as any);
+        } as NotificationOptions);
       } catch (error) {
         console.error('FCM: Error showing notification:', error);
       }
@@ -181,7 +204,7 @@ export class FCMService {
         await notificationService.createNotification(data.userId, {
           title: payload.notification?.title || 'Nueva notificación',
           message: payload.notification?.body || '',
-          type: notificationType as any,
+          type: notificationType as Notification['type'],
           data: data
         });
       } catch (error) {
@@ -268,7 +291,7 @@ export class FCMService {
         console.warn('FCM: No registration token available - Firebase returned null/undefined');
         return null;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // Manejar errores específicos de push service
       if (error instanceof Error) {
         console.error('FCM: Detailed error information:', {
@@ -294,10 +317,7 @@ export class FCMService {
     return this.currentToken;
   }
 
-  async refreshToken(vapidKey?: string): Promise<string | null> {
-    this.currentToken = null;
-    return await this.getRegistrationToken(vapidKey);
-  }
+
 
   async isNotificationSupported(): Promise<boolean> {
     // Esperar a que la inicialización termine
@@ -305,14 +325,14 @@ export class FCMService {
     return this.isSupported;
   }
 
-  getPermissionStatus(): NotificationPermission | null {
+  getPermissionStatus(): NotificationPermission {
     try {
       if (typeof window === 'undefined' || !window.Notification) {
-        return null;
+        return 'denied';
       }
-      return window.Notification.permission;
+      return window.Notification.permission || 'default';
     } catch {
-      return null;
+      return 'denied';
     }
   }
 
@@ -322,6 +342,9 @@ export class FCMService {
       console.log('FCM: Saving token to server:', { userId, token });
       
       // Use Cloud Function to save token
+      if (!app) {
+        throw new Error('Firebase app is not initialized');
+      }
       const functions = getFunctions(app);
       const saveFCMToken = httpsCallable(functions, 'saveFCMToken');
       
@@ -329,13 +352,15 @@ export class FCMService {
       console.log('FCM: Token saved successfully:', result.data);
       
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('FCM: Error saving token to server:', error);
       
       // Fallback to direct Firestore write
       try {
-        
-        const userTokensRef = doc(db, 'fcm_tokens', userId);
+        if (!db) {
+          throw new Error('Firestore is not initialized');
+        }
+        const userTokensRef = doc(db, 'fcmTokens', userId);
         const userTokensDoc = await getDoc(userTokensRef);
         
         if (userTokensDoc.exists()) {
@@ -355,7 +380,7 @@ export class FCMService {
         
         console.log('FCM: Token saved via fallback method');
         return true;
-      } catch (fallbackError) {
+      } catch (fallbackError: unknown) {
         console.error('FCM: Fallback save also failed:', fallbackError);
         return false;
       }
@@ -368,6 +393,9 @@ export class FCMService {
       console.log('FCM: Removing token from server:', { userId, token });
       
       // Use Cloud Function to remove token
+      if (!app) {
+        throw new Error('Firebase app is not initialized');
+      }
       const functions = getFunctions(app);
       const removeFCMToken = httpsCallable(functions, 'removeFCMToken');
       
@@ -375,23 +403,141 @@ export class FCMService {
       console.log('FCM: Token removed successfully:', result.data);
       
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('FCM: Error removing token from server:', error);
       
       // Fallback to direct Firestore write
       try {
-        
-        await updateDoc(doc(db, 'fcm_tokens', userId), {
+        if (!db) {
+          throw new Error('Firestore is not initialized');
+        }
+        await updateDoc(doc(db, 'fcmTokens', userId), {
           tokens: arrayRemove(token),
           lastUpdated: new Date()
         });
         
         console.log('FCM: Token removed via fallback method');
         return true;
-      } catch (fallbackError) {
+      } catch (fallbackError: unknown) {
         console.error('FCM: Fallback remove also failed:', fallbackError);
         return false;
       }
+    }
+  }
+
+  // Método para refrescar el token FCM
+  async refreshToken(): Promise<string | null> {
+    try {
+      console.log('FCM: Refreshing token...');
+      
+      if (!this.messaging) {
+        console.log('FCM: Messaging not initialized, waiting for initialization...');
+        await this.initializationPromise;
+      }
+
+      if (!this.messaging) {
+        throw new Error('Firebase Messaging is not available');
+      }
+
+      // Eliminar el token actual del cache
+      this.currentToken = null;
+
+      // Obtener un nuevo token
+      const newToken = await this.getRegistrationToken();
+      
+      if (newToken) {
+        console.log('FCM: Token refreshed successfully');
+        return newToken;
+      } else {
+        console.warn('FCM: Failed to refresh token');
+        return null;
+      }
+    } catch (error) {
+      console.error('FCM: Error refreshing token:', error);
+      return null;
+    }
+  }
+
+  // Método para limpiar tokens inválidos de un usuario
+  async cleanupInvalidTokens(userId: string): Promise<void> {
+    try {
+      console.log('FCM: Cleaning up invalid tokens for user:', userId);
+      
+      if (!this.isSupported) {
+        console.log('FCM: Not supported, skipping cleanup');
+        return;
+      }
+
+      if (!db) {
+        throw new Error('Firestore is not initialized');
+      }
+
+      const userTokensRef = doc(db, 'fcmTokens', userId);
+      const userTokensDoc = await getDoc(userTokensRef);
+      
+      if (!userTokensDoc.exists()) {
+        console.log('FCM: No tokens found for user:', userId);
+        return;
+      }
+
+      const tokens = userTokensDoc.data()?.tokens || [];
+      if (tokens.length === 0) {
+        console.log('FCM: No tokens to clean for user:', userId);
+        return;
+      }
+
+      // Validar cada token usando Cloud Function
+      const validTokens: string[] = [];
+      
+      if (app) {
+        const functions = getFunctions(app);
+        const validateToken = httpsCallable(functions, 'validateFCMToken');
+        
+        for (const token of tokens) {
+          try {
+            // Validación básica de formato primero
+            if (!token || typeof token !== 'string' || token.length < 50) {
+              console.warn('FCM: Invalid token format:', token);
+              continue;
+            }
+
+            // Validar con Firebase usando Cloud Function
+            const result = await validateToken({ token });
+            const data = result.data as { valid: boolean; reason?: string; warning?: string };
+            
+            if (data.valid) {
+              validTokens.push(token);
+              if (data.warning) {
+                console.warn(`FCM: Token validation warning for ${token}:`, data.warning);
+              }
+            } else {
+              console.warn(`FCM: Invalid token removed: ${token}, reason: ${data.reason}`);
+            }
+          } catch (error) {
+            console.warn('FCM: Error validating token:', token, error);
+            // En caso de error, mantener el token para evitar pérdida de datos
+            validTokens.push(token);
+          }
+        }
+      } else {
+        // Si no hay Cloud Functions disponibles, mantener todos los tokens
+        validTokens.push(...tokens);
+      }
+
+      // Actualizar la lista con solo tokens válidos
+      if (validTokens.length !== tokens.length) {
+        await updateDoc(userTokensRef, {
+          tokens: validTokens,
+          lastUpdated: new Date(),
+          lastCleanup: new Date()
+        });
+        
+        console.log(`FCM: Cleaned up ${tokens.length - validTokens.length} invalid tokens for user: ${userId}`);
+      } else {
+        console.log('FCM: All tokens are valid for user:', userId);
+      }
+    } catch (error) {
+      console.error('FCM: Error cleaning up invalid tokens:', error);
     }
   }
 

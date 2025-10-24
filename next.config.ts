@@ -2,7 +2,7 @@
 const nextConfig = {
   // Firebase App Hosting configuration
   output: 'standalone',
-  trailingSlash: true,
+  trailingSlash: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
