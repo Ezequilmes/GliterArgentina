@@ -44,9 +44,9 @@ env:
 build:
   command: |
     echo ">>> Cleaning node state"
-    rm -rf node_modules package-lock.json pnpm-lock.yaml
-    echo ">>> Installing dependencies with npm ci"
-    npm ci --omit=dev
+    rm -rf node_modules pnpm-lock.yaml
+    echo ">>> Installing dependencies"
+    npm install --omit=dev
     echo ">>> Type-check"
     npm run type-check
     echo ">>> Building Next.js app"
