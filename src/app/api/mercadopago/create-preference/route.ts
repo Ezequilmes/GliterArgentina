@@ -4,6 +4,35 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = false;
 
+// Fallback: leer el access token desde Secret Manager si falta en env
+let cachedAccessToken: string | null = null;
+async function getMercadoPagoAccessToken(): Promise<string | null> {
+  if (process.env.MERCADOPAGO_ACCESS_TOKEN) {
+    return process.env.MERCADOPAGO_ACCESS_TOKEN;
+  }
+  if (cachedAccessToken) return cachedAccessToken;
+  try {
+    const { SecretManagerServiceClient } = await import('@google-cloud/secret-manager');
+    const client = new SecretManagerServiceClient();
+    const projectId =
+      process.env.GOOGLE_CLOUD_PROJECT ||
+      process.env.FIREBASE_PROJECT_ID ||
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+      'gliter-argentina';
+    const name = `projects/${projectId}/secrets/MERCADOPAGO_ACCESS_TOKEN/versions/latest`;
+    const [accessResponse] = await client.accessSecretVersion({ name });
+    const data = accessResponse.payload?.data?.toString();
+    if (data) {
+      cachedAccessToken = data;
+      return data;
+    }
+    return null;
+  } catch (err) {
+    console.error('Secret Manager fallback failed:', err);
+    return null;
+  }
+}
+
 /**
  * POST /api/mercadopago/create-preference
  *
@@ -15,7 +44,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+    const accessToken = await getMercadoPagoAccessToken();
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Access token de Mercado Pago no configurado' },
@@ -23,38 +52,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const mpResponse = await fetch(
-      'https://api.mercadopago.com/checkout/preferences',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(body),
-      }
-    );
+    const { MercadoPagoConfig, Preference } = await import('mercadopago');
+    const client = new MercadoPagoConfig({ accessToken });
+    const preference = new Preference(client);
 
-    if (!mpResponse.ok) {
-      const error = await mpResponse.text();
-      console.error('Error al crear preferencia en Mercado Pago:', {
-        status: mpResponse.status,
-        statusText: mpResponse.statusText,
-        error: error,
-        requestBody: body
-      });
-      return NextResponse.json(
-        { 
-          error: 'Error al crear preferencia de pago',
-          details: error,
-          status: mpResponse.status
-        },
-        { status: mpResponse.status }
-      );
-    }
-
-    const data = await mpResponse.json();
-    return NextResponse.json(data);
+    const result = await preference.create({ body });
+     return NextResponse.json(result);
   } catch (err) {
     console.error('Error en create-preference API:', err);
     return NextResponse.json(
