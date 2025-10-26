@@ -37,10 +37,19 @@ export async function POST(req: Request) {
 
     if (!mpResponse.ok) {
       const error = await mpResponse.text();
-      console.error('Error al crear preferencia en Mercado Pago:', error);
+      console.error('Error al crear preferencia en Mercado Pago:', {
+        status: mpResponse.status,
+        statusText: mpResponse.statusText,
+        error: error,
+        requestBody: body
+      });
       return NextResponse.json(
-        { error: 'Error al crear preferencia de pago' },
-        { status: 500 }
+        { 
+          error: 'Error al crear preferencia de pago',
+          details: error,
+          status: mpResponse.status
+        },
+        { status: mpResponse.status }
       );
     }
 

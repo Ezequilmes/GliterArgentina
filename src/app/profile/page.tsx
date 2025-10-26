@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Edit3, MapPin, Heart, Eye, Users, Camera, Check, X, Shield } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';

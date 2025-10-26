@@ -261,11 +261,27 @@ export const userService = {
       if (!currentUserIsNew && targetUserIsNew) {
         throw new Error('Los usuarios existentes no pueden dar super like a usuarios nuevos');
       }
+
+      // Verificar si el usuario tiene créditos disponibles (solo si no es premium)
+      const currentSuperLikes = currentUserData.superLikes || 0;
+      const isPremium = currentUserData.isPremium || false;
       
-      // Add to super liked users
-      await updateDoc(userRef, {
+      if (!isPremium && currentSuperLikes <= 0) {
+        throw new Error('No tienes suficientes Super Likes disponibles');
+      }
+      
+      // Preparar las actualizaciones
+      const userUpdates: any = {
         superLikedUsers: arrayUnion(targetUserId)
-      });
+      };
+      
+      // Decrementar créditos solo si no es premium
+      if (!isPremium) {
+        userUpdates.superLikes = Math.max(0, currentSuperLikes - 1);
+      }
+      
+      // Actualizar usuario que da el super like
+      await updateDoc(userRef, userUpdates);
       
       // Add to received super likes
       await updateDoc(targetUserRef, {

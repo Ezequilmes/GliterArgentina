@@ -1,21 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'gliter-argentina';
-  
-  if (!projectId) {
-    throw new Error('Project ID no configurado. Asegúrate de que NEXT_PUBLIC_FIREBASE_PROJECT_ID esté definido.');
-  }
-  
-  console.log('🔧 Inicializando Firebase Admin con Project ID:', projectId);
-  
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-    projectId: projectId
-  });
-}
+import { messaging } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const messaging = admin.messaging();
+    // messaging ya está importado desde @/lib/firebase-admin
 
     // Create notification payload with corrected structure
     const notificationPayload = {

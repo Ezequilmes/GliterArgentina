@@ -9,6 +9,7 @@ import { ProfileGrid } from '@/components/discover/ProfileGrid';
 import { Button, Loading } from '@/components/ui';
 import { SuperLikeCounter, PremiumModal } from '@/components/premium';
 import { LocationStatus } from '@/components/location';
+import { DonationButton } from '@/components/donation';
 import { useToast } from '@/components/ui/Toast';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -375,11 +376,6 @@ export default function DiscoverPage() {
         analyticsService.trackSuperLike(superLikedUser.user.age, superLikedUser.distance);
       }
       
-      // Actualizar créditos locales después del super like
-      if (!userIsPremium) {
-        setUserSuperLikes(prev => Math.max(0, prev - 1));
-      }
-      
       // Remove user from the list
       setUsers(prev => prev.filter(u => u.user.id !== userId));
       setActionFeedback({ action: 'superlike', status: 'success' });
@@ -684,6 +680,7 @@ export default function DiscoverPage() {
               subtitle="Encuentra personas increíbles cerca de ti"
               rightContent={
                 <div className="flex items-center space-x-2 sm:space-x-3 animate-in slide-in-from-right-4 duration-500 delay-200">
+                  <DonationButton />
                   <SuperLikeCounter 
                     onUpgrade={() => setShowPremiumModal(true)}
                     showUpgradeButton={true}

@@ -10,46 +10,39 @@ env:
     value: "8080"
   - key: NEXT_PUBLIC_APP_URL
     value: "https://gliter.com.ar"
-  # Firebase Admin SDK configuration - Set these in Firebase Console -> App Hosting -> Environment Variables
-  - key: FIREBASE_PROJECT_ID
+  # Firebase Admin SDK configuration (using GOOGLE_APPLICATION_CREDENTIALS)
+  - key: GOOGLE_APPLICATION_CREDENTIALS
+    secret: GOOGLE_APPLICATION_CREDENTIALS
     availability:
-      - BUILD
       - RUNTIME
-  - key: FIREBASE_PRIVATE_KEY_ID
-    availability:
-      - BUILD
-      - RUNTIME
-  - key: FIREBASE_PRIVATE_KEY
-    availability:
-      - BUILD
-      - RUNTIME
-  - key: FIREBASE_CLIENT_EMAIL
-    availability:
-      - BUILD
-      - RUNTIME
-  - key: FIREBASE_CLIENT_ID
-    availability:
-      - BUILD
-      - RUNTIME
-  # MercadoPago configuration - Set these in Firebase Console -> App Hosting -> Environment Variables
+  # MercadoPago configuration
   - key: MERCADOPAGO_ACCESS_TOKEN
+    secret: MERCADOPAGO_ACCESS_TOKEN  # usa el secreto anterior
+    availability:
+      - RUNTIME                        # no hace falta en BUILD
+  - key: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
+    value: "APP_USR-7c5a0b8e-b8b5-4b8e-8b8e-8b8e8b8e8b8e"
     availability:
       - BUILD
       - RUNTIME
-  - key: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
+  - key: MERCADOPAGO_CLIENT_ID
+    value: "1234567890123456"
+    availability:
+      - BUILD
+      - RUNTIME
+  - key: MERCADOPAGO_CLIENT_SECRET
+    value: "abcdef1234567890abcdef1234567890"
     availability:
       - BUILD
       - RUNTIME
 
 build:
   command: |
-    echo ">>> Cleaning node state"
-    rm -rf node_modules pnpm-lock.yaml
-    echo ">>> Installing dependencies"
+    echo ">>> Cleaning environment"
+    rm -rf node_modules
+    echo ">>> Installing production deps"
     npm install --omit=dev
-    echo ">>> Type-check"
     npm run type-check
-    echo ">>> Building Next.js app"
     npm run build
   environment:
     - key: NODE_ENV

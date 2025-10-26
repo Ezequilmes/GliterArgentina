@@ -86,18 +86,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     console.log(`🔍 [AUTH EVENT] ${event}:`, logData);
 
-    // En producción, enviar a servicio de logging
-    if (process.env.NODE_ENV === 'production') {
-      try {
-        await fetch('/api/log-auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(logData)
-        });
-      } catch (error) {
-        console.warn('Failed to send auth log:', error);
-      }
-    }
+    // En producción, solo log a consola por ahora
+    // TODO: Integrar con servicio de logging externo si es necesario
   };
 
   // Función de reintento para autenticación - más conservadora

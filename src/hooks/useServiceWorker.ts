@@ -227,15 +227,12 @@ export function useServiceWorker(): UseServiceWorkerReturn {
           scope: '/firebase-cloud-messaging-push-scope',
           updateViaCache: 'imports'
         });
-        console.log('Firebase Messaging Service Worker registered:', firebaseRegistration);
+        console.log('Firebase Messaging Service Worker registered successfully:', firebaseRegistration);
         
-        // Send Firebase config to firebase messaging service worker
-        if (firebaseRegistration.active) {
-          firebaseRegistration.active.postMessage({
-            type: 'FIREBASE_CONFIG',
-            config: firebaseConfig
-          });
-        }
+        // Wait for the service worker to be ready
+        await navigator.serviceWorker.ready;
+        console.log('Firebase Messaging Service Worker is ready');
+        
       } catch (firebaseError) {
         console.error('Firebase Messaging Service Worker registration failed:', firebaseError);
         // Continue even if Firebase SW fails to register
@@ -247,14 +244,6 @@ export function useServiceWorker(): UseServiceWorkerReturn {
         isInstalling: false,
         registration,
       }));
-
-      // Send Firebase config to service worker
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'FIREBASE_CONFIG',
-          config: firebaseConfig
-        });
-      }
 
       // Listen for updates
       registration.addEventListener('updatefound', () => {

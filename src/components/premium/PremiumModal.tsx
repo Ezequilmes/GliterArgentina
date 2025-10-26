@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { analyticsService } from '@/services/analyticsService';
+import { createPaymentPreference, createSuperLikesPreference, PREMIUM_PLANS, SUPER_LIKE_PACKAGES } from '@/lib/mercadopago';
 
 interface PremiumModalProps {
   isOpen: boolean;
@@ -32,49 +33,85 @@ export function PremiumModal({ isOpen, onClose, initialTab = 'premium' }: Premiu
     }
   }, [isOpen]);
 
-  const handlePurchasePremium = async () => {
+  const handlePurchasePremium = async (planId: string = 'gold_monthly') => {
     if (!user?.id) return;
-
+    
     setLoading(true);
+    
     try {
-      // Track premium purchase started
-      analyticsService.trackPremiumPurchaseStarted('monthly', 999);
+      // Analíticas - inicio de compra
+      console.log('Premium purchase started:', { planId, userId: user.id });
 
-      // Simular compra premium (aquí integrarías con MercadoPago)
-      await updateDoc(doc(db, 'users', user.id), {
-        isPremium: true,
-        premiumExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
-        superLikes: 999 // Super likes ilimitados
-      });
+      // Crear preferencia de pago con MercadoPago
+      const paymentIntent = await createPaymentPreference(
+        user.id,
+        planId,
+        user.email || '',
+        user.name || 'Usuario'
+      );
 
-      // Track premium purchase completed
-      analyticsService.trackPremiumPurchaseCompleted('monthly', 999);
-
-      toast.success('¡Bienvenido a Premium! 👑');
-      onClose();
+      // Redirigir a MercadoPago
+      if (paymentIntent.initPoint) {
+        window.location.href = paymentIntent.initPoint;
+      }
+      
     } catch (error) {
-      console.error('Error purchasing premium:', error);
-      toast.error('Error al procesar la compra');
+      console.error('Error al procesar compra premium:', error);
+      toast.error('Error al procesar la compra. Intenta nuevamente.');
+      
+      // Analíticas - error en compra
+      console.error('Premium purchase error:', {
+        userId: user.id,
+        plan: planId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePurchaseSuperLikes = async (amount: number) => {
+  const handlePurchaseSuperLikes = async (packageId: string) => {
     if (!user?.id) return;
-
+    
     setLoading(true);
+    
     try {
-      // Simular compra de super likes (aquí integrarías con MercadoPago)
-      await updateDoc(doc(db, 'users', user.id), {
-        superLikes: increment(amount)
+      const package_ = SUPER_LIKE_PACKAGES.find(p => p.id === packageId);
+      if (!package_) {
+        throw new Error('Paquete no encontrado');
+      }
+
+      // Analíticas - inicio de compra
+      console.log('Superlikes purchase initiated:', {
+        userId: user.id,
+        packageId: packageId,
+        amount: package_.amount,
+        price: package_.price
       });
 
-      toast.success(`¡${amount} Super Likes agregados! ⭐`);
-      onClose();
+      // Crear preferencia de pago con MercadoPago
+      const paymentIntent = await createSuperLikesPreference(
+        user.id,
+        packageId,
+        user.email || '',
+        user.name || 'Usuario'
+      );
+
+      // Redirigir a MercadoPago
+      if (paymentIntent.initPoint) {
+        window.location.href = paymentIntent.initPoint;
+      }
+      
     } catch (error) {
-      console.error('Error purchasing super likes:', error);
-      toast.error('Error al procesar la compra');
+      console.error('Error al comprar Super Likes:', error);
+      toast.error('Error al procesar la compra. Intenta nuevamente.');
+      
+      // Analíticas - error en compra
+      console.error('Superlikes purchase error:', {
+        userId: user.id,
+        packageId: packageId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setLoading(false);
     }
@@ -87,11 +124,13 @@ export function PremiumModal({ isOpen, onClose, initialTab = 'premium' }: Premiu
     { icon: Crown, text: 'Perfil destacado', color: 'text-purple-500' },
   ];
 
-  const superLikePackages = [
-    { amount: 5, price: 299, popular: false },
-    { amount: 15, price: 699, popular: true },
-    { amount: 30, price: 1199, popular: false },
-  ];
+  // Usar los paquetes de MercadoPago
+  const superLikePackages = SUPER_LIKE_PACKAGES.map(pkg => ({
+    id: pkg.id,
+    amount: pkg.amount,
+    price: pkg.price / 100, // Convertir de centavos a pesos para mostrar
+    popular: pkg.popular
+  }));
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -151,7 +190,7 @@ export function PremiumModal({ isOpen, onClose, initialTab = 'premium' }: Premiu
             {/* Price */}
             <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-lg p-3 sm:p-4 text-center">
               <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                $2.999
+                $5.000
                 <span className="text-base sm:text-lg font-normal text-gray-600 dark:text-gray-400">/mes</span>
               </div>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -161,7 +200,7 @@ export function PremiumModal({ isOpen, onClose, initialTab = 'premium' }: Premiu
 
             {/* Purchase Button */}
             <Button
-              onClick={handlePurchasePremium}
+              onClick={() => handlePurchasePremium('gold_monthly')}
               disabled={loading}
               className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white border-0 py-3 touch-manipulation"
             >
@@ -227,7 +266,7 @@ export function PremiumModal({ isOpen, onClose, initialTab = 'premium' }: Premiu
                       ${pkg.price}
                     </div>
                     <Button
-                      onClick={() => handlePurchaseSuperLikes(pkg.amount)}
+                      onClick={() => handlePurchaseSuperLikes(pkg.id)}
                       disabled={loading}
                       size="sm"
                       className="mt-1 bg-yellow-500 hover:bg-yellow-600 text-white border-0 text-xs sm:text-sm touch-manipulation"

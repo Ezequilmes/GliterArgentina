@@ -702,8 +702,15 @@ export function useChat(): UseChatReturn {
           clearTimeout(typingTimeoutRef.current);
         }
 
-        typingTimeoutRef.current = setTimeout(() => {
-          setTyping(false);
+        typingTimeoutRef.current = setTimeout(async () => {
+          try {
+            setIsTyping(false);
+            if (currentChat?.id && user?.id) {
+              await chatService.setTyping(currentChat.id, user.id, false);
+            }
+          } catch (err) {
+            console.error('Error auto-stopping typing status:', err);
+          }
         }, 3000);
       } else {
         if (typingTimeoutRef.current) {

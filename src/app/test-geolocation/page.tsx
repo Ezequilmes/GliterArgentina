@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState } from 'react';
 import { MapPin, AlertCircle, CheckCircle, Clock, RefreshCw, Navigation } from 'lucide-react';
 
@@ -8,6 +10,11 @@ export default function TestGeolocationPage() {
   const [location, setLocation] = useState<GeolocationPosition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Added safe window/navigator detection
+  const isBrowser = typeof window !== 'undefined' && typeof navigator !== 'undefined';
+  const userAgent = isBrowser ? navigator.userAgent : 'N/A';
+  const geolocationSupported = isBrowser && 'geolocation' in navigator ? 'Sí' : 'No';
 
   const checkPermissions = async () => {
     setStatus('Verificando permisos...');
@@ -240,8 +247,8 @@ export default function TestGeolocationPage() {
           <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Información del Navegador</h3>
             <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              <div>User Agent: {navigator.userAgent}</div>
-              <div>Geolocalización soportada: {navigator.geolocation ? 'Sí' : 'No'}</div>
+              <div>User Agent: {userAgent}</div>
+              <div>Geolocalización soportada: {geolocationSupported}</div>
               <div>HTTPS: {typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'Sí' : 'No'}</div>
             </div>
           </div>

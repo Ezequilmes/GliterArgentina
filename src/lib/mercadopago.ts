@@ -1,9 +1,24 @@
 import { PremiumPlan, PaymentIntent } from '@/types';
 
 // Configuración de MercadoPago
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_APP_URL?.includes('localhost');
 const MP_PUBLIC_KEY = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY;
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+// Validación de credenciales según el ambiente
+if (IS_DEVELOPMENT) {
+  if (!MP_ACCESS_TOKEN?.startsWith('TEST-')) {
+    console.warn('⚠️  ADVERTENCIA: Estás en desarrollo pero usando credenciales de PRODUCCIÓN');
+    console.warn('   Esto puede causar errores 403. Usa credenciales de sandbox (TEST-xxx)');
+  }
+} else {
+  if (MP_ACCESS_TOKEN?.startsWith('TEST-')) {
+    console.warn('⚠️  ADVERTENCIA: Estás en producción pero usando credenciales de SANDBOX');
+  }
+}
+
+console.log(`🔧 MercadoPago configurado para: ${IS_DEVELOPMENT ? 'DESARROLLO (sandbox)' : 'PRODUCCIÓN'}`);
 
 // Planes premium disponibles
 export const PREMIUM_PLANS: PremiumPlan[] = [
@@ -57,6 +72,31 @@ export const PREMIUM_PLANS: PremiumPlan[] = [
       '33% de descuento vs mensual',
       'Soporte prioritario',
     ],
+  },
+];
+
+// Paquetes de Super Likes disponibles
+export const SUPER_LIKE_PACKAGES = [
+  {
+    id: 'superlikes_5',
+    amount: 5,
+    price: 29900, // En centavos (ARS $299)
+    currency: 'ARS',
+    popular: false,
+  },
+  {
+    id: 'superlikes_15',
+    amount: 15,
+    price: 69900, // En centavos (ARS $699)
+    currency: 'ARS',
+    popular: true,
+  },
+  {
+    id: 'superlikes_30',
+    amount: 30,
+    price: 119900, // En centavos (ARS $1199)
+    currency: 'ARS',
+    popular: false,
   },
 ];
 
@@ -171,6 +211,93 @@ export async function createPaymentPreference(
     };
   } catch (error) {
     console.error('Error al crear preferencia de pago:', error);
+    throw error;
+  }
+}
+
+/**
+ * Crea una preferencia de pago para Super Likes
+ */
+export async function createSuperLikesPreference(
+  userId: string,
+  packageId: string,
+  userEmail: string,
+  userName: string
+): Promise<PaymentIntent> {
+  const package_ = SUPER_LIKE_PACKAGES.find(p => p.id === packageId);
+  if (!package_) {
+    throw new Error('Paquete de Super Likes no encontrado');
+  }
+
+  const preference = {
+    items: [
+      {
+        id: package_.id,
+        title: `${package_.amount} Super Likes`,
+        description: `Paquete de ${package_.amount} Super Likes para aumentar tus posibilidades de match`,
+        quantity: 1,
+        unit_price: package_.price / 100, // Convertir de centavos a pesos
+        currency_id: package_.currency,
+      },
+    ],
+    payer: {
+      email: userEmail,
+      name: userName,
+    },
+    back_urls: {
+      success: `${APP_URL}/payment/success`,
+      failure: `${APP_URL}/payment/failure`,
+      pending: `${APP_URL}/payment/pending`,
+    },
+    auto_return: 'approved',
+    external_reference: `${userId}_${packageId}_${Date.now()}`,
+    notification_url: `${APP_URL}/api/webhooks/mercadopago`,
+    metadata: {
+      user_id: userId,
+      package_id: packageId,
+      super_likes_amount: package_.amount,
+      type: 'super_likes',
+    },
+    payment_methods: {
+      excluded_payment_types: [],
+      excluded_payment_methods: [],
+      installments: 12,
+    },
+    shipments: {
+      cost: 0,
+      mode: 'not_specified',
+    },
+  };
+
+  try {
+    const response = await fetch('/api/mercadopago/create-preference', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(preference),
+    });
+
+    if (!response.ok) {
+      throw new Error('Error al crear la preferencia de pago');
+    }
+
+    const data = await response.json();
+    
+    return {
+      id: data.id,
+      preferenceId: data.id,
+      initPoint: data.init_point,
+      sandboxInitPoint: data.sandbox_init_point,
+      amount: package_.price,
+      currency: package_.currency,
+      status: 'pending',
+      userId,
+      planId: packageId,
+      createdAt: new Date(),
+    };
+  } catch (error) {
+    console.error('Error al crear preferencia de pago para Super Likes:', error);
     throw error;
   }
 }

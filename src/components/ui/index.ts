@@ -6,6 +6,7 @@ export { default as Card } from './Card';
 export { ErrorBoundary } from './ErrorBoundary';
 export { default as FollowInstagramButton } from './FollowInstagramButton';
 export { default as ExclusiveRegistrationForm } from '../exclusive/ExclusiveRegistrationForm';
+export { InstallInstructions } from './InstallInstructions';
 export { default as Input } from './Input';
 export { default as Loading } from './Loading';
 export { default as Modal } from './Modal';

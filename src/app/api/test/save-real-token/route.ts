@@ -1,28 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-
-// Inicializar Firebase Admin si no está inicializado
-if (!admin.apps.length) {
-  const serviceAccount = {
-    type: "service_account",
-    project_id: process.env.FIREBASE_PROJECT_ID,
-    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    client_id: process.env.FIREBASE_CLIENT_ID,
-    auth_uri: "https://accounts.google.com/o/oauth2/auth",
-    token_uri: "https://oauth2.googleapis.com/token",
-    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-    client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.FIREBASE_CLIENT_EMAIL}`
-  } as admin.ServiceAccount;
-
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: process.env.FIREBASE_PROJECT_ID
-  });
-}
-
-const db = admin.firestore();
+import { db } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +29,7 @@ export async function POST(request: NextRequest) {
     const tokenData = {
       tokens: [token],
       userId: userId,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: FieldValue.serverTimestamp(),
       isRealToken: true, // Marcar como token real
       deviceInfo: {
         userAgent: request.headers.get('user-agent') || 'Unknown',
@@ -67,8 +45,8 @@ export async function POST(request: NextRequest) {
       email: `${userId}@test-real.com`,
       displayName: `Usuario Real ${userId}`,
       isPremium: true,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      lastLogin: FieldValue.serverTimestamp(),
       isTestUser: true
     };
 

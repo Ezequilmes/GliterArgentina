@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AppLayout } from '@/components/layout';
-import { Card, Button, Loading, Avatar } from '@/components/ui';
+import { Card, Button, Loading, Avatar, InstallInstructions } from '@/components/ui';
 import { getUserProfilePhoto } from '@/lib/userUtils';
 import { 
   User, 
@@ -245,6 +245,11 @@ export default function DashboardPage() {
                 </div>
               </Card>
             </div>
+          </div>
+
+          {/* Install Instructions Section */}
+          <div className="mt-8">
+            <InstallInstructions />
           </div>
         </div>
       </AppLayout>
