@@ -6,19 +6,11 @@ const MP_PUBLIC_KEY = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY;
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-// Validación de credenciales según el ambiente
-if (IS_DEVELOPMENT) {
-  if (!MP_ACCESS_TOKEN?.startsWith('TEST-')) {
-    console.warn('⚠️  ADVERTENCIA: Estás en desarrollo pero usando credenciales de PRODUCCIÓN');
-    console.warn('   Esto puede causar errores 403. Usa credenciales de sandbox (TEST-xxx)');
-  }
-} else {
-  if (MP_ACCESS_TOKEN?.startsWith('TEST-')) {
-    console.warn('⚠️  ADVERTENCIA: Estás en producción pero usando credenciales de SANDBOX');
-  }
+// Validación de credenciales - solo advertir en producción si hay problemas críticos
+if (!IS_DEVELOPMENT && MP_ACCESS_TOKEN?.startsWith('TEST-')) {
+  console.warn('⚠️  ADVERTENCIA: Estás en producción pero usando credenciales de SANDBOX');
+  console.warn('   Esto impedirá procesar pagos reales. Configura credenciales de producción.');
 }
-
-console.log(`🔧 MercadoPago configurado para: ${IS_DEVELOPMENT ? 'DESARROLLO (sandbox)' : 'PRODUCCIÓN'}`);
 
 // Planes premium disponibles
 export const PREMIUM_PLANS: PremiumPlan[] = [
@@ -107,6 +99,12 @@ export function initializeMercadoPago(): Promise<any> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
       reject(new Error('MercadoPago solo puede ser inicializado en el cliente'));
+      return;
+    }
+
+    // Validar que la Public Key esté configurada
+    if (!MP_PUBLIC_KEY) {
+      reject(new Error('Public Key de MercadoPago no configurada. Verifica NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY'));
       return;
     }
 

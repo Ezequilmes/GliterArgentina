@@ -51,11 +51,14 @@ export async function POST(request: NextRequest) {
       targetUsers, 
       icon, 
       link,
-      adminEmail 
+      adminEmail,
+      token,
+      userId,
+      isTest = false
     } = body;
 
-    // Verificar que el usuario es administrador
-    if (adminEmail !== 'ezequielmazzera@gmail.com') {
+    // Verificar autorización (admin o modo test)
+    if (!isTest && adminEmail !== 'ezequielmazzera@gmail.com') {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 403 }
@@ -63,51 +66,73 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar datos requeridos
-    if (!title || !message || !targetType) {
-      return NextResponse.json(
-        { error: 'Faltan datos requeridos: title, message, targetType' },
-        { status: 400 }
-      );
+    if (isTest) {
+      // Modo test: requiere token, title, body
+      if (!token || !title || !message) {
+        return NextResponse.json(
+          { error: 'Modo test requiere: token, title, message' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Modo admin: requiere title, message, targetType
+      if (!title || !message || !targetType) {
+        return NextResponse.json(
+          { error: 'Faltan datos requeridos: title, message, targetType' },
+          { status: 400 }
+        );
+      }
     }
 
     let tokens: string[] = [];
 
-    // Obtener tokens según el tipo de destinatario
-    if (targetType === 'all') {
-      // Enviar a todos los usuarios
-      const tokensSnapshot = await db.collection('fcm_tokens').get();
-      tokensSnapshot.docs.forEach(doc => {
-        const userTokens = doc.data().tokens || [];
-        // Filtrar solo tokens válidos
-        const validTokens = userTokens.filter(isValidFCMToken);
-        tokens.push(...validTokens);
-      });
-    } else if (targetType === 'premium') {
-      // Enviar solo a usuarios premium
-      const usersSnapshot = await db.collection('users')
-        .where('isPremium', '==', true)
-        .get();
-      
-      const premiumUserIds = usersSnapshot.docs.map(doc => doc.id);
-      
-      for (const userId of premiumUserIds) {
-        const tokenDoc = await db.collection('fcm_tokens').doc(userId).get();
-        if (tokenDoc.exists) {
-          const userTokens = tokenDoc.data()?.tokens || [];
-          // Filtrar solo tokens válidos
-          const validTokens = userTokens.filter(isValidFCMToken);
-          tokens.push(...validTokens);
-        }
+    // Modo test: usar token directo
+    if (isTest) {
+      if (!isValidFCMToken(token)) {
+        return NextResponse.json(
+          { error: 'Token FCM inválido para testing' },
+          { status: 400 }
+        );
       }
-    } else if (targetType === 'specific' && targetUsers) {
-      // Enviar a usuarios específicos
-      for (const userId of targetUsers) {
-        const tokenDoc = await db.collection('fcm_tokens').doc(userId).get();
-        if (tokenDoc.exists) {
-          const userTokens = tokenDoc.data()?.tokens || [];
+      tokens = [token];
+    } else {
+      // Obtener tokens según el tipo de destinatario
+      if (targetType === 'all') {
+        // Enviar a todos los usuarios
+        const tokensSnapshot = await db.collection('fcm_tokens').get();
+        tokensSnapshot.docs.forEach(doc => {
+          const userTokens = doc.data().tokens || [];
           // Filtrar solo tokens válidos
           const validTokens = userTokens.filter(isValidFCMToken);
           tokens.push(...validTokens);
+        });
+      } else if (targetType === 'premium') {
+        // Enviar solo a usuarios premium
+        const usersSnapshot = await db.collection('users')
+          .where('isPremium', '==', true)
+          .get();
+        
+        const premiumUserIds = usersSnapshot.docs.map(doc => doc.id);
+        
+        for (const userId of premiumUserIds) {
+          const tokenDoc = await db.collection('fcm_tokens').doc(userId).get();
+          if (tokenDoc.exists) {
+            const userTokens = tokenDoc.data()?.tokens || [];
+            // Filtrar solo tokens válidos
+            const validTokens = userTokens.filter(isValidFCMToken);
+            tokens.push(...validTokens);
+          }
+        }
+      } else if (targetType === 'specific' && targetUsers) {
+        // Enviar a usuarios específicos
+        for (const userId of targetUsers) {
+          const tokenDoc = await db.collection('fcm_tokens').doc(userId).get();
+          if (tokenDoc.exists) {
+            const userTokens = tokenDoc.data()?.tokens || [];
+            // Filtrar solo tokens válidos
+            const validTokens = userTokens.filter(isValidFCMToken);
+            tokens.push(...validTokens);
+          }
         }
       }
     }

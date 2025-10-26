@@ -44,9 +44,9 @@ env:
 build:
   command: |
     echo ">>> Cleaning environment"
-    rm -rf node_modules
+    rm -rf node_modules package-lock.json
     echo ">>> Installing production deps"
-    npm install --omit=dev
+    npm ci --omit=dev
     npm run type-check
     npm run build
   environment:

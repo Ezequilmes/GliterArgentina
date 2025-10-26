@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserStats } from '@/hooks/useUserStats';
 import { getUserProfilePhoto } from '@/lib/userUtils';
 import PromoCodeInput from '@/components/PromoCodeInput';
+import { DonationButton } from '@/components/donation';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -238,6 +239,17 @@ export default function ProfilePage() {
                   >
                     {user.isVerified ? 'Ver estado' : 'Verificar'}
                   </button>
+                </div>
+              </div>
+
+              {/* Donaciones */}
+              <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Apoya a Gliter</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  ¿Te gusta nuestra app? Ayúdanos a mantenerla y mejorarla con una donación voluntaria.
+                </p>
+                <div className="flex justify-center">
+                  <DonationButton />
                 </div>
               </div>
 

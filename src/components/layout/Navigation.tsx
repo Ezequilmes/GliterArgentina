@@ -136,7 +136,7 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
         </div>
         
         {/* Navigation Buttons - Centered on mobile */}
-        <div className="flex items-center space-x-1 sm:space-x-3 mx-auto sm:mx-0">
+        <div className="flex items-center space-x-2 sm:space-x-3 mx-auto sm:mx-0">
           {navigationItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -165,7 +165,7 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
           </div>
           
           {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
+          <div className="relative mr-1 sm:mr-0" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className={cn(
@@ -180,7 +180,7 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
 
             {/* Dropdown Content */}
             {isDropdownOpen && (
-              <div className="absolute right-0 top-12 sm:top-12 w-72 sm:w-80 md:w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="absolute right-0 sm:right-0 top-12 sm:top-12 w-72 sm:w-80 md:w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden transform -translate-x-2 sm:translate-x-0">
                 {/* User Info Header */}
                  <div className="bg-gradient-to-r from-primary to-accent p-4 sm:p-4 text-white">
                    <div className="flex items-center space-x-3 sm:space-x-3">

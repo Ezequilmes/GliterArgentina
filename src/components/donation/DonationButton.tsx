@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Heart, X, HandHeart } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { Heart, X, HandHeart, Coffee, Users, Sparkles, Shield, Lock, CreditCard, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -14,24 +15,30 @@ interface DonationButtonProps {
 const DONATION_PLANS = [
   {
     id: 'donation_1000',
-    name: 'Donación Básica',
-    description: 'Ayuda a mantener la aplicación funcionando',
+    name: '☕ Un Café para el Equipo',
+    description: 'Invítanos un café y mantén la app funcionando',
     amount: 100000, // $1000 en centavos
-    label: '$1.000'
+    label: '$1.000',
+    icon: Coffee,
+    gradient: 'from-amber-500 to-orange-600'
   },
   {
     id: 'donation_2500',
-    name: 'Donación Estándar',
-    description: 'Contribuye al desarrollo de nuevas funciones',
+    name: '🍕 Pizza para el Equipo',
+    description: 'Una pizza para el equipo mientras desarrollamos nuevas funciones',
     amount: 250000, // $2500 en centavos
-    label: '$2.500'
+    label: '$2.500',
+    icon: Heart,
+    gradient: 'from-pink-500 to-rose-600'
   },
   {
     id: 'donation_5000',
-    name: 'Donación Premium',
-    description: 'Apoya significativamente el proyecto',
+    name: '🚀 Impulsa el Proyecto',
+    description: 'Apoya significativamente el crecimiento de Gliter',
     amount: 500000, // $5000 en centavos
-    label: '$5.000'
+    label: '$5.000',
+    icon: Sparkles,
+    gradient: 'from-purple-500 to-indigo-600'
   },
 ];
 
@@ -136,57 +143,119 @@ const DonationButton: React.FC<DonationButtonProps> = ({ className = '' }) => {
       {/* Botón de donación */}
       <button
         onClick={() => setIsModalOpen(true)}
-        className={`flex items-center justify-center p-2 rounded-full bg-pink-500 hover:bg-pink-600 text-white transition-colors duration-200 ${className}`}
-        title="Donar para el desarrollo"
+        className={`flex items-center justify-center p-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-110 ${className}`}
+        title="Apoyar el proyecto con un café ☕"
       >
         <HandHeart className="w-5 h-5" />
       </button>
 
-      {/* Modal de donación */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative">
-            {/* Botón cerrar */}
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              disabled={!!isProcessing}
-            >
-              <X className="w-5 h-5" />
-            </button>
+      {/* Modal de donación - Popup centrado usando React Portal */}
+      {isModalOpen && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          {/* Overlay con animación */}
+          <div 
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in-0 duration-300" 
+            onClick={() => setIsModalOpen(false)}
+          ></div>
+          
+          {/* Contenedor del modal - Ancho fijo amplio y centrado */}
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl w-[800px] max-w-none min-h-[60vh] max-h-[85vh] shadow-2xl border border-gray-200 dark:border-gray-700 animate-in zoom-in-95 duration-300 overflow-y-auto mx-auto">
+            {/* Header ampliado proporcional al nuevo tamaño */}
+            <div className="bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 p-8 rounded-t-2xl relative">
+              {/* Botón de cerrar */}
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="absolute top-4 right-4 w-8 h-8 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-200"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
 
-            {/* Contenido del modal */}
-            <div className="text-center">
-              <div className="mb-4">
-                <Heart className="w-12 h-12 text-pink-500 mx-auto mb-2" />
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Apoya el desarrollo
+              {/* Contenido del header ampliado */}
+              <div className="text-center">
+                <Heart className="w-8 h-8 text-white mx-auto mb-3" />
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  Apoya a Gliter Argentina
                 </h2>
-                <p className="text-gray-600 dark:text-gray-300 mt-2">
-                  Tu donación nos ayuda a mejorar la aplicación y agregar nuevas funciones
+                <p className="text-base text-white/90">
+                  Tu apoyo nos ayuda a mejorar la plataforma
+                </p>
+              </div>
+            </div>
+
+            {/* Contenido del modal - Versión ampliada para mejor legibilidad */}
+            <div className="p-10">
+              {/* Sección de impacto - Ampliada */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6 mb-8">
+                <div className="flex items-center gap-3 mb-3">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Tu impacto
+                  </h3>
+                </div>
+                <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+                  Cada donación nos ayuda a mantener y mejorar la plataforma para todos los usuarios.
                 </p>
               </div>
 
-              {/* Opciones de donación */}
-              <div className="space-y-3">
-                {DONATION_PLANS.map((donation) => (
-                  <button
-                    key={donation.id}
-                    onClick={() => handleDonation(donation)}
-                    disabled={!!isProcessing}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isProcessing === donation.id ? 'Procesando...' : `Donar ${donation.label}`}
-                  </button>
-                ))}
+              {/* Opciones de donación - Grid ampliado para mejor legibilidad */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white text-center">
+                  Elige tu aporte
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {DONATION_PLANS.map((donation, index) => {
+                    const IconComponent = donation.icon;
+                    return (
+                      <button
+                        key={donation.id}
+                        onClick={() => handleDonation(donation)}
+                        disabled={!!isProcessing}
+                        className={`p-4 bg-white dark:bg-gray-800 rounded-xl border-2 transition-all duration-200 ${
+                          isProcessing === donation.id
+                            ? 'border-gray-300 dark:border-gray-600'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <IconComponent className="w-6 h-6 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
+                          <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-1">
+                            {donation.label}
+                          </h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                            {donation.description}
+                          </p>
+                          {/* Se cambia el <button> anidado por un <div> para evitar el error de anidamiento.
+                              El <button> exterior ya maneja el click. */}
+                          <div
+                            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-bold py-2 px-4 rounded-lg transition-all duration-200 group-disabled:opacity-50"
+                          >
+                            {isProcessing === donation.id ? (
+                              <div className="flex items-center justify-center space-x-1">
+                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <span>Procesando</span>
+                              </div>
+                            ) : (
+                              `Donar`
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                Procesado de forma segura por MercadoPago
-              </p>
+              {/* Footer ampliado */}
+              <div className="mt-8 pt-6 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl text-center">
+                <p className="text-base text-gray-600 dark:text-gray-400">
+                  💝 Gracias por tu apoyo
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -278,8 +278,28 @@ export class FCMService {
 
       // Obtener token de registro
       console.log('FCM: Requesting registration token from Firebase...');
+
+      // Ensure the Firebase Messaging Service Worker is registered and use its registration explicitly
+      let swRegistration: ServiceWorkerRegistration | undefined;
+      if ('serviceWorker' in navigator) {
+        swRegistration = await navigator.serviceWorker.getRegistration('/firebase-cloud-messaging-push-scope');
+        if (!swRegistration) {
+          try {
+            swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+              scope: '/firebase-cloud-messaging-push-scope',
+              updateViaCache: 'imports'
+            });
+            console.log('FCM: Firebase Messaging SW registered for token:', swRegistration);
+          } catch (swError) {
+            console.warn('FCM: Failed to register Firebase Messaging SW for token:', swError);
+          }
+        }
+      }
+
+      // Pass explicit registration to avoid default SW registration issues
       const token = await getToken(this.messaging, {
-        vapidKey: finalVapidKey
+        vapidKey: finalVapidKey,
+        serviceWorkerRegistration: swRegistration
       });
 
       if (token) {
