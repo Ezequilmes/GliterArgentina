@@ -9,31 +9,34 @@ env:
   - key: PORT
     value: "8080"
   - key: NEXT_PUBLIC_APP_URL
-    value: "https://gliter.com.ar"
-  # Firebase Admin SDK configuration (using GOOGLE_APPLICATION_CREDENTIALS)
-  - key: GOOGLE_APPLICATION_CREDENTIALS
-    secret: GOOGLE_APPLICATION_CREDENTIALS
+    value: "https://www.gliter.com.ar"
+  # Firebase Admin SDK configuration (GOOGLE_APPLICATION_CREDENTIALS disabled to allow ADC)
+  # - key: GOOGLE_APPLICATION_CREDENTIALS
+  #   secret: GOOGLE_APPLICATION_CREDENTIALS
+  #   availability:
+  #     - RUNTIME
+  # MercadoPago configuration - PRODUCTION CREDENTIALS
+  - key: MERCADOPAGO_ACCESS_TOKEN
+    secret: MERCADOPAGO_ACCESS_TOKEN
     availability:
       - RUNTIME
-  # MercadoPago configuration
-  - key: MERCADOPAGO_ACCESS_TOKEN
-    secret: MERCADOPAGO_ACCESS_TOKEN  # usa el secreto anterior
-    availability:
-      - RUNTIME                        # no hace falta en BUILD
   - key: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
-    value: "APP_USR-7c5a0b8e-b8b5-4b8e-8b8e-8b8e8b8e8b8e"
+    secret: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
     availability:
       - BUILD
       - RUNTIME
   - key: MERCADOPAGO_CLIENT_ID
-    value: "1234567890123456"
+    secret: MERCADOPAGO_CLIENT_ID
     availability:
       - BUILD
       - RUNTIME
   - key: MERCADOPAGO_CLIENT_SECRET
-    value: "abcdef1234567890abcdef1234567890"
+    secret: MERCADOPAGO_CLIENT_SECRET
     availability:
-      - BUILD
+      - RUNTIME
+  - key: MERCADOPAGO_WEBHOOK_SECRET
+    secret: MERCADOPAGO_WEBHOOK_SECRET
+    availability:
       - RUNTIME
 
 build:
