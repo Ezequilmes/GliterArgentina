@@ -82,10 +82,12 @@ export async function POST(req: Request) {
 
     const result = await preference.create({ body });
      return NextResponse.json(result);
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error en create-preference API:', err);
+    const debug = process.env.DEBUG_MERCADOPAGO === '1';
+    const message = err?.message || 'Error interno del servidor';
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      debug ? { error: message } : { error: 'Error interno del servidor' },
       { status: 500 }
     );
   }
