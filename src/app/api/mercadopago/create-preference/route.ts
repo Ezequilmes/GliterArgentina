@@ -19,13 +19,37 @@ async function getMercadoPagoAccessToken(): Promise<string | null> {
       process.env.FIREBASE_PROJECT_ID ||
       process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
       'gliter-argentina';
-    const name = `projects/${projectId}/secrets/MERCADOPAGO_ACCESS_TOKEN/versions/latest`;
-    const [accessResponse] = await client.accessSecretVersion({ name });
-    const data = accessResponse.payload?.data?.toString();
-    if (data) {
-      cachedAccessToken = data;
-      return data;
+
+    // Intentar primero con secreto regional (App Hosting crea secretos regionales)
+    const locations = [process.env.SECRET_LOCATION || process.env.GOOGLE_SECRET_LOCATION || 'us-central1'];
+
+    for (const loc of locations) {
+      try {
+        const regionalName = `projects/${projectId}/locations/${loc}/secrets/MERCADOPAGO_ACCESS_TOKEN/versions/latest`;
+        const [accessResponse] = await client.accessSecretVersion({ name: regionalName });
+        const data = accessResponse.payload?.data?.toString();
+        if (data) {
+          cachedAccessToken = data;
+          return data;
+        }
+      } catch (e) {
+        // Continúa con fallback global si falla regional
+      }
     }
+
+    // Fallback global (por si el secreto no es regional)
+    try {
+      const globalName = `projects/${projectId}/secrets/MERCADOPAGO_ACCESS_TOKEN/versions/latest`;
+      const [accessResponse] = await client.accessSecretVersion({ name: globalName });
+      const data = accessResponse.payload?.data?.toString();
+      if (data) {
+        cachedAccessToken = data;
+        return data;
+      }
+    } catch (e) {
+      // Ignorar, se manejará abajo como no configurado
+    }
+
     return null;
   } catch (err) {
     console.error('Secret Manager fallback failed:', err);
