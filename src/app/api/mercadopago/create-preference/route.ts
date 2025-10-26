@@ -8,7 +8,7 @@ export const revalidate = false;
 let cachedAccessToken: string | null = null;
 async function getMercadoPagoAccessToken(): Promise<string | null> {
   if (process.env.MERCADOPAGO_ACCESS_TOKEN) {
-    return process.env.MERCADOPAGO_ACCESS_TOKEN;
+    return process.env.MERCADOPAGO_ACCESS_TOKEN.trim();
   }
   if (cachedAccessToken) return cachedAccessToken;
   try {
@@ -27,7 +27,7 @@ async function getMercadoPagoAccessToken(): Promise<string | null> {
       try {
         const regionalName = `projects/${projectId}/locations/${loc}/secrets/MERCADOPAGO_ACCESS_TOKEN/versions/latest`;
         const [accessResponse] = await client.accessSecretVersion({ name: regionalName });
-        const data = accessResponse.payload?.data?.toString();
+        const data = accessResponse.payload?.data?.toString()?.trim();
         if (data) {
           cachedAccessToken = data;
           return data;
@@ -41,7 +41,7 @@ async function getMercadoPagoAccessToken(): Promise<string | null> {
     try {
       const globalName = `projects/${projectId}/secrets/MERCADOPAGO_ACCESS_TOKEN/versions/latest`;
       const [accessResponse] = await client.accessSecretVersion({ name: globalName });
-      const data = accessResponse.payload?.data?.toString();
+      const data = accessResponse.payload?.data?.toString()?.trim();
       if (data) {
         cachedAccessToken = data;
         return data;
