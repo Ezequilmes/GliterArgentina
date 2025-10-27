@@ -1,62 +1,41 @@
 runtime: nodejs20
-entrypoint: npm run start
+entrypoint: npm start
 
 env:
   - key: NODE_ENV
     value: production
-  - key: NEXT_TELEMETRY_DISABLED
-    value: "1"
   - key: PORT
     value: "8080"
-  - key: NEXT_PUBLIC_APP_URL
-    value: "https://www.gliter.com.ar"
-  - key: DEBUG_MERCADOPAGO
+  - key: NEXT_TELEMETRY_DISABLED
     value: "1"
-  # Firebase Admin SDK configuration (GOOGLE_APPLICATION_CREDENTIALS disabled to allow ADC)
-  # - key: GOOGLE_APPLICATION_CREDENTIALS
-  #   secret: GOOGLE_APPLICATION_CREDENTIALS
-  #   availability:
-  #     - RUNTIME
-  # MercadoPago configuration - PRODUCTION CREDENTIALS
-  - key: MERCADOPAGO_ACCESS_TOKEN
-    secret: MERCADOPAGO_ACCESS_TOKEN
-    availability:
-      - RUNTIME
-  - key: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
-    secret: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
-    availability:
-      - BUILD
-      - RUNTIME
-  - key: MERCADOPAGO_CLIENT_ID
-    secret: MERCADOPAGO_CLIENT_ID
-    availability:
-      - BUILD
-      - RUNTIME
-  - key: MERCADOPAGO_CLIENT_SECRET
-    secret: MERCADOPAGO_CLIENT_SECRET
-    availability:
-      - RUNTIME
-  - key: MERCADOPAGO_WEBHOOK_SECRET
-    secret: MERCADOPAGO_WEBHOOK_SECRET
-    availability:
-      - RUNTIME
+  - key: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyBDaKVYlJSfIJ7nKeIkTEWSmhlB1Soqay0"
+  - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "gliter-argentina.firebaseapp.com"
+  - key: NEXT_PUBLIC_FIREBASE_DATABASE_URL
+    value: "https://gliter-argentina-default-rtdb.firebaseio.com/"
+  - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "gliter-argentina"
+  - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "gliter-argentina.firebasestorage.app"
+  - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "1084162955705"
+  - key: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:1084162955705:web:25bb32180d1bdaf724fe68"
+  - key: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-MMFQWWFCJD"
+  - key: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+    value: "BGVjAOjpQTeTCnmNcFrrLHsaHA7a1KSSsn7n0msDXz_0kH_rIkuqNUwYRQn4BnH0-fa-pY24OW3rZDYKwUYbPW4"
 
 build:
   command: |
-    echo ">>> Cleaning environment"
-    rm -rf node_modules package-lock.json
-    echo ">>> Installing production deps"
-    npm ci --omit=dev
-    npm run type-check
+    npm install --omit=dev
     npm run build
-  environment:
-    - key: NODE_ENV
-      value: production
 
 resources:
-  cpu: 1
-  memoryMiB: 2048
-  diskMiB: 4096
+  cpu: 2
+  memoryMiB: 4096
+  diskMiB: 8192
 
 handlers:
   - glob: '**'
