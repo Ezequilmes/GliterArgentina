@@ -122,8 +122,8 @@ export function ChatList({
   const sortedChats = useMemo(() => {
     return [...filteredChats].sort((a, b) => {
       // Primero por mensajes no leídos
-      const aUnread = (a.unreadCount && a.unreadCount[currentUser.id]) || 0;
-      const bUnread = (b.unreadCount && b.unreadCount[currentUser.id]) || 0;
+      const aUnread = (a.unreadCount && currentUser?.id && a.unreadCount[currentUser.id]) || 0;
+      const bUnread = (b.unreadCount && currentUser?.id && b.unreadCount[currentUser.id]) || 0;
       if (aUnread !== bUnread) return bUnread - aUnread;
 
       // Luego por última actividad
@@ -222,7 +222,7 @@ export function ChatList({
             {sortedChats.map((chat) => {
               const otherUser = getOtherUser(chat);
               const isSelected = chat.id === selectedChatId;
-              const hasUnread = (chat.unreadCount && chat.unreadCount[currentUser.id] || 0) > 0;
+              const hasUnread = (chat.unreadCount && currentUser?.id && chat.unreadCount[currentUser.id] || 0) > 0;
               const isOnline = isUserOnline(otherUser.id);
               const lastSeen = getUserLastSeen(otherUser.id);
 
@@ -279,7 +279,7 @@ export function ChatList({
                           )}
                           {hasUnread && (
                             <div className="bg-primary text-primary-foreground text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
-                              {(chat.unreadCount && chat.unreadCount[currentUser.id] || 0) > 99 ? '99+' : (chat.unreadCount && chat.unreadCount[currentUser.id] || 0)}
+                              {(chat.unreadCount && currentUser?.id && chat.unreadCount[currentUser.id] || 0) > 99 ? '99+' : (chat.unreadCount && currentUser?.id && chat.unreadCount[currentUser.id] || 0)}
                             </div>
                           )}
                         </div>

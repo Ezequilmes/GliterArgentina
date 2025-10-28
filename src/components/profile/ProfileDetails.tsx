@@ -115,6 +115,8 @@ export function ProfileDetails({
                 alt={`${user.name} - Foto ${currentPhotoIndex + 1}`}
                 fill
                 className="object-cover"
+                priority={currentPhotoIndex === 0}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
               
               {/* Photo Navigation */}

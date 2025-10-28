@@ -148,7 +148,7 @@ export class FCMService {
       
       // Reproducir sonido específico para mensajes
       if (messageType === 'message') {
-        const audio = new Audio('/sounds/newMessage.mp3');
+        const audio = new Audio('/sounds/messenger-tono-mensaje-.mp3');
         audio.volume = 0.8;
         audio.play().catch(error => {
           console.warn('FCM: Could not play notification sound:', error);
@@ -241,6 +241,12 @@ export class FCMService {
     // Esperar a que la inicialización termine
     await this.initializationPromise;
     
+    // Verificar contexto seguro primero para evitar errores innecesarios
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      console.info('FCM: Push notifications require HTTPS. Skipping registration in HTTP development environment.');
+      return null;
+    }
+
     console.log('FCM: Getting registration token - Environment:', {
       isProduction: process.env.NODE_ENV === 'production',
       protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
@@ -256,6 +262,18 @@ export class FCMService {
     }
 
     try {
+      // Verificar si el push service está disponible antes de solicitar permisos
+      if (!('PushManager' in window)) {
+        console.warn('FCM: Push messaging is not supported in this browser');
+        return null;
+      }
+
+      // Verificar si el navegador soporta service workers
+      if (!('serviceWorker' in navigator)) {
+        console.warn('FCM: Service Workers are not supported in this browser');
+        return null;
+      }
+
       // Verificar permisos
       console.log('FCM: Requesting notification permission...');
       const hasPermission = await this.requestPermission();
@@ -265,11 +283,6 @@ export class FCMService {
       }
       console.log('FCM: Notification permission granted');
 
-      // Verificar si el push service está disponible
-      if (!('PushManager' in window)) {
-        console.warn('FCM: Push messaging is not supported');
-        return null;
-      }
       console.log('FCM: PushManager is available');
 
       // Verificar VAPID key
@@ -292,6 +305,8 @@ export class FCMService {
             console.log('FCM: Firebase Messaging SW registered for token:', swRegistration);
           } catch (swError) {
             console.warn('FCM: Failed to register Firebase Messaging SW for token:', swError);
+            // En caso de error del service worker, intentar sin él
+            swRegistration = undefined;
           }
         }
       }
@@ -312,23 +327,45 @@ export class FCMService {
         return null;
       }
     } catch (error: unknown) {
-      // Manejar errores específicos de push service
+      // Manejar errores específicos de push service de forma silenciosa en desarrollo
       if (error instanceof Error) {
-        console.error('FCM: Detailed error information:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack,
-          isProduction: process.env.NODE_ENV === 'production'
-        });
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        const isInsecureContext = typeof window !== 'undefined' && !window.isSecureContext;
         
+        // Errores comunes en desarrollo local (HTTP) - manejar silenciosamente
         if (error.message.includes('push service not available') || 
             error.message.includes('Registration failed') ||
-            error.message.includes('unsupported-browser')) {
-          console.warn('FCM: Push service not available - this is normal in development or unsupported environments');
+            error.message.includes('unsupported-browser') ||
+            error.message.includes('AbortError') ||
+            error.name === 'AbortError') {
+          
+          if (isInsecureContext) {
+            console.info('FCM: Push notifications require HTTPS. This is expected in HTTP development environment.');
+          } else if (isDevelopment) {
+            console.info('FCM: Push service not available in development environment. This is normal.');
+          } else {
+            console.warn('FCM: Push service not available in production environment. Please check browser compatibility.');
+          }
           return null;
         }
+        
+        // Error específico de contexto inseguro
+        if (error.message.includes('only available in secure contexts')) {
+          console.info('FCM: Push notifications require HTTPS. Please use HTTPS in production.');
+          return null;
+        }
+
+        // Solo mostrar errores detallados en producción o errores inesperados
+        if (!isDevelopment || (!error.message.includes('push service') && !error.message.includes('Registration failed'))) {
+          console.error('FCM: Detailed error information:', {
+            message: error.message,
+            name: error.name,
+            isProduction: !isDevelopment,
+            isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+            protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown'
+          });
+        }
       }
-      console.error('FCM: Error getting registration token:', error);
       return null;
     }
   }

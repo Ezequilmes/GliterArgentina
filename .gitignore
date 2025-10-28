@@ -49,6 +49,21 @@ ui-debug.log
 # MCP Configuration (contains tokens)
 mcp-config*.json
 
+# Security - Sensitive files with credentials
+configure-firebase-production.js
+verify-mercadopago-credentials.js
+scripts/create-admin-user-doc.js
+scripts/auto-login.js
+scripts/test-admin-*.js
+check-users-and-add-token.js
+get-real-fcm-token.js
+real-fcm-token.json
+scripts/config.js
+
+# Temporary test files
+*.test.token
+*.temp.js
+
 # logs
 *.log
 

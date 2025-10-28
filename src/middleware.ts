@@ -4,32 +4,25 @@ export function middleware(request: NextRequest) {
   const userAgent = request.headers.get('user-agent') || '';
   const response = NextResponse.next();
 
-  // Detect WebView and mobile app browsers
-  const isWebView = /wv|WebView|Android.*Version\/.*Chrome|iPhone.*Mobile.*Safari|iPad.*Mobile.*Safari/.test(userAgent);
-  const isTraeApp = /TraeApp/i.test(userAgent); // Only detect explicit TraeApp, not generic "Trae"
-  const isMobile = /Mobile|Android|iPhone|iPad/.test(userAgent);
-
-  // Add headers for WebView compatibility
-  if (isWebView || isTraeApp || isMobile) {
-    // Disable some features that might not work in WebView
-    response.headers.set('X-WebView-Compatible', 'true');
-    response.headers.set('X-Frame-Options', 'ALLOWALL');
-    
-    // Add cache control for better performance in mobile browsers
-    response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-  }
-
-  // Special handling for Trae app
-  if (isTraeApp) {
-    response.headers.set('X-Trae-App', 'true');
-    // Disable service worker registration
-    response.headers.set('X-Disable-SW', 'true');
-  }
+  // Detect mobile devices only
+  const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
 
   // Add CORS headers for API routes
   if (request.nextUrl.pathname.startsWith('/api/')) {
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+
+  // Service Worker headers
+  if (request.nextUrl.pathname.includes('sw.js') || request.nextUrl.pathname.includes('firebase-messaging-sw.js')) {
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    // Allow cross-origin for service workers
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
 

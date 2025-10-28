@@ -100,6 +100,7 @@ export default function ProfilePage() {
                     alt={user.name}
                     size="xl"
                     className="border-4 border-white shadow-lg"
+                    priority={true}
                   />
                   <button
                     onClick={() => setIsEditing(true)}

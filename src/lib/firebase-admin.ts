@@ -60,13 +60,18 @@ function initializeFirebaseAdmin() {
       return true;
     }
 
-    // Si estamos en desarrollo y no hay credenciales, usar applicationDefault
+    // Si estamos en desarrollo y no hay credenciales, usar configuración básica
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔧 Inicializando Firebase Admin con applicationDefault (desarrollo)');
-      initializeApp({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'gliter-argentina'
-      });
-      return true;
+      console.log('🔧 Inicializando Firebase Admin para desarrollo');
+      try {
+        initializeApp({
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'gliter-argentina'
+        });
+        return true;
+      } catch (error) {
+        console.error('Error en inicialización de desarrollo:', error);
+        return false;
+      }
     }
 
     console.warn('⚠️ No se encontraron credenciales de Firebase Admin SDK');
@@ -95,13 +100,13 @@ function getMessagingService() {
 }
 
 // Exportar funciones lazy en lugar de instancias directas
-export const db = new Proxy({} as ReturnType<typeof getFirestore>, {
+export const db = new Proxy(Object.create(null) as ReturnType<typeof getFirestore>, {
   get(target, prop) {
     return getDb()[prop as keyof ReturnType<typeof getFirestore>];
   }
 });
 
-export const messaging = new Proxy({} as ReturnType<typeof getMessaging>, {
+export const messaging = new Proxy(Object.create(null) as ReturnType<typeof getMessaging>, {
   get(target, prop) {
     return getMessagingService()[prop as keyof ReturnType<typeof getMessaging>];
   }

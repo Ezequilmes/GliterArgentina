@@ -11,24 +11,12 @@ export function PWAInitializer() {
   const { requestPermission, subscribe, isSupported: pushSupported } = usePushNotifications();
   const { isOnline } = useNetworkStatus();
   const { addToast } = useToast();
-  const browserInfo = detectBrowser();
-
   // Note: Service Worker registration is now handled automatically by useServiceWorker hook
   // No manual registration needed here to avoid conflicts
 
   // Service Worker initialization and cleanup
   useEffect(() => {
-    // Skip Service Worker operations in development to avoid InvalidStateError
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Service Worker operations disabled in development');
-      return;
-    }
-
-    // Skip Service Worker operations in WebView/Trae app
-    if (browserInfo.isWebView || browserInfo.isTraeApp) {
-      console.log('🚫 Service Worker operations skipped in WebView/Trae app');
-      return;
-    }
+    console.log('🚀 Initializing PWA services...');
 
     // Only clean up OLD/INVALID Service Workers, not our current one
     if ('serviceWorker' in navigator) {
@@ -51,14 +39,11 @@ export function PWAInitializer() {
         console.warn('Error accessing Service Workers:', error);
       }
     }
-  }, [browserInfo.isWebView, browserInfo.isTraeApp]);
+  }, []);
 
   useEffect(() => {
-    // Skip push notification setup in development, WebView, or when SW not supported/registered
-    if (process.env.NODE_ENV === 'development' || !pushSupported || browserInfo.isWebView || browserInfo.isTraeApp) {
-      if (browserInfo.isWebView || browserInfo.isTraeApp) {
-        console.log('🚫 Push notifications skipped in WebView/Trae app');
-      }
+    // Skip push notification setup when SW not supported/registered
+    if (!pushSupported) {
       return;
     }
 

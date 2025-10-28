@@ -56,6 +56,7 @@ export default function DashboardPage() {
                       size="2xl"
                       fallback={user?.name?.charAt(0) || 'U'}
                       className="w-full h-full"
+                      priority={true}
                     />
                   </div>
                   

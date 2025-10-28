@@ -12,7 +12,7 @@ export interface AnalyticsEvents {
   user_login: {
     method: 'email' | 'google' | 'facebook';
   };
-  user_logout: {};
+  user_logout: Record<string, never>;
 
   // Eventos de perfil
   profile_completed: {
@@ -24,7 +24,7 @@ export interface AnalyticsEvents {
     photo_count: number;
     is_first_photo: boolean;
   };
-  profile_updated: {};
+  profile_updated: Record<string, never>;
 
   // Eventos de descubrimiento
   profile_viewed: {
@@ -76,15 +76,15 @@ export interface AnalyticsEvents {
   };
 
   // Eventos de ubicación
-  location_permission_granted: {};
-  location_permission_denied: {};
+  location_permission_granted: Record<string, never>;
+  location_permission_denied: Record<string, never>;
   location_updated: {
     accuracy?: number;
   };
 
   // Eventos de notificaciones
-  notification_permission_granted: {};
-  notification_permission_denied: {};
+  notification_permission_granted: Record<string, never>;
+  notification_permission_denied: Record<string, never>;
   push_notification_received: {
     type: 'match' | 'message' | 'like' | 'general';
   };

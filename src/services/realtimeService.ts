@@ -4,11 +4,9 @@ import {
   push, 
   onValue, 
   off, 
-  serverTimestamp, 
   onDisconnect,
   remove,
   update,
-  child,
   get
 } from 'firebase/database';
 import { database } from '@/lib/firebase';
@@ -182,7 +180,7 @@ class RealtimeService {
     type: 'message' | 'match' | 'like' | 'super_like';
     title: string;
     body: string;
-    data?: any;
+    data?: Record<string, unknown>;
   }): Promise<void> {
     if (!isFirebaseAvailable()) {
       console.warn('Firebase not available on server side, skipping notification');
@@ -205,7 +203,7 @@ class RealtimeService {
   }
 
   // Escuchar notificaciones instantáneas
-  onInstantNotifications(userId: string, callback: (notifications: any[]) => void): () => void {
+  onInstantNotifications(userId: string, callback: (notifications: Record<string, unknown>[]) => void): () => void {
     if (!isFirebaseAvailable()) {
       console.warn('Firebase not available on server side, returning empty unsubscribe function');
       return () => {};

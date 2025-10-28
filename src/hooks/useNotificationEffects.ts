@@ -40,7 +40,7 @@ export const useNotificationEffects = ({
   // Inicializar audio
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      audioRef.current = new Audio('/sounds/newMessage.mp3');
+      audioRef.current = new Audio('/sounds/messenger-tono-mensaje-.mp3');
       audioRef.current.volume = settings.volume;
       
       // Precargar el audio

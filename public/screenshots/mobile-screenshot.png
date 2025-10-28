@@ -1,0 +1,25 @@
+<svg width="390" height="844" viewBox="0 0 390 844" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Mobile screenshot mockup -->
+  <rect width="390" height="844" fill="#f8fafc"/>
+  
+  <!-- Header -->
+  <rect width="390" height="80" fill="#6366f1"/>
+  <text x="195" y="50" text-anchor="middle" fill="white" font-family="Arial" font-size="20" font-weight="bold">Gliter Argentina</text>
+  
+  <!-- Content area -->
+  <rect x="20" y="100" width="350" height="120" rx="12" fill="white" stroke="#e2e8f0"/>
+  <circle cx="60" cy="140" r="20" fill="#6366f1"/>
+  <rect x="90" y="125" width="200" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="90" y="145" width="150" height="10" rx="5" fill="#f1f5f9"/>
+  
+  <rect x="20" y="240" width="350" height="120" rx="12" fill="white" stroke="#e2e8f0"/>
+  <circle cx="60" cy="280" r="20" fill="#10b981"/>
+  <rect x="90" y="265" width="180" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="90" y="285" width="120" height="10" rx="5" fill="#f1f5f9"/>
+  
+  <!-- Bottom navigation -->
+  <rect y="764" width="390" height="80" fill="white" stroke="#e2e8f0"/>
+  <circle cx="97.5" cy="804" r="12" fill="#6366f1"/>
+  <circle cx="195" cy="804" r="12" fill="#e2e8f0"/>
+  <circle cx="292.5" cy="804" r="12" fill="#e2e8f0"/>
+</svg>

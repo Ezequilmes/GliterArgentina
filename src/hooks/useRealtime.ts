@@ -191,9 +191,16 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     clearReadNotifications,
     
     // Utilidades
-    isUserOnline: (userId: string) => userPresence[userId]?.isOnline || false,
-    isUserTyping: (chatId: string, userId: string) => typingUsers[chatId]?.[userId]?.isTyping || false,
+    isUserOnline: (userId: string) => {
+      if (!userPresence || !userId) return false;
+      return userPresence[userId]?.isOnline || false;
+    },
+    isUserTyping: (chatId: string, userId: string) => {
+      if (!typingUsers || !chatId || !userId) return false;
+      return typingUsers[chatId]?.[userId]?.isTyping || false;
+    },
     getTypingUsers: (chatId: string) => {
+      if (!typingUsers || !chatId) return [];
       const typing = typingUsers[chatId] || {};
       return Object.keys(typing).filter(userId => typing[userId]?.isTyping);
     }

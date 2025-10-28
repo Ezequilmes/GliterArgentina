@@ -20,8 +20,8 @@ export default function TestFCM() {
 
   useEffect(() => {
     // Verificar el estado inicial de los permisos
-    if ('Notification' in window) {
-      setPermission(Notification.permission);
+    if (typeof window !== 'undefined' && 'Notification' in window && typeof window.Notification !== 'undefined') {
+      setPermission(window.Notification.permission);
     }
   }, []);
 
@@ -40,7 +40,9 @@ export default function TestFCM() {
 
       // Solicitar permisos de notificación usando el servicio FCM
       const hasPermission = await fcmService.requestPermission();
-      setPermission(Notification.permission);
+      if (typeof window !== 'undefined' && 'Notification' in window && typeof window.Notification !== 'undefined') {
+        setPermission(window.Notification.permission);
+      }
 
       if (hasPermission) {
         // Obtener token FCM usando el servicio

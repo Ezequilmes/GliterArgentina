@@ -1,13 +1,12 @@
 import {
   ref,
-  uploadBytes,
   uploadBytesResumable,
+  uploadBytes,
   getDownloadURL,
   deleteObject,
   listAll,
   getMetadata,
   updateMetadata,
-  UploadTask,
   UploadTaskSnapshot
 } from 'firebase/storage';
 import { storage } from './firebase';
@@ -22,7 +21,7 @@ export interface UploadProgress {
 export interface UploadResult {
   url: string;
   path: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 // Servicio de almacenamiento
@@ -69,7 +68,7 @@ export const storageService = {
               bytesTransferred: snapshot.bytesTransferred,
               totalBytes: snapshot.totalBytes,
               progress,
-              state: snapshot.state as any
+              state: snapshot.state as 'running' | 'paused' | 'success' | 'canceled' | 'error'
             });
           },
           (error) => {
@@ -82,7 +81,7 @@ export const storageService = {
               resolve({
                 url,
                 path: filePath,
-                metadata
+                metadata: metadata as unknown as Record<string, unknown>
               });
             } catch (error) {
               reject(error);
@@ -102,7 +101,7 @@ export const storageService = {
       return {
         url,
         path: filePath,
-        metadata
+        metadata: metadata as unknown as Record<string, unknown>
       };
     }
   },
@@ -145,7 +144,7 @@ export const storageService = {
               resolve({
                 url,
                 path: filePath,
-                metadata
+                metadata: metadata as unknown as Record<string, unknown>
               });
             } catch (error) {
               reject(error);
@@ -161,7 +160,7 @@ export const storageService = {
       return {
         url,
         path: filePath,
-        metadata
+        metadata: metadata as unknown as Record<string, unknown>
       };
     }
   },
@@ -201,7 +200,7 @@ export const storageService = {
               resolve({
                 url,
                 path: filePath,
-                metadata
+                metadata: metadata as unknown as Record<string, unknown>
               });
             } catch (error) {
               reject(error);
@@ -217,7 +216,7 @@ export const storageService = {
       return {
         url,
         path: filePath,
-        metadata
+        metadata: metadata as unknown as Record<string, unknown>
       };
     }
   },
@@ -300,7 +299,7 @@ export const storageService = {
               resolve({
                 url,
                 path: filePath,
-                metadata
+                metadata: metadata as unknown as Record<string, unknown>
               });
             } catch (error) {
               reject(error);
@@ -316,7 +315,7 @@ export const storageService = {
       return {
         url,
         path: filePath,
-        metadata
+        metadata: metadata as unknown as Record<string, unknown>
       };
     }
   },

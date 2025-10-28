@@ -45,22 +45,38 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Debug logs for hook initialization
+  console.log('🔧 useGeolocation hook initialized with options:', options);
+  console.log('🔧 Current state:', { location, loading, error, permissionState, retryCount });
+
   // Check geolocation permissions
   const checkPermissions = useCallback(async (): Promise<PermissionState> => {
+    console.log('🔐 Checking geolocation permissions...');
+    
+    // Check if we're running on the client side
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      console.log('🔐 Running on server side, returning prompt state');
+      return 'prompt';
+    }
+    
     try {
       if ('permissions' in navigator) {
         const permission = await navigator.permissions.query({ name: 'geolocation' });
+        console.log('🔐 Permission state:', permission.state);
         setPermissionState(permission.state);
         
         // Listen for permission changes
         permission.onchange = () => {
+          console.log('🔐 Permission state changed to:', permission.state);
           setPermissionState(permission.state);
         };
         
         return permission.state;
+      } else {
+        console.warn('🔐 Permissions API not supported');
       }
     } catch (err) {
-      console.warn('Permissions API not supported');
+      console.warn('🔐 Error checking permissions:', err);
     }
     
     return 'prompt';
@@ -82,22 +98,39 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
 
   // Retry logic for failed geolocation requests
   const retryGetLocation = useCallback((attempt: number): Promise<Location> => {
+    console.log(`🔄 retryGetLocation called with attempt: ${attempt}/${retryAttempts}`);
     return new Promise((resolve, reject) => {
+      // Check if we're running on the client side
+      if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+        const error = 'Geolocalización no disponible en el servidor';
+        console.error('🔄 Server side error:', error);
+        reject(new Error(error));
+        return;
+      }
+      
       if (attempt >= retryAttempts) {
-        reject(new Error(`Falló después de ${retryAttempts} intentos`));
+        const error = `Falló después de ${retryAttempts} intentos`;
+        console.error('🔄 Max retry attempts reached:', error);
+        reject(new Error(error));
         return;
       }
 
       setRetryCount(attempt + 1);
+      console.log(`🔄 Setting retry count to: ${attempt + 1}`);
       
       // Clear any existing timeout
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
       
+      const delay = attempt > 0 ? retryDelay : 0;
+      console.log(`🔄 Waiting ${delay}ms before attempt ${attempt + 1}`);
+      
       retryTimeoutRef.current = setTimeout(() => {
+        console.log(`🔄 Starting geolocation attempt ${attempt + 1}`);
         navigator.geolocation.getCurrentPosition(
           (position) => {
+            console.log('🔄 Geolocation success:', position);
             const newLocation: Location = {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
@@ -105,21 +138,25 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
               timestamp: position.timestamp
             };
             
+            console.log('🔄 Setting location:', newLocation);
             setLocation(newLocation);
             setLoading(false);
             setRetryCount(0);
             resolve(newLocation);
           },
           (err) => {
+            console.error(`🔄 Geolocation error on attempt ${attempt + 1}:`, err);
             if (err.code === err.PERMISSION_DENIED) {
               // Don't retry on permission denied
               const errorMessage = getErrorMessage(err);
+              console.error('🔄 Permission denied, not retrying:', errorMessage);
               setError(errorMessage);
               setLoading(false);
               setRetryCount(0);
               reject(new Error(errorMessage));
             } else {
               // Retry on other errors
+              console.log(`🔄 Retrying due to error: ${err.message}`);
               retryGetLocation(attempt + 1).then(resolve).catch(reject);
             }
           },
@@ -129,29 +166,47 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
             maximumAge
           }
         );
-      }, attempt > 0 ? retryDelay : 0);
+      }, delay);
     });
   }, [enableHighAccuracy, timeout, maximumAge, retryAttempts, retryDelay, getErrorMessage]);
 
   // Get current position with enhanced error handling and retry logic
   const getCurrentLocation = useCallback((): Promise<Location> => {
+    console.log('📍 getCurrentLocation called');
     return new Promise(async (resolve, reject) => {
+      // Check if we're running on the client side
+      if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+        const error = 'Geolocalización no disponible en el servidor';
+        console.error('📍 Server side error:', error);
+        setError(error);
+        reject(new Error(error));
+        return;
+      }
+      
       if (!navigator.geolocation) {
         const error = 'Geolocalización no soportada por este navegador';
+        console.error('📍 Error:', error);
         setError(error);
         reject(new Error(error));
         return;
       }
+
+      console.log('📍 Navigator.geolocation is available');
 
       // Check permissions first
+      console.log('📍 Checking permissions before getting location...');
       const permission = await checkPermissions();
+      console.log('📍 Permission check result:', permission);
+      
       if (permission === 'denied') {
         const error = 'Permisos de ubicación denegados. Por favor, permite el acceso en la configuración del navegador.';
+        console.error('📍 Permission denied:', error);
         setError(error);
         reject(new Error(error));
         return;
       }
 
+      console.log('📍 Starting location request...');
       setLoading(true);
       setError(null);
       setRetryCount(0);
@@ -164,18 +219,22 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
       // Timeout para casos donde la solicitud no resuelve
       timeoutRef.current = setTimeout(() => {
         const error = 'Tiempo de espera agotado. Verifica tu conexión y permisos de ubicación.';
+        console.error('📍 Timeout error:', error);
         setError(error);
         setLoading(false);
         reject(new Error(error));
       }, Math.min(timeout + 2000, 20000)); // Cap total timeout at 20 seconds
 
       try {
+        console.log('📍 Calling retryGetLocation...');
         const location = await retryGetLocation(0);
+        console.log('📍 Location obtained successfully:', location);
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
         resolve(location);
       } catch (err) {
+        console.error('📍 Error in getCurrentLocation:', err);
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
@@ -189,6 +248,12 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
 
   // Watch position changes with enhanced error handling
   const watchLocation = useCallback(() => {
+    // Check if we're running on the client side
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      setError('Geolocalización no disponible en el servidor');
+      return;
+    }
+    
     if (!navigator.geolocation) {
       setError('Geolocalización no soportada por este navegador');
       return;
@@ -239,7 +304,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
 
   // Stop watching position
   const stopWatching = useCallback(() => {
-    if (watchId !== null) {
+    if (watchId !== null && typeof window !== 'undefined' && typeof navigator !== 'undefined') {
       navigator.geolocation.clearWatch(watchId);
       setWatchId(null);
       setIsWatching(false);
@@ -284,6 +349,24 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
     checkPermissions();
   }, [checkPermissions]);
 
+  // Auto-get location when permissions are granted (unless watch mode is enabled)
+  useEffect(() => {
+    console.log('🔄 useGeolocation: Auto-location effect triggered', { 
+      permissionState, 
+      location, 
+      loading, 
+      watch,
+      error 
+    });
+    
+    if (!watch && permissionState === 'granted' && !location && !loading && !error) {
+      console.log('🎯 useGeolocation: Auto-getting location');
+      getCurrentLocation().catch(err => {
+        console.error('🚨 useGeolocation: Auto-location failed:', err);
+      });
+    }
+  }, [permissionState, location, loading, watch, error, getCurrentLocation]);
+
   // Auto-start watching if enabled (only if explicitly requested)
   useEffect(() => {
     if (watch) {
@@ -291,7 +374,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
     }
 
     return () => {
-      if (watchId !== null) {
+      if (watchId !== null && typeof window !== 'undefined' && typeof navigator !== 'undefined') {
         navigator.geolocation.clearWatch(watchId);
       }
     };

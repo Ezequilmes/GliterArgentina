@@ -1,5 +1,5 @@
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
-import { toast } from 'react-hot-toast';
+import { toast } from '../utils/toast';
 
 interface NotificationSettings {
   soundEnabled: boolean;
@@ -54,7 +54,7 @@ export const useNotificationManager = ({
   useEffect(() => {
     if (typeof window === 'undefined' || !finalSettings.soundEnabled) return;
 
-    const audio = new Audio('/sounds/newMessage.mp3');
+    const audio = new Audio('/sounds/messenger-tono-mensaje-.mp3');
     audio.volume = finalSettings.volume;
     audio.preload = 'auto';
     

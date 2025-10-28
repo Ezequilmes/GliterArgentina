@@ -8,8 +8,21 @@ const STATIC_ASSETS = [
   '/chat',
   '/discover',
   '/profile',
+  '/matches',
+  '/settings',
   '/manifest.json',
-  // Add other critical assets
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+  '/logo.svg',
+  '/icon-144x144.svg',
+  // Critical sounds for offline experience
+  '/sounds/messenger-tono-mensaje-.mp3',
+  '/sounds/send_chat.mp3',
+  '/sounds/receive_chat.mp3',
+  // Add critical CSS and JS files
+  '/_next/static/css/app/layout.css',
+  '/_next/static/chunks/webpack.js',
+  '/_next/static/chunks/main.js'
 ];
 
 // Install event - cache static assets
@@ -20,10 +33,27 @@ self.addEventListener('install', (event) => {
     caches.open(STATIC_CACHE)
       .then((cache) => {
         console.log('Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        // Cache assets individually to handle failures gracefully
+        return Promise.allSettled(
+          STATIC_ASSETS.map(asset => 
+            cache.add(asset).catch(err => {
+              console.warn(`Failed to cache ${asset}:`, err);
+              return null;
+            })
+          )
+        );
       })
-      .then(() => {
+      .then((results) => {
+        const failed = results.filter(result => result.status === 'rejected');
+        if (failed.length > 0) {
+          console.warn(`Failed to cache ${failed.length} assets, but continuing installation`);
+        }
+        console.log('Service Worker installation completed');
         return self.skipWaiting();
+      })
+      .catch((error) => {
+        console.error('Service Worker installation failed:', error);
+        throw error;
       })
   );
 });
@@ -165,16 +195,57 @@ async function handleStaticAsset(request) {
 
 // Handle navigation - app shell pattern
 async function handleNavigation(request) {
+  const url = new URL(request.url);
+  
+  // For navigation requests, try network first, then fallback to cache
   try {
     const response = await fetch(request);
+    
+    // Cache successful navigation responses
+    if (response.ok) {
+      const cache = await caches.open(DYNAMIC_CACHE);
+      cache.put(request, response.clone());
+    }
+    
     return response;
   } catch (error) {
-    // Return cached app shell
-    const cachedResponse = await caches.match('/');
+    console.log('Network failed for navigation, trying cache:', url.pathname);
+    
+    // Try to find cached version of the specific page
+    const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       return cachedResponse;
     }
-    throw error;
+    
+    // Fallback to app shell for SPA routes
+    const appShell = await caches.match('/');
+    if (appShell) {
+      return appShell;
+    }
+    
+    // Last resort: return offline page
+    return new Response(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Gliter Argentina - Sin conexión</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: system-ui; text-align: center; padding: 2rem; }
+            .offline { color: #666; }
+          </style>
+        </head>
+        <body>
+          <h1>Sin conexión</h1>
+          <p class="offline">Verifica tu conexión a internet e intenta nuevamente.</p>
+          <button onclick="window.location.reload()">Reintentar</button>
+        </body>
+      </html>
+    `, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' }
+    });
   }
 }
 

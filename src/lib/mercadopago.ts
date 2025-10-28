@@ -92,10 +92,19 @@ export const SUPER_LIKE_PACKAGES = [
   },
 ];
 
+// Definir tipos para MercadoPago
+interface MercadoPagoSDK {
+  new (publicKey: string): unknown;
+}
+
+interface WindowWithMercadoPago extends Window {
+  MercadoPago?: MercadoPagoSDK;
+}
+
 /**
  * Inicializa MercadoPago SDK
  */
-export function initializeMercadoPago(): Promise<any> {
+export function initializeMercadoPago(): Promise<unknown> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
       reject(new Error('MercadoPago solo puede ser inicializado en el cliente'));
@@ -108,20 +117,24 @@ export function initializeMercadoPago(): Promise<any> {
       return;
     }
 
+    const windowWithMP = window as WindowWithMercadoPago;
+
     // Cargar el SDK de MercadoPago si no está cargado
-    if (!(window as any).MercadoPago) {
+    if (!windowWithMP.MercadoPago) {
       const script = document.createElement('script');
       script.src = 'https://sdk.mercadopago.com/js/v2';
       script.onload = () => {
-        const mp = new (window as any).MercadoPago(MP_PUBLIC_KEY);
-        resolve(mp);
+        if (windowWithMP.MercadoPago) {
+          const mp = new windowWithMP.MercadoPago(MP_PUBLIC_KEY);
+          resolve(mp);
+        }
       };
       script.onerror = () => {
         reject(new Error('Error al cargar MercadoPago SDK'));
       };
       document.head.appendChild(script);
     } else {
-      const mp = new (window as any).MercadoPago(MP_PUBLIC_KEY);
+      const mp = new windowWithMP.MercadoPago(MP_PUBLIC_KEY);
       resolve(mp);
     }
   });
@@ -162,12 +175,14 @@ export async function createPaymentPreference(
       pending: `${APP_URL}/payment/pending`,
     },
     auto_return: 'approved',
-    external_reference: `${userId}_${planId}_${Date.now()}`,
+    external_reference: `premium_${userId}_${planId}_${Date.now()}`,
     notification_url: `${APP_URL}/api/webhooks/mercadopago`,
     metadata: {
       user_id: userId,
       plan_id: planId,
       plan_duration: plan.duration,
+      amount: plan.price,
+      type: 'premium',
     },
     payment_methods: {
       excluded_payment_types: [],
@@ -180,6 +195,8 @@ export async function createPaymentPreference(
     },
   };
 
+  console.log('Enviando preferencia de premium:', preference);
+
   try {
     const response = await fetch('/api/mercadopago/create-preference', {
       method: 'POST',
@@ -190,7 +207,13 @@ export async function createPaymentPreference(
     });
 
     if (!response.ok) {
-      throw new Error('Error al crear la preferencia de pago');
+      const errorData = await response.text();
+      console.error('Error en create-preference:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
+      });
+      throw new Error(`Error al crear la preferencia de pago: ${response.status} - ${errorData}`);
     }
 
     const data = await response.json();
@@ -248,7 +271,7 @@ export async function createSuperLikesPreference(
       pending: `${APP_URL}/payment/pending`,
     },
     auto_return: 'approved',
-    external_reference: `${userId}_${packageId}_${Date.now()}`,
+    external_reference: `super_likes_${userId}_${packageId}_${Date.now()}`,
     notification_url: `${APP_URL}/api/webhooks/mercadopago`,
     metadata: {
       user_id: userId,
@@ -267,6 +290,8 @@ export async function createSuperLikesPreference(
     },
   };
 
+  console.log('Enviando preferencia de Super Likes:', preference);
+
   try {
     const response = await fetch('/api/mercadopago/create-preference', {
       method: 'POST',
@@ -277,7 +302,13 @@ export async function createSuperLikesPreference(
     });
 
     if (!response.ok) {
-      throw new Error('Error al crear la preferencia de pago');
+      const errorData = await response.text();
+      console.error('Error en create-preference:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
+      });
+      throw new Error(`Error al crear la preferencia de pago: ${response.status} - ${errorData}`);
     }
 
     const data = await response.json();

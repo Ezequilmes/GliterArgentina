@@ -13,6 +13,7 @@ interface AvatarProps {
   fallback?: string;
   online?: boolean;
   onClick?: () => void;
+  priority?: boolean;
 }
 
 const sizeClasses = {
@@ -49,7 +50,8 @@ export const Avatar: React.FC<AvatarProps> = ({
   className,
   fallback,
   online = false,
-  onClick
+  onClick,
+  priority = false
 }) => {
   const [imageError, setImageError] = React.useState(false);
   const [imageLoading, setImageLoading] = React.useState(true);
@@ -90,6 +92,7 @@ export const Avatar: React.FC<AvatarProps> = ({
             onError={handleImageError}
             onLoad={handleImageLoad}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            priority={priority || (size === 'xl' || size === '2xl')}
           />
           {imageLoading && (
             <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />

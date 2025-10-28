@@ -388,7 +388,7 @@ export function useChat(): UseChatReturn {
     content: string, 
     type: ChatMessage['type'] = 'text',
     replyTo?: string,
-    metadata?: Record<string, unknown>
+    metadata?: ChatMessage['metadata']
   ) => {
     if (!chatId || !user?.id || !content.trim()) return;
     
@@ -406,9 +406,14 @@ export function useChat(): UseChatReturn {
     }
 
     // Sanitize metadata to avoid undefined values causing Firestore errors
-    const cleanMetadata = metadata && typeof metadata === 'object'
-      ? Object.fromEntries(Object.entries(metadata).filter(([, value]) => value !== undefined))
-      : undefined;
+    const cleanMetadata = metadata ? {
+      ...(metadata.fileName !== undefined && { fileName: metadata.fileName }),
+      ...(metadata.fileSize !== undefined && { fileSize: metadata.fileSize }),
+      ...(metadata.fileType !== undefined && { fileType: metadata.fileType }),
+      ...(metadata.duration !== undefined && { duration: metadata.duration }),
+      ...(metadata.coordinates !== undefined && { coordinates: metadata.coordinates }),
+      ...(metadata.thumbnailUrl !== undefined && { thumbnailUrl: metadata.thumbnailUrl })
+    } : undefined;
 
     try {
       await chatService.sendMessage(chatId, user.id, otherUserId, content.trim(), type, replyTo, cleanMetadata);

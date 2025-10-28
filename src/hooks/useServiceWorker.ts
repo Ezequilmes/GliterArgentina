@@ -33,19 +33,7 @@ interface UseServiceWorkerReturn extends ServiceWorkerState {
 
 export function useServiceWorker(): UseServiceWorkerReturn {
   const [state, setState] = useState<ServiceWorkerState>(() => {
-    // En desarrollo, deshabilitar Service Worker por defecto para evitar InvalidStateError
-    if (process.env.NODE_ENV === 'development') {
-      return {
-        isSupported: false,
-        isRegistered: false,
-        isInstalling: false,
-        isWaiting: false,
-        isControlling: false,
-        updateAvailable: false,
-        registration: null,
-      };
-    }
-
+    // Permitir Service Worker en desarrollo para FCM, pero con precauciones adicionales
     const isSupported = typeof window !== 'undefined' && 
                        'serviceWorker' in navigator && 
                        window.isSecureContext &&
@@ -87,10 +75,10 @@ export function useServiceWorker(): UseServiceWorkerReturn {
 
   // Detección mejorada de soporte con prevención de InvalidStateError
   useEffect(() => {
-    // En desarrollo, no verificar soporte para evitar InvalidStateError
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Service Worker deshabilitado en desarrollo para evitar InvalidStateError');
-      return;
+    // En desarrollo, permitir PWA pero con precauciones adicionales
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    if (isDevelopment) {
+      console.log('Service Worker en modo desarrollo - PWA habilitado con precauciones');
     }
 
     const checkSupport = async () => {
@@ -220,6 +208,34 @@ export function useServiceWorker(): UseServiceWorkerReturn {
       });
 
       console.log('Service Worker registered:', registration);
+
+      // Send Firebase configuration to the main service worker
+      try {
+        // Wait for the service worker to be ready
+        await navigator.serviceWorker.ready;
+        
+        // Send Firebase config to the main service worker
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'FIREBASE_CONFIG',
+            config: firebaseConfig
+          });
+          console.log('Firebase configuration sent to service worker');
+        } else {
+          // If no controller yet, wait for it and then send config
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'FIREBASE_CONFIG',
+                config: firebaseConfig
+              });
+              console.log('Firebase configuration sent to service worker after controller change');
+            }
+          }, { once: true });
+        }
+      } catch (configError) {
+        console.error('Failed to send Firebase config to service worker:', configError);
+      }
 
       // Register Firebase Messaging Service Worker
       try {

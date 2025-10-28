@@ -20,6 +20,7 @@ import { db } from './firebase';
 import { User } from '@/types';
 import { chatService } from '@/services/chatService';
 import { analyticsService } from '@/services/analyticsService';
+import { fcmNotificationService } from '@/services/fcmNotificationService';
 
 export interface Match {
   id: string;
@@ -112,6 +113,32 @@ export const matchService = {
     // Crear notificaciones para ambos usuarios
     await notificationService.createMatchNotification(user1Id, user2Id, 'match');
     await notificationService.createMatchNotification(user2Id, user1Id, 'match');
+
+    // Enviar notificaciones FCM push
+    try {
+      const [user1Doc, user2Doc] = await Promise.all([
+        getDoc(doc(db, 'users', user1Id)),
+        getDoc(doc(db, 'users', user2Id))
+      ]);
+
+      const user1Data = user1Doc.data();
+      const user2Data = user2Doc.data();
+
+      if (user1Data && user2Data) {
+        await Promise.all([
+          fcmNotificationService.sendNewMatchNotification(
+            user1Id,
+            { name: user2Data.name || 'Usuario', photoURL: user2Data.profilePhoto }
+          ),
+          fcmNotificationService.sendNewMatchNotification(
+            user2Id,
+            { name: user1Data.name || 'Usuario', photoURL: user1Data.profilePhoto }
+          )
+        ]);
+      }
+    } catch (fcmError) {
+      console.error('Error sending FCM match notifications:', fcmError);
+    }
 
     return matchDoc.id;
   },

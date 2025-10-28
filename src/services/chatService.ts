@@ -3,14 +3,11 @@ import {
   doc, 
   addDoc, 
   updateDoc, 
-  setDoc,
-  deleteDoc,
   getDoc, // FIX: Added getDoc import for optimized queries
   query, 
   where, 
   orderBy, 
   onSnapshot, 
-  serverTimestamp, 
   Timestamp,
   getDocs,
   limit,
@@ -20,16 +17,15 @@ import {
   increment,
   documentId,
   deleteField, // FIX: Added deleteField import for proper reaction removal
-  runTransaction, // FIX: Added runTransaction for atomic operations
-  arrayUnion, // FIX: Added arrayUnion for readBy field compatibility
   enableNetwork,
-  disableNetwork
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { userService } from '@/lib/firestore';
 import { PopulatedChat } from '@/types';
 import { notificationService } from '@/services/notificationService';
 import { realtimeService } from '@/services/realtimeService';
+import { fcmNotificationService } from '@/services/fcmNotificationService';
 
 export interface ChatMessage {
   id: string;
@@ -105,9 +101,9 @@ class ChatService {
     timeoutId: ReturnType<typeof setTimeout>; // Para cleanup de timeouts
   }>();
   // Nuevo: Cache para listeners de mensajes con paginación
-  private messageListeners = new Map<string, { unsubscribe: () => void; lastDoc?: any; hasMore: boolean }>();
+  private messageListeners = new Map<string, { unsubscribe: () => void; lastDoc?: unknown; hasMore: boolean }>();
   // Nuevo: Sistema de reintento automático
-  private retryQueue = new Map<string, { messageData: any; attempts: number; nextRetry: number }>();
+  private retryQueue = new Map<string, { messageData: { chatId: string; receiverId: string; [key: string]: unknown }; attempts: number; nextRetry: number }>();
   private isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
   private retryInterval: ReturnType<typeof setInterval> | null = null;
   private maxRetryAttempts = 5;
@@ -286,9 +282,9 @@ class ChatService {
   }
 
   // Nuevo: Agregar mensaje a cola de reintento
-  private addToRetryQueue(messageId: string, messageData: any): void {
+  private addToRetryQueue(messageId: string, messageData: Record<string, unknown>): void {
     this.retryQueue.set(messageId, {
-      messageData,
+      messageData: messageData as { chatId: string; receiverId: string; [key: string]: unknown },
       attempts: 0,
       nextRetry: Date.now() + this.baseRetryDelay
     });
@@ -340,7 +336,7 @@ class ChatService {
     const messagesRef = collection(db, 'chats', chatId, 'messages');
 
     // Helper to recursively remove undefined values
-    const removeUndefinedDeep = (obj: any): any => {
+    const removeUndefinedDeep = (obj: unknown): unknown => {
       if (Array.isArray(obj)) {
         return obj.map(removeUndefinedDeep);
       }
@@ -354,7 +350,7 @@ class ChatService {
       return obj;
     };
 
-    const sanitizedMetadata = metadata !== undefined ? removeUndefinedDeep(metadata) : undefined;
+    const sanitizedMetadata = metadata !== undefined ? removeUndefinedDeep(metadata) as ChatMessage['metadata'] : undefined;
     
     try {
       const message: Omit<ChatMessage, 'id'> = {
@@ -368,11 +364,8 @@ class ChatService {
         status: 'sending',
         deliveryAttempts: 0,
         replyTo: replyTo ?? null,
-      } as any;
-
-      if (sanitizedMetadata !== undefined) {
-        (message as any).metadata = sanitizedMetadata;
-      }
+        ...(sanitizedMetadata !== undefined && { metadata: sanitizedMetadata })
+      };
       
       const docRef = await addDoc(messagesRef, message);
       
@@ -404,11 +397,23 @@ class ChatService {
         const senderData = senderDoc.data();
         
         if (senderData) {
+          // Crear notificación en Firestore
           await notificationService.createMessageNotification(
             receiverId,
             { name: senderData.name || 'Usuario', id: senderId },
             this.getPreviewContent(content, type)
           );
+
+          // Enviar notificación FCM push
+          try {
+            await fcmNotificationService.sendNewMessageNotification(
+              receiverId,
+              { name: senderData.name || 'Usuario', photoURL: senderData.profilePhoto },
+              this.getPreviewContent(content, type)
+            );
+          } catch (fcmError) {
+            console.error('Error sending FCM notification:', fcmError);
+          }
         }
       } catch (notificationError) {
         console.error('Error creating notification:', notificationError);
@@ -431,11 +436,8 @@ class ChatService {
           status: 'failed',
           deliveryAttempts: 1,
           replyTo: replyTo ?? null,
-        } as any;
-        
-        if (sanitizedMetadata !== undefined) {
-          (failedMessage as any).metadata = sanitizedMetadata;
-        }
+          ...(sanitizedMetadata !== undefined && { metadata: sanitizedMetadata as ChatMessage['metadata'] })
+        };
         
         const docRef = await addDoc(messagesRef, failedMessage);
         
@@ -635,7 +637,7 @@ class ChatService {
   }
 
   // Helper to recursively remove undefined values
-  private removeUndefinedValues(obj: any): any {
+  private removeUndefinedValues(obj: unknown): unknown {
     if (Array.isArray(obj)) {
       return obj.map(this.removeUndefinedValues.bind(this));
     }
@@ -682,7 +684,7 @@ class ChatService {
         const currentStatus = messageData.status;
         
         // Preparar datos de actualización
-        const updateData: any = {
+        const updateData: Record<string, unknown> = {
           read: true,
           readAt: readTimestamp
         };
@@ -822,7 +824,7 @@ class ChatService {
     options?: {
       enablePagination?: boolean;
       loadOlder?: boolean;
-      startAfter?: any; // DocumentSnapshot para paginación
+      startAfter?: unknown; // DocumentSnapshot para paginación
       onError?: (error: Error) => void;
     }
   ): () => void {
@@ -959,6 +961,7 @@ class ChatService {
       }
 
       // Crear nuevo listener para mensajes más antiguos
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const olderUnsubscribe = this.subscribeToMessages(
         chatId,
         callback,
@@ -1039,11 +1042,12 @@ class ChatService {
       const chats: Chat[] = [];
       
       querySnapshot.forEach((doc) => {
-        chats.push({ id: doc.id, ...doc.data() } as Chat);
+        const data = doc.data() as Record<string, unknown>;
+        chats.push({ id: doc.id, ...data } as Chat);
       });
       
       // Filter inactive chats (ordering already done by server)
-      return chats.filter(chat => (chat as any).isActive !== false);
+      return chats.filter(chat => (chat as Chat & { isActive?: boolean }).isActive !== false);
     } catch (error) {
       console.error('Error getting user chats:', error);
       // FIX: Optional error reporting integration point
@@ -1061,19 +1065,20 @@ class ChatService {
     const chatsRef = collection(db, 'chats');
 
     // Procesar instantánea en una lista de chats ordenada y filtrada
-    const processSnapshot = (snapshot: any): Chat[] => {
+    const processSnapshot = (snapshot: unknown): Chat[] => {
       const chats: Chat[] = [];
-      snapshot.forEach((doc: any) => {
-        chats.push({ id: doc.id, ...doc.data() } as Chat);
+      (snapshot as { forEach: (callback: (doc: { id: string; data: () => unknown }) => void) => void }).forEach((doc: { id: string; data: () => unknown }) => {
+        const data = doc.data() as Record<string, unknown>;
+        chats.push({ id: doc.id, ...data } as Chat);
       });
       return chats
-        .filter(chat => (chat as any).isActive !== false)
+        .filter(chat => (chat as { isActive?: boolean }).isActive !== false)
         .sort((a, b) => {
-          const t1 = (a as any).lastActivity;
-          const t2 = (b as any).lastActivity;
-          const ts1 = t1 && (typeof t1.toMillis === 'function' ? t1.toMillis() : ((t1 as any).seconds ?? 0) * 1000);
-          const ts2 = t2 && (typeof t2.toMillis === 'function' ? t2.toMillis() : ((t2 as any).seconds ?? 0) * 1000);
-          return ts2 - ts1;
+          const t1 = (a as { lastActivity?: { seconds?: number; toMillis?: () => number } }).lastActivity;
+          const t2 = (b as { lastActivity?: { seconds?: number; toMillis?: () => number } }).lastActivity;
+          const ts1 = t1 && (typeof t1.toMillis === 'function' ? t1.toMillis() : ((t1 as { seconds?: number }).seconds ?? 0) * 1000);
+          const ts2 = t2 && (typeof t2.toMillis === 'function' ? t2.toMillis() : ((t2 as { seconds?: number }).seconds ?? 0) * 1000);
+          return (ts2 ?? 0) - (ts1 ?? 0);
         });
     };
 
@@ -1168,11 +1173,11 @@ class ChatService {
     );
 
     // Helper to transform a snapshot into populated chats
-    const buildPopulatedChats = async (snapshot: any): Promise<PopulatedChat[]> => {
+    const buildPopulatedChats = async (snapshot: { docs: { id: string; data: () => unknown }[] }): Promise<PopulatedChat[]> => {
       const chats: PopulatedChat[] = [];
 
       const allParticipantIds = new Set<string>();
-      snapshot.docs.forEach((docSnap: any) => {
+      snapshot.docs.forEach((docSnap: { id: string; data: () => unknown }) => {
         const chatData = docSnap.data() as Chat & { participantIds?: string[] };
         (chatData.participants || chatData.participantIds || []).forEach((pid: string) =>
           allParticipantIds.add(pid)
@@ -1180,7 +1185,7 @@ class ChatService {
       });
 
       // Optimized batch user loading
-      const userMap = new Map<string, any>();
+      const userMap = new Map<string, unknown>();
       const participantIdsArray = Array.from(allParticipantIds);
       
       // FIX: Validate array is not empty before batch query
@@ -1222,7 +1227,7 @@ class ChatService {
         }
       }
 
-      snapshot.docs.forEach((docSnap: any) => {
+      snapshot.docs.forEach((docSnap: { id: string; data: () => unknown }) => {
         const rawData = docSnap.data() as Chat & { participantIds?: string[] };
         // If the "participants" field is missing or empty, fall back to "participantIds"
         const participantIds = (rawData.participants && (rawData.participants as string[]).length > 0
@@ -1249,13 +1254,13 @@ class ChatService {
         try {
           const populatedChats = await buildPopulatedChats(snapshot);
           const filtered = populatedChats
-            .filter(chat => (chat as any).isActive !== false)
+            .filter(chat => (chat as { isActive?: boolean }).isActive !== false)
             .sort((a, b) => {
-              const t1 = (a as any).lastActivity;
-              const t2 = (b as any).lastActivity;
-              const ts1 = t1 && (typeof t1.toMillis === 'function' ? t1.toMillis() : ((t1 as any).seconds ?? 0) * 1000);
-              const ts2 = t2 && (typeof t2.toMillis === 'function' ? t2.toMillis() : ((t2 as any).seconds ?? 0) * 1000);
-              return ts2 - ts1;
+              const t1 = (a as { lastActivity?: { toMillis?: () => number; seconds?: number } }).lastActivity;
+              const t2 = (b as { lastActivity?: { toMillis?: () => number; seconds?: number } }).lastActivity;
+              const ts1 = t1 && (typeof t1.toMillis === 'function' ? t1.toMillis() : ((t1 as { seconds?: number }).seconds ?? 0) * 1000);
+              const ts2 = t2 && (typeof t2.toMillis === 'function' ? t2.toMillis() : ((t2 as { seconds?: number }).seconds ?? 0) * 1000);
+              return (ts2 ?? 0) - (ts1 ?? 0);
             });
           callback(filtered);
         } catch (error) {
@@ -1628,7 +1633,7 @@ class ChatService {
         return;
       }
 
-      const updateData: any = { status };
+      const updateData: Record<string, unknown> = { status };
       
       // Añadir timestamp específico según el estado
       if (status === 'delivered') {
@@ -1761,7 +1766,7 @@ class ChatService {
     try {
       const chats = await this.getUserChats(userId);
       return chats.reduce((total, chat) => {
-        return total + (chat.unreadCount[userId] || 0);
+        return total + (chat.unreadCount && userId && chat.unreadCount[userId] || 0);
       }, 0);
     } catch (error) {
       console.error('Error getting total unread count:', error);

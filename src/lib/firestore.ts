@@ -26,6 +26,7 @@ import {
 import { db } from './firebase';
 import { User, Chat, Message, UserDistance } from '@/types';
 import { notificationService } from '@/services/notificationService';
+import { fcmNotificationService } from '@/services/fcmNotificationService';
 import { withRetry, safeFirestoreReadSimple as safeFirestoreRead, safeFirestoreWriteSimple as safeFirestoreWrite } from './firestoreErrorHandler';
 import { calculateDistance } from './geolocation';
 
@@ -212,9 +213,26 @@ export const userService = {
           notificationService.createMatchNotification(userId, { name: targetUserData.name, id: targetUserId }),
           notificationService.createMatchNotification(targetUserId, { name: currentUserData.name, id: userId })
         ]);
+
+        // Send FCM match notifications
+        try {
+          await Promise.all([
+            fcmNotificationService.sendNewMatchNotification(userId, { name: targetUserData.name, photoURL: targetUserData.profilePhoto }),
+            fcmNotificationService.sendNewMatchNotification(targetUserId, { name: currentUserData.name, photoURL: currentUserData.profilePhoto })
+          ]);
+        } catch (fcmError) {
+          console.error('Error sending FCM match notifications:', fcmError);
+        }
       } else {
         // Send like notification to target user
         await notificationService.createLikeNotification(targetUserId, { name: currentUserData.name, id: userId });
+
+        // Send FCM like notification
+        try {
+          await fcmNotificationService.sendLikeNotification(targetUserId, { name: currentUserData.name, photoURL: currentUserData.profilePhoto });
+        } catch (fcmError) {
+          console.error('Error sending FCM like notification:', fcmError);
+        }
       }
     }, `likeUser(${userId}, ${targetUserId})`);
   },
@@ -309,9 +327,26 @@ export const userService = {
           notificationService.createMatchNotification(userId, { name: targetUserData.name, id: targetUserId }),
           notificationService.createMatchNotification(targetUserId, { name: currentUserData.name, id: userId })
         ]);
+
+        // Send FCM match notifications
+        try {
+          await Promise.all([
+            fcmNotificationService.sendNewMatchNotification(userId, { name: targetUserData.name, photoURL: targetUserData.profilePhoto }),
+            fcmNotificationService.sendNewMatchNotification(targetUserId, { name: currentUserData.name, photoURL: currentUserData.profilePhoto })
+          ]);
+        } catch (fcmError) {
+          console.error('Error sending FCM match notifications:', fcmError);
+        }
       } else {
         // Send super like notification to target user
         await notificationService.createSuperLikeNotification(targetUserId, { name: currentUserData.name, id: userId });
+
+        // Send FCM super like notification
+        try {
+          await fcmNotificationService.sendSuperLikeNotification(targetUserId, { name: currentUserData.name, photoURL: currentUserData.profilePhoto });
+        } catch (fcmError) {
+          console.error('Error sending FCM super like notification:', fcmError);
+        }
       }
     }, `superLikeUser(${userId}, ${targetUserId})`);
   },

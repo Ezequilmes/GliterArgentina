@@ -303,7 +303,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
               )}
               
               {/* Estado del otro usuario */}
-              {isOnline || userPresence[otherUser.id]?.isOnline ? (
+              {isOnline || (userPresence && userPresence[otherUser.id]?.isOnline) ? (
                 <>
                   <Circle className="w-2 h-2 fill-success text-success" />
                   <span className="text-sm text-success-strong">
@@ -320,8 +320,8 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                 <>
                   <Circle className="w-2 h-2 fill-muted-foreground text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    {lastSeen || userPresence[otherUser.id]?.lastSeen
-                      ? formatLastSeen(lastSeen || new Date(userPresence[otherUser.id]?.lastSeen!))
+                    {lastSeen || (userPresence && userPresence[otherUser.id]?.lastSeen)
+                      ? formatLastSeen(lastSeen || new Date((userPresence && userPresence[otherUser.id]?.lastSeen) || Date.now()))
                       : 'Desconectado'}
                   </span>
                 </>

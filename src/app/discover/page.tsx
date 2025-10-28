@@ -15,13 +15,14 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ActionFeedback from '@/components/ui/ActionFeedback';
 import { UserCard } from '@/components/profile';
-import { Settings, Filter, MapPin, User as UserIcon, MessageCircle, Users, Shield, RefreshCw, AlertCircle, Check, AlertTriangle } from 'lucide-react';
+import { Settings, Filter, MapPin, User as UserIcon, MessageCircle, Users, Shield, RefreshCw, AlertCircle, Check, AlertTriangle, Bell } from 'lucide-react';
 import { userService } from '@/lib/firestore';
 import { matchService } from '@/lib/matchService';
 import { chatService } from '@/services/chatService';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useRouter } from 'next/navigation';
 import { analyticsService } from '@/services/analyticsService';
+import { fcmService } from '@/services/fcmService';
 import type { User, UserDistance } from '@/types';
 
 export default function DiscoverPage() {
@@ -69,6 +70,11 @@ export default function DiscoverPage() {
     interests: []
   });
 
+  // FCM Notification states
+  const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [isTestingNotification, setIsTestingNotification] = useState(false);
+
   // Handle location retry
   const handleLocationRetry = async () => {
     try {
@@ -103,6 +109,121 @@ export default function DiscoverPage() {
     }
   };
 
+  // FCM Notification functions
+  const initializeFCM = async () => {
+    try {
+      console.log('🔔 Initializing FCM...');
+      
+      const isSupported = await fcmService.isNotificationSupported();
+      if (!isSupported) {
+        console.warn('FCM no está soportado en este navegador');
+        return;
+      }
+
+      const permission = fcmService.getPermissionStatus();
+      setNotificationPermission(permission);
+      
+      if (permission === 'granted') {
+        const token = await fcmService.getRegistrationToken();
+        if (token) {
+          setFcmToken(token);
+          console.log('🔔 FCM Token obtained:', token);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error initializing FCM:', error);
+    }
+  };
+
+  const requestNotificationPermission = async () => {
+    try {
+      if (typeof window === 'undefined' || !('Notification' in window) || typeof window.Notification === 'undefined') {
+        console.warn('Notification API not available');
+        return;
+      }
+      const permission = await window.Notification.requestPermission();
+      setNotificationPermission(permission);
+      
+      if (permission === 'granted') {
+        const token = await fcmService.getRegistrationToken();
+        setFcmToken(token);
+        addToast({
+          title: 'Notificaciones activadas',
+          message: 'Ahora recibirás notificaciones de nuevos matches y mensajes',
+          type: 'success'
+        });
+      } else {
+        addToast({
+          title: 'Notificaciones desactivadas',
+          message: 'No recibirás notificaciones push',
+          type: 'warning'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error requesting notification permission:', error);
+      addToast({
+        title: 'Error',
+        message: 'No se pudo activar las notificaciones',
+        type: 'error'
+      });
+    }
+  };
+
+  const sendTestNotification = async () => {
+    if (!user) {
+      addToast({
+        title: 'Error',
+        message: 'Debes estar autenticado para enviar notificaciones',
+        type: 'error'
+      });
+      return;
+    }
+
+    setIsTestingNotification(true);
+
+    try {
+      // Importar el servicio dinámicamente
+      const { fcmNotificationService } = await import('@/services/fcmNotificationService');
+      
+      // Solicitar permisos si no están concedidos
+      const permission = await fcmNotificationService.requestPermission();
+      if (permission !== 'granted') {
+        addToast({
+          title: 'Error',
+          message: 'Permisos de notificación denegados',
+          type: 'error'
+        });
+        return;
+      }
+
+      // Enviar notificación de prueba
+      const success = await fcmNotificationService.sendTestNotification();
+      
+      if (success) {
+        addToast({
+          title: 'Notificación enviada',
+          message: '✅ Notificación enviada correctamente',
+          type: 'success'
+        });
+      } else {
+        addToast({
+          title: 'Error',
+          message: '❌ Error enviando notificación de prueba',
+          type: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error en sendTestNotification:', error);
+      addToast({
+        title: 'Error',
+        message: '❌ Error enviando notificación de prueba',
+        type: 'error'
+      });
+    } finally {
+      setIsTestingNotification(false);
+    }
+  };
+
   useEffect(() => {
     console.log('🔍 DiscoverPage useEffect triggered');
     console.log('👤 User:', user ? `authenticated (${user.id})` : 'not authenticated');
@@ -122,11 +243,8 @@ export default function DiscoverPage() {
       if (locationError) {
         console.log('📍 Location error details:', locationError);
       }
-      // If no location and permission is granted or prompt, try to get it
-      if ((permissionState === 'granted' || permissionState === 'prompt') && !locationLoading) {
-        console.log('🔄 Attempting to get current location...');
-        getCurrentLocation().catch(err => console.error('Error getting location on mount:', err));
-      }
+      // Don't automatically request location - wait for user gesture
+      console.log('⏳ Waiting for user to manually request location');
       return;
     }
 
@@ -253,6 +371,13 @@ export default function DiscoverPage() {
 
     loadData();
   }, [user, location, locationLoading, locationError, filters, permissionState]);
+
+  // Initialize FCM when component mounts
+  useEffect(() => {
+    if (user) {
+      initializeFCM();
+    }
+  }, [user]);
 
   // Enhanced location error handling
   const getLocationErrorMessage = () => {
@@ -686,6 +811,26 @@ export default function DiscoverPage() {
                     showUpgradeButton={true}
                   />
                   <div className="flex items-center space-x-2">
+                    <button 
+                      onClick={sendTestNotification}
+                      disabled={isTestingNotification || !fcmToken}
+                      className={`p-2 rounded-md hover:scale-110 transition-transform duration-300 ${
+                        notificationPermission === 'granted' ? 'text-green-600' : 
+                        notificationPermission === 'denied' ? 'text-red-600' : 'text-yellow-600'
+                      }`}
+                      title={
+                        !fcmToken ? 'Inicializando notificaciones...' :
+                        notificationPermission === 'granted' ? 'Enviar notificación de prueba' :
+                        notificationPermission === 'denied' ? 'Permisos de notificación denegados' :
+                        'Solicitar permisos de notificación'
+                      }
+                    >
+                      {isTestingNotification ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Bell className="w-4 h-4" />
+                      )}
+                    </button>
                     <Button 
                       variant="ghost" 
                       size="sm"

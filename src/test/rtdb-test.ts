@@ -28,7 +28,7 @@ export async function testRealtimeDatabase() {
     }
     
     // Configurar listener en tiempo real
-    const unsubscribe = onValue(testRef, (snapshot) => {
+    onValue(testRef, (snapshot) => {
       if (snapshot.exists()) {
         console.log('🔄 Datos actualizados en tiempo real:', snapshot.val());
       }

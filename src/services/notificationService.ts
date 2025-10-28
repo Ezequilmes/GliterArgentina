@@ -20,7 +20,7 @@ export interface Notification {
   type: 'match' | 'message' | 'like' | 'super_like' | 'visit' | 'verification' | 'premium';
   title: string;
   message: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   read: boolean;
   createdAt: Timestamp;
   expiresAt?: Timestamp;
@@ -30,7 +30,7 @@ export interface NotificationOptions {
   title: string;
   message: string;
   type: Notification['type'];
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   expiresIn?: number; // milliseconds
 }
 

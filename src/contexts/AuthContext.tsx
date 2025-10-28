@@ -470,28 +470,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isMobile: isMobileDevice()
       });
 
-      // Obtener ubicación actual
-      let location = {
+      // Use default location (Buenos Aires) - user can update later with explicit permission
+      const location = {
         latitude: -34.6037,
         longitude: -58.3816,
         city: 'Buenos Aires',
         country: 'Argentina'
       };
 
-      try {
-        const currentLocation = await getCurrentLocation();
-        location = {
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          city: currentLocation.city || 'Buenos Aires',
-          country: currentLocation.country || 'Argentina'
-        };
-        await logAuthEvent('location_obtained', { location });
-      } catch (locationError) {
-        await logAuthEvent('location_error', { 
-          error: locationError instanceof Error ? locationError.message : 'Unknown error'
-        });
-      }
+      await logAuthEvent('default_location_used', { location });
 
       const authUser = await signUp({
         email: data.email,

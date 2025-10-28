@@ -165,7 +165,7 @@ export interface Notification {
   title: string;
   message: string;
   isRead: boolean;
-  data?: any;
+  data?: Record<string, unknown>;
   createdAt: Timestamp;
 }
 
@@ -271,7 +271,7 @@ export interface ChatContextType {
 }
 
 // Tipos de utilidades
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

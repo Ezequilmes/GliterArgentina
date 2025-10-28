@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, disableNetwork, enableNetwork, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getDatabase, connectDatabaseEmulator } from 'firebase/database';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
@@ -28,30 +28,68 @@ function validateFirebaseConfig() {
   
   if (missingFields.length > 0) {
     console.error('❌ Missing Firebase configuration fields:', missingFields);
+    console.error('Current config:', firebaseConfig);
     return false;
   }
   
+  console.log('✅ Firebase configuration validated successfully');
+  console.log('Project ID:', firebaseConfig.projectId);
   return true;
 }
 
-// Inicializar Firebase solo si estamos en el cliente y la configuración es válida
+// Inicializar Firebase
 let app: any = null;
 let auth: any = null;
 let db: any = null;
+let isFirebaseInitialized = false;
 
-if (typeof window !== 'undefined' && validateFirebaseConfig()) {
-  // Verificar si ya existe una app inicializada
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+// Función para inicializar Firebase de manera asíncrona
+async function initializeFirebaseApp() {
+  if (isFirebaseInitialized || typeof window === 'undefined') {
+    return { app, auth, db };
+  }
+
+  try {
+    if (validateFirebaseConfig()) {
+      // Verificar si ya existe una app inicializada
+      app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      console.log('✅ Firebase App initialized successfully');
+      console.log('App name:', app.name);
+      console.log('Project ID:', app.options.projectId);
+      
+      // Inicializar servicios
+      auth = getAuth(app);
+      
+      // Inicializar Firestore con persistencia moderna
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          cacheSizeBytes: 40 * 1024 * 1024, // 40MB cache size
+          tabManager: persistentMultipleTabManager()
+        })
+      });
+      console.log('✅ Firebase Auth and Firestore initialized');
+      console.log('✅ Firestore offline persistence enabled (modern API)');
+      
+      isFirebaseInitialized = true;
+    } else {
+      console.error('❌ Firebase configuration validation failed');
+    }
+  } catch (error) {
+    console.error('❌ Error initializing Firebase:', error);
+  }
   
-  // Inicializar servicios
-  auth = getAuth(app);
-  db = getFirestore(app);
-} else if (typeof window === 'undefined') {
+  return { app, auth, db };
+}
+
+// Inicializar Firebase inmediatamente en el cliente
+if (typeof window !== 'undefined') {
+  initializeFirebaseApp();
+} else {
   // En el servidor, crear objetos mock para evitar errores
   console.log('🔄 Running on server - Firebase services will be initialized on client');
 }
 
-export { auth, db };
+export { auth, db, app, initializeFirebaseApp };
 
 // Inicializar otros servicios solo en el cliente
 let database: any = null;

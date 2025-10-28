@@ -8,7 +8,7 @@ export interface InAppMessage {
   actionUrl?: string;
   imageUrl?: string;
   campaignName?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   priority?: 'low' | 'normal' | 'high';
   expiresAt?: Date;
   targetAudience?: string[];
@@ -109,7 +109,8 @@ class InAppMessagingService {
       } else {
         this.messagesDisplayedToday = parseInt(localStorage.getItem('inapp_messages_today') || '0');
       }
-    } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_error) {
       // Ignorar errores de localStorage
     }
   }
@@ -117,7 +118,8 @@ class InAppMessagingService {
   private saveSessionData(): void {
     try {
       localStorage.setItem('inapp_messages_today', this.messagesDisplayedToday.toString());
-    } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_error) {
       // Ignorar errores de localStorage
     }
   }
@@ -238,7 +240,8 @@ class InAppMessagingService {
           }
         });
       }
-    } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_error) {
       // Ignorar errores de analytics
     }
   }
@@ -323,7 +326,8 @@ class InAppMessagingService {
           }
         });
       }
-    } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_error) {
       // Ignorar errores de analytics
     }
   }
