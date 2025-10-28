@@ -106,7 +106,7 @@ export default function PWADebugPage() {
             <div>Móvil: {browserInfo.isMobile ? 'Sí' : 'No'}</div>
             <div>iOS: {browserInfo.isIOS ? 'Sí' : 'No'}</div>
             <div>Android: {browserInfo.isAndroid ? 'Sí' : 'No'}</div>
-            <div>User Agent: {typeof window !== 'undefined' ? navigator.userAgent : 'N/A'}</div>
+            <div>User Agent: {typeof window !== 'undefined' ? navigator.userAgent : 'Loading...'}</div>
           </div>
         </div>
 
@@ -172,9 +172,9 @@ export default function PWADebugPage() {
           <h2 className="text-lg font-semibold mb-4">Información del Entorno</h2>
           <div className="text-sm space-y-2">
             <div>NODE_ENV: {process.env.NODE_ENV || 'undefined'}</div>
-            <div>HTTPS: {typeof window !== 'undefined' ? (location.protocol === 'https:' ? 'Sí' : 'No') : 'N/A'}</div>
-            <div>Secure Context: {typeof window !== 'undefined' ? (window.isSecureContext ? 'Sí' : 'No') : 'N/A'}</div>
-            <div>Document Ready: {typeof document !== 'undefined' ? document.readyState : 'N/A'}</div>
+            <div>HTTPS: {typeof window !== 'undefined' ? (location.protocol === 'https:' ? 'Sí' : 'No') : 'Loading...'}</div>
+            <div>Secure Context: {typeof window !== 'undefined' ? (window.isSecureContext ? 'Sí' : 'No') : 'Loading...'}</div>
+            <div>Document Ready: {typeof document !== 'undefined' ? document.readyState : 'Loading...'}</div>
           </div>
         </div>
 

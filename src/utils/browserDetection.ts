@@ -15,8 +15,23 @@ export interface BrowserInfo {
 }
 
 export function detectBrowser(): BrowserInfo {
-  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : '';
-  const platform = typeof navigator !== 'undefined' ? navigator.platform.toLowerCase() : '';
+  // Return safe defaults for server-side rendering
+  if (typeof window === 'undefined') {
+    return {
+      isMobile: false,
+      isIOS: false,
+      isAndroid: false,
+      browserName: 'Unknown',
+      supportsServiceWorker: false,
+      supportsNotifications: false,
+      supportsGeolocation: false,
+      supportsLocalStorage: false,
+      supportsIndexedDB: false,
+    };
+  }
+
+  const userAgent = navigator.userAgent.toLowerCase();
+  const platform = navigator.platform.toLowerCase();
   
   // Detect mobile devices
   const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
@@ -38,11 +53,11 @@ export function detectBrowser(): BrowserInfo {
   }
   
   // Feature detection
-  const supportsServiceWorker = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
-  const supportsNotifications = typeof window !== 'undefined' && 'Notification' in window;
-  const supportsGeolocation = typeof navigator !== 'undefined' && 'geolocation' in navigator;
-  const supportsLocalStorage = typeof window !== 'undefined' && 'localStorage' in window;
-  const supportsIndexedDB = typeof window !== 'undefined' && 'indexedDB' in window;
+  const supportsServiceWorker = 'serviceWorker' in navigator;
+  const supportsNotifications = 'Notification' in window;
+  const supportsGeolocation = 'geolocation' in navigator;
+  const supportsLocalStorage = 'localStorage' in window;
+  const supportsIndexedDB = 'indexedDB' in window;
   
   return {
     isMobile,

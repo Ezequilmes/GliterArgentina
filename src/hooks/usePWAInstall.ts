@@ -27,24 +27,27 @@ export function usePWAInstall(): PWAInstallState {
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstallPromptShown, setIsInstallPromptShown] = useState(false);
-
-  // Detect iOS
-  const isIOS = typeof window !== 'undefined' && 
-    /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-  // Detect if app is running in standalone mode
-  const isStandalone = typeof window !== 'undefined' && (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as any).standalone ||
-    document.referrer.includes('android-app://')
-  );
+  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   // Check if app can be installed
   const canInstall = isInstallable && !isInstalled && !isStandalone;
 
   useEffect(() => {
+    // Detect iOS
+    const detectIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    setIsIOS(detectIOS);
+
+    // Detect if app is running in standalone mode
+    const detectStandalone = (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone ||
+      document.referrer.includes('android-app://')
+    );
+    setIsStandalone(detectStandalone);
+
     // Check if already installed
-    setIsInstalled(isStandalone);
+    setIsInstalled(detectStandalone);
 
     // Listen for beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {

@@ -32,22 +32,14 @@ interface UseServiceWorkerReturn extends ServiceWorkerState {
 }
 
 export function useServiceWorker(): UseServiceWorkerReturn {
-  const [state, setState] = useState<ServiceWorkerState>(() => {
-    // Permitir Service Worker en desarrollo para FCM, pero con precauciones adicionales
-    const isSupported = typeof window !== 'undefined' && 
-                       'serviceWorker' in navigator && 
-                       window.isSecureContext &&
-                       document.readyState !== 'loading';
-    
-    return {
-      isSupported,
-      isRegistered: false,
-      isInstalling: false,
-      isWaiting: false,
-      isControlling: false,
-      updateAvailable: false,
-      registration: null,
-    };
+  const [state, setState] = useState<ServiceWorkerState>({
+    isSupported: false, // Always start with false to prevent hydration mismatch
+    isRegistered: false,
+    isInstalling: false,
+    isWaiting: false,
+    isControlling: false,
+    updateAvailable: false,
+    registration: null,
   });
 
   const { addToast } = useToast();
