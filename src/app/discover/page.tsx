@@ -114,9 +114,10 @@ export default function DiscoverPage() {
     try {
       console.log('🔔 Initializing FCM...');
       
+      // Verificar soporte de FCM de forma no bloqueante
       const isSupported = await fcmService.isNotificationSupported();
       if (!isSupported) {
-        console.warn('FCM no está soportado en este navegador');
+        console.log('FCM no está soportado en este navegador - continuando sin notificaciones');
         return;
       }
 
@@ -128,10 +129,14 @@ export default function DiscoverPage() {
         if (token) {
           setFcmToken(token);
           console.log('🔔 FCM Token obtained:', token);
+        } else {
+          console.log('🔔 FCM Token not available - continuando sin notificaciones');
         }
       }
     } catch (error) {
-      console.error('❌ Error initializing FCM:', error);
+      // Manejar errores de FCM de forma silenciosa para no afectar la funcionalidad principal
+      console.log('FCM initialization failed (handled gracefully):', error);
+      // No mostrar toast de error para no confundir al usuario
     }
   };
 
@@ -372,10 +377,15 @@ export default function DiscoverPage() {
     loadData();
   }, [user, location, locationLoading, locationError, filters, permissionState]);
 
-  // Initialize FCM when component mounts
+  // Initialize FCM when component mounts (non-blocking)
   useEffect(() => {
     if (user) {
-      initializeFCM();
+      // Ejecutar FCM de forma asíncrona sin bloquear el renderizado
+      setTimeout(() => {
+        initializeFCM().catch(error => {
+          console.log('FCM initialization failed in background (handled gracefully):', error);
+        });
+      }, 100); // Pequeño delay para no interferir con la carga inicial
     }
   }, [user]);
 
@@ -1076,4 +1086,3 @@ export default function DiscoverPage() {
       </AppLayout>
     </ProtectedRoute>
   );
-}

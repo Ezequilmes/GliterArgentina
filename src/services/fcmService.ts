@@ -69,25 +69,34 @@ export class FCMService {
       });
 
       if (!hasServiceWorker) {
-        console.warn('FCM: Service Workers not supported');
+        console.warn('FCM: Service Workers not supported - FCM will be disabled but app will continue to work');
         this.isSupported = false;
         return;
       }
 
       if (!hasNotifications) {
-        console.warn('FCM: Notifications API not supported');
+        console.warn('FCM: Notifications API not supported - FCM will be disabled but app will continue to work');
         this.isSupported = false;
         return;
       }
 
       if (!hasPushManager) {
-        console.warn('FCM: Push Manager not supported');
+        console.warn('FCM: Push Manager not supported - FCM will be disabled but app will continue to work');
         this.isSupported = false;
         return;
       }
 
       if (!isSecureContext) {
-        console.warn('FCM: Secure context required (HTTPS or localhost)');
+        console.warn('FCM: Secure context required (HTTPS or localhost) - FCM will be disabled but app will continue to work');
+        this.isSupported = false;
+        return;
+      }
+
+      // Verificación adicional: intentar acceder al Service Worker para detectar InvalidStateError
+      try {
+        await navigator.serviceWorker.getRegistrations();
+      } catch (swError) {
+        console.warn('FCM: Service Worker access failed - FCM will be disabled but app will continue to work:', swError);
         this.isSupported = false;
         return;
       }
@@ -238,39 +247,30 @@ export class FCMService {
   }
 
   async getRegistrationToken(vapidKey?: string): Promise<string | null> {
-    // Esperar a que la inicialización termine
-    await this.initializationPromise;
+    console.log('FCM: Getting registration token...');
     
-    // Verificar contexto seguro primero para evitar errores innecesarios
-    if (typeof window !== 'undefined' && !window.isSecureContext) {
-      console.info('FCM: Push notifications require HTTPS. Skipping registration in HTTP development environment.');
+    // Verificar si FCM está soportado antes de continuar
+    if (!this.isSupported) {
+      console.log('FCM: FCM not supported, returning null token gracefully');
       return null;
     }
 
-    console.log('FCM: Getting registration token - Environment:', {
-      isProduction: process.env.NODE_ENV === 'production',
-      protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
-      hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
-      isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
-      messagingAvailable: !!this.messaging,
-      isSupported: this.isSupported
-    });
-    
-    if (!this.messaging || !this.isSupported) {
-      console.warn('FCM: Messaging not available - messaging:', !!this.messaging, 'isSupported:', this.isSupported);
+    // Verificar si messaging está inicializado
+    if (!this.messaging) {
+      console.log('FCM: Messaging not initialized, returning null token gracefully');
       return null;
     }
 
     try {
       // Verificar si el push service está disponible antes de solicitar permisos
       if (!('PushManager' in window)) {
-        console.warn('FCM: Push messaging is not supported in this browser');
+        console.log('FCM: Push messaging is not supported in this browser, returning null gracefully');
         return null;
       }
 
       // Verificar si el navegador soporta service workers
       if (!('serviceWorker' in navigator)) {
-        console.warn('FCM: Service Workers are not supported in this browser');
+        console.log('FCM: Service Workers are not supported in this browser, returning null gracefully');
         return null;
       }
 
@@ -278,7 +278,7 @@ export class FCMService {
       console.log('FCM: Requesting notification permission...');
       const hasPermission = await this.requestPermission();
       if (!hasPermission) {
-        console.warn('FCM: Notification permission denied');
+        console.log('FCM: Notification permission denied, returning null gracefully');
         return null;
       }
       console.log('FCM: Notification permission granted');
@@ -295,19 +295,19 @@ export class FCMService {
       // Ensure the Firebase Messaging Service Worker is registered and use its registration explicitly
       let swRegistration: ServiceWorkerRegistration | undefined;
       if ('serviceWorker' in navigator) {
-        swRegistration = await navigator.serviceWorker.getRegistration('/firebase-cloud-messaging-push-scope');
-        if (!swRegistration) {
-          try {
+        try {
+          swRegistration = await navigator.serviceWorker.getRegistration('/firebase-cloud-messaging-push-scope');
+          if (!swRegistration) {
             swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
               scope: '/firebase-cloud-messaging-push-scope',
               updateViaCache: 'imports'
             });
             console.log('FCM: Firebase Messaging SW registered for token:', swRegistration);
-          } catch (swError) {
-            console.warn('FCM: Failed to register Firebase Messaging SW for token:', swError);
-            // En caso de error del service worker, intentar sin él
-            swRegistration = undefined;
           }
+        } catch (swError) {
+          console.log('FCM: Failed to register Firebase Messaging SW for token, continuing without it:', swError);
+          // En caso de error del service worker, intentar sin él
+          swRegistration = undefined;
         }
       }
 
@@ -323,49 +323,28 @@ export class FCMService {
         console.log('FCM: Token length:', token.length);
         return token;
       } else {
-        console.warn('FCM: No registration token available - Firebase returned null/undefined');
+        console.log('FCM: No registration token available - Firebase returned null/undefined, returning null gracefully');
         return null;
       }
     } catch (error: unknown) {
-      // Manejar errores específicos de push service de forma silenciosa en desarrollo
+      // Manejar todos los errores de forma silenciosa y graceful
       if (error instanceof Error) {
-        const isDevelopment = process.env.NODE_ENV !== 'production';
-        const isInsecureContext = typeof window !== 'undefined' && !window.isSecureContext;
+        console.log('FCM: Error getting registration token (handled gracefully):', error.message);
         
-        // Errores comunes en desarrollo local (HTTP) - manejar silenciosamente
+        // Errores comunes que no deben bloquear la aplicación
         if (error.message.includes('push service not available') || 
             error.message.includes('Registration failed') ||
             error.message.includes('unsupported-browser') ||
             error.message.includes('AbortError') ||
+            error.message.includes('Service Workers are not supported') ||
             error.name === 'AbortError') {
           
-          if (isInsecureContext) {
-            console.info('FCM: Push notifications require HTTPS. This is expected in HTTP development environment.');
-          } else if (isDevelopment) {
-            console.info('FCM: Push service not available in development environment. This is normal.');
-          } else {
-            console.warn('FCM: Push service not available in production environment. Please check browser compatibility.');
-          }
+          console.log('FCM: Known compatibility issue, FCM disabled but app continues normally');
           return null;
-        }
-        
-        // Error específico de contexto inseguro
-        if (error.message.includes('only available in secure contexts')) {
-          console.info('FCM: Push notifications require HTTPS. Please use HTTPS in production.');
-          return null;
-        }
-
-        // Solo mostrar errores detallados en producción o errores inesperados
-        if (!isDevelopment || (!error.message.includes('push service') && !error.message.includes('Registration failed'))) {
-          console.error('FCM: Detailed error information:', {
-            message: error.message,
-            name: error.name,
-            isProduction: !isDevelopment,
-            isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
-            protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown'
-          });
         }
       }
+      
+      console.log('FCM: Unexpected error getting registration token (handled gracefully):', error);
       return null;
     }
   }
