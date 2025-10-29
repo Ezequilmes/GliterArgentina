@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "gliter-argentina",
+    "my-web-app": "gliter-argentina"
+  },
+  "targets": {},
+  "etags": {}
+}
