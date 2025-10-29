@@ -153,14 +153,14 @@ class FCMNotificationService {
       const result = await response.json();
       
       if (response.ok) {
-        console.log('✅ Notificación FCM enviada:', result.messageId);
+        console.log('Notificación FCM enviada:', result.messageId);
         return true;
       } else {
-        console.error('❌ Error enviando notificación FCM:', result.error);
+        console.error('Error enviando notificación FCM:', result.error);
         return false;
       }
     } catch (error) {
-      console.error('❌ Error en servicio de notificaciones FCM:', error);
+      console.error('Error en servicio de notificaciones FCM:', error);
       return false;
     }
   }
@@ -194,13 +194,13 @@ class FCMNotificationService {
       // 2. Obtener token FCM del usuario
       const userToken = await this.getUserFCMToken(userId);
       if (!userToken) {
-        console.log('⚠️ Usuario no tiene token FCM, solo se guardó en Firestore');
+        console.log('Usuario no tiene token FCM, solo se guardó en Firestore');
         return;
       }
 
       // 3. Enviar notificación FCM
       const payload: FCMNotificationPayload = {
-        title: '💕 ¡Nuevo match!',
+        title: '¡Nuevo match!',
         body: `¡Tienes un nuevo match con ${matchedUser.name}! Envía el primer mensaje.`,
         data: {
           type: 'match',
@@ -225,7 +225,7 @@ class FCMNotificationService {
 
       await this.sendFCMNotification(userToken, payload);
     } catch (error) {
-      console.error('❌ Error notificando nuevo match:', error);
+      console.error('Error notificando nuevo match:', error);
     }
   }
 
@@ -243,13 +243,13 @@ class FCMNotificationService {
       // 2. Obtener token FCM del usuario
       const userToken = await this.getUserFCMToken(userId);
       if (!userToken) {
-        console.log('⚠️ Usuario no tiene token FCM, solo se guardó en Firestore');
+        console.log('Usuario no tiene token FCM, solo se guardó en Firestore');
         return;
       }
 
       // 3. Enviar notificación FCM
       const payload: FCMNotificationPayload = {
-        title: `💬 Mensaje de ${sender.name}`,
+        title: `Mensaje de ${sender.name}`,
         body: messagePreview.length > 50 ? `${messagePreview.substring(0, 50)}...` : messagePreview,
         data: {
           type: 'message',
@@ -275,7 +275,7 @@ class FCMNotificationService {
 
       await this.sendFCMNotification(userToken, payload);
     } catch (error) {
-      console.error('❌ Error notificando nuevo mensaje:', error);
+      console.error('Error notificando nuevo mensaje:', error);
     }
   }
 
@@ -299,7 +299,7 @@ class FCMNotificationService {
 
       // 3. Enviar notificación FCM
       const payload: FCMNotificationPayload = {
-        title: '⭐ ¡Super Like!',
+        title: '¡Super Like!',
         body: `¡${likerUser.name} te ha dado un Super Like! Le gustas mucho.`,
         data: {
           type: 'super_like',
@@ -348,7 +348,7 @@ class FCMNotificationService {
 
       // 3. Enviar notificación FCM
       const payload: FCMNotificationPayload = {
-        title: '❤️ ¡Nuevo like!',
+        title: '¡Nuevo like!',
         body: `¡${likerUser.name} te ha dado like! ¿Le darás like también?`,
         data: {
           type: 'like',
@@ -390,13 +390,13 @@ class FCMNotificationService {
       // 2. Obtener token FCM del usuario
       const userToken = await this.getUserFCMToken(userId);
       if (!userToken) {
-        console.log('⚠️ Usuario no tiene token FCM, solo se guardó en Firestore');
+        console.log('Usuario no tiene token FCM, solo se guardó en Firestore');
         return;
       }
 
       // 3. Enviar notificación FCM
       const payload: FCMNotificationPayload = {
-        title: '👀 Visita a tu perfil',
+        title: 'Visita a tu perfil',
         body: `${visitorUser.name} ha visitado tu perfil. ¡Échale un vistazo!`,
         data: {
           type: 'visit',
@@ -651,7 +651,7 @@ class FCMNotificationService {
 
        return await this.sendNotification(
          token,
-         '👀 Visita a tu perfil',
+         'Visita a tu perfil',
          `${visitor.name} ha visitado tu perfil`,
          {
            type: 'visit',
