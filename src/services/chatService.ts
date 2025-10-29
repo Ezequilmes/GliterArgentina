@@ -683,54 +683,20 @@ class ChatService {
         const messageData = messageDoc.data();
         const currentStatus = messageData.status;
         
-        // Preparar datos de actualización
-        const updateData: Record<string, unknown> = {
-          read: true,
-          readAt: readTimestamp
-        };
-
-        // Manejar transiciones de estado correctas
-        if (currentStatus === 'sent') {
-          // Primero marcar como delivered, luego como read
-          updateData.status = 'delivered';
-          updateData.deliveredAt = readTimestamp;
-          
-          // Programar actualización a 'read' después de un breve delay
-          setTimeout(async () => {
-            try {
-              await updateDoc(messageDoc.ref, {
-                status: 'read',
-                readAt: serverTimestamp()
-              });
-              console.log(`📖 Mensaje ${messageDoc.id} actualizado de 'delivered' a 'read'`);
-            } catch (error) {
-              console.error(`Error actualizando mensaje ${messageDoc.id} a 'read':`, error);
-            }
-          }, 100); // 100ms delay para asegurar la transición
-          
-        } else if (currentStatus === 'delivered') {
-          // Directamente a read
-          updateData.status = 'read';
-        } else if (currentStatus === 'sending') {
-          // Casos edge: mensaje aún enviándose pero el usuario ya lo está leyendo
-          updateData.status = 'delivered';
-          updateData.deliveredAt = readTimestamp;
-          
-          // También programar actualización a 'read'
-          setTimeout(async () => {
-            try {
-              await updateDoc(messageDoc.ref, {
-                status: 'read',
-                readAt: serverTimestamp()
-              });
-            } catch (error) {
-              console.error(`Error actualizando mensaje ${messageDoc.id} a 'read':`, error);
-            }
-          }, 200);
-        } else {
-          // Para otros estados, solo marcar como leído sin cambiar status
-          console.log(`Mensaje ${messageDoc.id} en estado ${currentStatus}, solo marcando como leído`);
+        // Si el mensaje ya está leído, no hacer nada.
+        if (messageData.read) {
+          return;
         }
+
+        // Simplificamos la lógica: si se marca como leído, actualizamos a 'read' directamente.
+        // Esto evita race conditions y múltiples escrituras.
+        const updateData: Record<string, unknown> = {
+          status: 'read',
+          read: true,
+          readAt: readTimestamp,
+          // Si no tiene deliveredAt, lo añadimos también.
+          ...(!messageData.deliveredAt && { deliveredAt: readTimestamp })
+        };
 
         batch.update(messageDoc.ref, updateData);
         messagesUpdated++;
@@ -747,7 +713,7 @@ class ChatService {
 
       await batch.commit();
       
-      console.log(`📖 Marcados ${messagesUpdated} mensajes como leídos en chat ${chatId} con transiciones de estado correctas`);
+      console.log(`📖 Marcados ${messagesUpdated} mensajes como leídos en chat ${chatId}`);
     } catch (error) {
       console.error('Error marking messages as read:', error);
       throw error;

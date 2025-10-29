@@ -69,34 +69,25 @@ export class FCMService {
       });
 
       if (!hasServiceWorker) {
-        console.warn('FCM: Service Workers not supported - FCM will be disabled but app will continue to work');
+        console.warn('FCM: Service Workers not supported');
         this.isSupported = false;
         return;
       }
 
       if (!hasNotifications) {
-        console.warn('FCM: Notifications API not supported - FCM will be disabled but app will continue to work');
+        console.warn('FCM: Notifications API not supported');
         this.isSupported = false;
         return;
       }
 
       if (!hasPushManager) {
-        console.warn('FCM: Push Manager not supported - FCM will be disabled but app will continue to work');
+        console.warn('FCM: Push Manager not supported');
         this.isSupported = false;
         return;
       }
 
       if (!isSecureContext) {
-        console.warn('FCM: Secure context required (HTTPS or localhost) - FCM will be disabled but app will continue to work');
-        this.isSupported = false;
-        return;
-      }
-
-      // Verificación adicional: intentar acceder al Service Worker para detectar InvalidStateError
-      try {
-        await navigator.serviceWorker.getRegistrations();
-      } catch (swError) {
-        console.warn('FCM: Service Worker access failed - FCM will be disabled but app will continue to work:', swError);
+        console.warn('FCM: Secure context required (HTTPS or localhost)');
         this.isSupported = false;
         return;
       }
@@ -247,30 +238,39 @@ export class FCMService {
   }
 
   async getRegistrationToken(vapidKey?: string): Promise<string | null> {
-    console.log('FCM: Getting registration token...');
+    // Esperar a que la inicialización termine
+    await this.initializationPromise;
     
-    // Verificar si FCM está soportado antes de continuar
-    if (!this.isSupported) {
-      console.log('FCM: FCM not supported, returning null token gracefully');
+    // Verificar contexto seguro primero para evitar errores innecesarios
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      console.info('FCM: Push notifications require HTTPS. Skipping registration in HTTP development environment.');
       return null;
     }
 
-    // Verificar si messaging está inicializado
-    if (!this.messaging) {
-      console.log('FCM: Messaging not initialized, returning null token gracefully');
+    console.log('FCM: Getting registration token - Environment:', {
+      isProduction: process.env.NODE_ENV === 'production',
+      protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
+      hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+      isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+      messagingAvailable: !!this.messaging,
+      isSupported: this.isSupported
+    });
+    
+    if (!this.messaging || !this.isSupported) {
+      console.warn('FCM: Messaging not available - messaging:', !!this.messaging, 'isSupported:', this.isSupported);
       return null;
     }
 
     try {
       // Verificar si el push service está disponible antes de solicitar permisos
       if (!('PushManager' in window)) {
-        console.log('FCM: Push messaging is not supported in this browser, returning null gracefully');
+        console.warn('FCM: Push messaging is not supported in this browser');
         return null;
       }
 
       // Verificar si el navegador soporta service workers
       if (!('serviceWorker' in navigator)) {
-        console.log('FCM: Service Workers are not supported in this browser, returning null gracefully');
+        console.warn('FCM: Service Workers are not supported in this browser');
         return null;
       }
 
@@ -278,7 +278,7 @@ export class FCMService {
       console.log('FCM: Requesting notification permission...');
       const hasPermission = await this.requestPermission();
       if (!hasPermission) {
-        console.log('FCM: Notification permission denied, returning null gracefully');
+        console.warn('FCM: Notification permission denied');
         return null;
       }
       console.log('FCM: Notification permission granted');
@@ -295,19 +295,19 @@ export class FCMService {
       // Ensure the Firebase Messaging Service Worker is registered and use its registration explicitly
       let swRegistration: ServiceWorkerRegistration | undefined;
       if ('serviceWorker' in navigator) {
-        try {
-          swRegistration = await navigator.serviceWorker.getRegistration('/firebase-cloud-messaging-push-scope');
-          if (!swRegistration) {
+        swRegistration = await navigator.serviceWorker.getRegistration('/firebase-cloud-messaging-push-scope');
+        if (!swRegistration) {
+          try {
             swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
               scope: '/firebase-cloud-messaging-push-scope',
               updateViaCache: 'imports'
             });
             console.log('FCM: Firebase Messaging SW registered for token:', swRegistration);
+          } catch (swError) {
+            console.warn('FCM: Failed to register Firebase Messaging SW for token:', swError);
+            // En caso de error del service worker, intentar sin él
+            swRegistration = undefined;
           }
-        } catch (swError) {
-          console.log('FCM: Failed to register Firebase Messaging SW for token, continuing without it:', swError);
-          // En caso de error del service worker, intentar sin él
-          swRegistration = undefined;
         }
       }
 
@@ -323,28 +323,49 @@ export class FCMService {
         console.log('FCM: Token length:', token.length);
         return token;
       } else {
-        console.log('FCM: No registration token available - Firebase returned null/undefined, returning null gracefully');
+        console.warn('FCM: No registration token available - Firebase returned null/undefined');
         return null;
       }
     } catch (error: unknown) {
-      // Manejar todos los errores de forma silenciosa y graceful
+      // Manejar errores específicos de push service de forma silenciosa en desarrollo
       if (error instanceof Error) {
-        console.log('FCM: Error getting registration token (handled gracefully):', error.message);
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        const isInsecureContext = typeof window !== 'undefined' && !window.isSecureContext;
         
-        // Errores comunes que no deben bloquear la aplicación
+        // Errores comunes en desarrollo local (HTTP) - manejar silenciosamente
         if (error.message.includes('push service not available') || 
             error.message.includes('Registration failed') ||
             error.message.includes('unsupported-browser') ||
             error.message.includes('AbortError') ||
-            error.message.includes('Service Workers are not supported') ||
             error.name === 'AbortError') {
           
-          console.log('FCM: Known compatibility issue, FCM disabled but app continues normally');
+          if (isInsecureContext) {
+            console.info('FCM: Push notifications require HTTPS. This is expected in HTTP development environment.');
+          } else if (isDevelopment) {
+            console.info('FCM: Push service not available in development environment. This is normal.');
+          } else {
+            console.warn('FCM: Push service not available in production environment. Please check browser compatibility.');
+          }
           return null;
         }
+        
+        // Error específico de contexto inseguro
+        if (error.message.includes('only available in secure contexts')) {
+          console.info('FCM: Push notifications require HTTPS. Please use HTTPS in production.');
+          return null;
+        }
+
+        // Solo mostrar errores detallados en producción o errores inesperados
+        if (!isDevelopment || (!error.message.includes('push service') && !error.message.includes('Registration failed'))) {
+          console.error('FCM: Detailed error information:', {
+            message: error.message,
+            name: error.name,
+            isProduction: !isDevelopment,
+            isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+            protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown'
+          });
+        }
       }
-      
-      console.log('FCM: Unexpected error getting registration token (handled gracefully):', error);
       return null;
     }
   }
@@ -389,37 +410,12 @@ export class FCMService {
       
       return true;
     } catch (error: unknown) {
-      console.error('FCM: Error saving token to server:', error);
-      
-      // Fallback to direct Firestore write
-      try {
-        if (!db) {
-          throw new Error('Firestore is not initialized');
-        }
-        const userTokensRef = doc(db, 'fcmTokens', userId);
-        const userTokensDoc = await getDoc(userTokensRef);
-        
-        if (userTokensDoc.exists()) {
-          const tokens = userTokensDoc.data()?.tokens || [];
-          if (!tokens.includes(token)) {
-            await updateDoc(userTokensRef, {
-              tokens: arrayUnion(token),
-              lastUpdated: new Date()
-            });
-          }
-        } else {
-          await setDoc(userTokensRef, {
-            tokens: [token],
-            lastUpdated: new Date()
-          });
-        }
-        
-        console.log('FCM: Token saved via fallback method');
-        return true;
-      } catch (fallbackError: unknown) {
-        console.error('FCM: Fallback save also failed:', fallbackError);
-        return false;
-      }
+      console.error('FCM: Error saving token to server via Cloud Function:', error);
+      // Se elimina el fallback de escritura directa para evitar race conditions.
+      // La Cloud Function es la única responsable de escribir en la BD.
+      // Si falla, es mejor registrar el error y reintentar la llamada a la función
+      // en lugar de causar una posible corrupción de estado.
+      return false;
     }
   }
 
@@ -440,24 +436,10 @@ export class FCMService {
       
       return true;
     } catch (error: unknown) {
-      console.error('FCM: Error removing token from server:', error);
-      
-      // Fallback to direct Firestore write
-      try {
-        if (!db) {
-          throw new Error('Firestore is not initialized');
-        }
-        await updateDoc(doc(db, 'fcmTokens', userId), {
-          tokens: arrayRemove(token),
-          lastUpdated: new Date()
-        });
-        
-        console.log('FCM: Token removed via fallback method');
-        return true;
-      } catch (fallbackError: unknown) {
-        console.error('FCM: Fallback remove also failed:', fallbackError);
-        return false;
-      }
+      console.error('FCM: Error removing token from server via Cloud Function:', error);
+      // Se elimina el fallback de escritura directa para evitar race conditions.
+      // La Cloud Function es la única responsable de la operación.
+      return false;
     }
   }
 
