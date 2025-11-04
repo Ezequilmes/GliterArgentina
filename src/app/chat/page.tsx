@@ -49,6 +49,8 @@ export default function ChatPage() {
     const checkMobile = () => {
       if (typeof window !== 'undefined') {
         setIsMobile(window.innerWidth < 768);
+      } else {
+        setIsMobile(false);
       }
     };
     
@@ -164,7 +166,7 @@ export default function ChatPage() {
                 {error}
               </p>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => typeof window !== 'undefined' && window.location.reload()}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Reintentar

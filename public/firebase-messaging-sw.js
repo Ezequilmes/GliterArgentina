@@ -1,4 +1,5 @@
 // Firebase Cloud Messaging Service Worker
+// Import Firebase scripts
 try {
   importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
   importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
@@ -6,70 +7,69 @@ try {
   console.error('[firebase-messaging-sw.js] Failed to import Firebase scripts:', error);
 }
 
-// Check if we're in a service worker context
-if (typeof self === 'undefined' || typeof importScripts === 'undefined') {
-  console.error('[firebase-messaging-sw.js] Not running in service worker context');
-} else {
-  // Firebase configuration will be received from main app
-  let firebaseConfig = null;
-  let messaging = null;
+// Firebase configuration - embedded directly to avoid async issues
+const firebaseConfig = {
+  apiKey: "AIzaSyBDaKVYlJSfIJ7nKeIkTEWSmhlB1Soqay0",
+  authDomain: "gliter-argentina.firebaseapp.com",
+  databaseURL: "https://gliter-argentina-default-rtdb.firebaseio.com/",
+  projectId: "gliter-argentina",
+  storageBucket: "gliter-argentina.firebasestorage.app",
+  messagingSenderId: "1084162955705",
+  appId: "1:1084162955705:web:25bb32180d1bdaf724fe68",
+  measurementId: "G-MMFQWWFCJD"
+};
 
-  // Listen for configuration from main app
-  self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'FIREBASE_CONFIG') {
-      firebaseConfig = event.data.config;
-      initializeFirebaseMessaging();
-    }
-  });
+// Initialize Firebase immediately
+let messaging = null;
 
-  function initializeFirebaseMessaging() {
-    // Initialize Firebase only if firebase is available and config is set
-    if (typeof firebase !== 'undefined' && firebaseConfig) {
-      try {
-        firebase.initializeApp(firebaseConfig);
-        
-        // Initialize Firebase Cloud Messaging and get a reference to the service
-        messaging = firebase.messaging();
+if (typeof firebase !== 'undefined' && firebaseConfig) {
+  try {
+    // Initialize Firebase app
+    firebase.initializeApp(firebaseConfig);
+    
+    // Initialize Firebase Cloud Messaging
+    messaging = firebase.messaging();
+    
+    console.log('[firebase-messaging-sw.js] Firebase initialized successfully');
 
-      // Handle background messages
-      messaging.onBackgroundMessage((payload) => {
-        console.log('[firebase-messaging-sw.js] Received background message ', payload);
-        
-        const notificationTitle = payload.notification?.title || 'Gliter Argentina';
-        const notificationOptions = {
-          body: payload.notification?.body || 'Tienes una nueva notificación',
-          icon: '/logo.svg',
-          badge: '/logo.svg',
-          tag: payload.data?.type || 'general',
-          data: payload.data,
-          actions: [
-            {
-              action: 'open',
-              title: 'Abrir'
-            },
-            {
-              action: 'close',
-              title: 'Cerrar'
-            }
-          ]
-        };
+    // Handle background messages
+    messaging.onBackgroundMessage((payload) => {
+      console.log('[firebase-messaging-sw.js] Received background message:', payload);
+      
+      const notificationTitle = payload.notification?.title || 'Gliter Argentina';
+      const notificationOptions = {
+        body: payload.notification?.body || 'Tienes una nueva notificación',
+        icon: '/icons/notification-icon-192x192.png',
+        badge: '/icons/notification-badge-72x72.png',
+        tag: payload.data?.type || 'general',
+        data: payload.data,
+        actions: [
+          {
+            action: 'open',
+            title: 'Abrir'
+          },
+          {
+            action: 'close',
+            title: 'Cerrar'
+          }
+        ],
+        requireInteraction: false,
+        silent: false
+      };
 
-        if (self.registration && self.registration.showNotification) {
-          self.registration.showNotification(notificationTitle, notificationOptions);
-        }
-      });
-    } catch (error) {
-      console.error('[firebase-messaging-sw.js] Failed to initialize Firebase messaging:', error);
-    }
-  } else {
-    console.error('[firebase-messaging-sw.js] Firebase not available');
+      return self.registration.showNotification(notificationTitle, notificationOptions);
+    });
+    
+  } catch (error) {
+    console.error('[firebase-messaging-sw.js] Failed to initialize Firebase messaging:', error);
   }
+} else {
+  console.error('[firebase-messaging-sw.js] Firebase not available or config missing');
 }
 
-// Handle notification click - outside the Firebase initialization block
-if (typeof self !== 'undefined' && self.addEventListener) {
-  self.addEventListener('notificationclick', (event) => {
-  console.log('[firebase-messaging-sw.js] Notification click received.');
+// Handle notification click events
+self.addEventListener('notificationclick', (event) => {
+  console.log('[firebase-messaging-sw.js] Notification click received:', event);
 
   event.notification.close();
 
@@ -101,27 +101,20 @@ if (typeof self !== 'undefined' && self.addEventListener) {
     }
   }
 
-    // Open the app and navigate to the appropriate page
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        // Check if there's already a window/tab open with the target URL
-        for (const client of clientList) {
-          if (client.url.includes(url) && 'focus' in client) {
-            return client.focus();
-          }
+  // Open the app and navigate to the appropriate page
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Check if there's already a window/tab open with the target URL
+      for (const client of clientList) {
+        if (client.url.includes(url) && 'focus' in client) {
+          return client.focus();
         }
-        
-        // If no window/tab is open, open a new one
-        if (clients.openWindow) {
-          return clients.openWindow(url);
-        }
-      })
-    );
-  });
-
-      } catch (error) {
-        console.error('[firebase-messaging-sw.js] Error initializing Firebase:', error);
       }
-    }
-  }
-}
+      
+      // If no window/tab is open, open a new one
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
+});

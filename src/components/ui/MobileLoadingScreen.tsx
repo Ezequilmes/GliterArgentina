@@ -35,7 +35,7 @@ export default function MobileLoadingScreen({
 
   // Detectar si es móvil
   const isMobile = typeof window !== 'undefined' && (
-    /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase()) ||
+    /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(window.navigator.userAgent.toLowerCase()) ||
     ('ontouchstart' in window && window.innerWidth <= 768)
   );
 
@@ -155,7 +155,7 @@ export default function MobileLoadingScreen({
               )}
               
               <Button
-                onClick={() => window.location.reload()}
+                onClick={() => typeof window !== 'undefined' && window.location.reload()}
                 variant="secondary"
                 className="w-full"
                 size="sm"
@@ -197,7 +197,7 @@ export default function MobileLoadingScreen({
 
             <div className="space-y-2">
               <Button
-                onClick={() => window.location.reload()}
+                onClick={() => typeof window !== 'undefined' && window.location.reload()}
                 variant="primary"
                 className="w-full flex items-center justify-center space-x-2"
                 size="sm"

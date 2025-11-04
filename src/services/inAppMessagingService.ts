@@ -230,7 +230,7 @@ class InAppMessagingService {
             messageId: message.messageId,
             campaignName: message.campaignName,
             timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent
+            userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'server-side'
           })
         }).catch(error => {
           if (this.config.debugMode) {

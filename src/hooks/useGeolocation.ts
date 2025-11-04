@@ -1,54 +1,106 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Location } from '@/types';
+import { createLogger } from '@/services/loggingService';
 
-export interface UseGeolocationOptions {
+// Create component-specific logger
+const logger = createLogger('useGeolocation');
+
+interface GeolocationState {
+  location: GeolocationPosition | null;
+  error: string | null;
+  loading: boolean;
+  permission: PermissionState | null;
+  retryCount: number;
+  isWatching: boolean;
+  lastAttempt: number | null;
+  consecutiveFailures: number;
+}
+
+interface GeolocationOptions {
   enableHighAccuracy?: boolean;
   timeout?: number;
   maximumAge?: number;
-  watch?: boolean;
-  retryAttempts?: number;
+  maxRetries?: number;
   retryDelay?: number;
+  watchPosition?: boolean;
+  minRetryInterval?: number;
+  maxConsecutiveFailures?: number;
+  fallbackToIP?: boolean;
 }
 
-export interface UseGeolocationReturn {
-  location: Location | null;
-  loading: boolean;
-  error: string | null;
-  permissionState: PermissionState | null;
-  getCurrentLocation: () => Promise<Location>;
-  watchLocation: () => void;
-  stopWatching: () => void;
-  calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
-  checkPermissions: () => Promise<PermissionState>;
-  retryCount: number;
-  isWatching: boolean;
-}
+const DEFAULT_OPTIONS: Required<GeolocationOptions> = {
+  enableHighAccuracy: true,
+  timeout: 15000, // Increased timeout
+  maximumAge: 300000, // 5 minutes
+  maxRetries: 5, // Increased max retries
+  retryDelay: 3000, // Increased retry delay
+  watchPosition: false,
+  minRetryInterval: 5000, // Minimum 5 seconds between retries
+  maxConsecutiveFailures: 3,
+  fallbackToIP: true,
+};
 
-export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocationReturn {
-  const {
-    enableHighAccuracy = true,
-    timeout = 10000,
-    maximumAge = 300000, // 5 minutes
-    watch = false,
-    retryAttempts = 3,
-    retryDelay = 2000
-  } = options;
-
-  const [location, setLocation] = useState<Location | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [permissionState, setPermissionState] = useState<PermissionState | null>(null);
-  const [watchId, setWatchId] = useState<number | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const [isWatching, setIsWatching] = useState(false);
+export const useGeolocation = (options: GeolocationOptions = {}) => {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
   
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [state, setState] = useState<GeolocationState>({
+    location: null,
+    error: null,
+    loading: false,
+    permission: null,
+    retryCount: 0,
+    isWatching: false,
+    lastAttempt: null,
+    consecutiveFailures: 0,
+  });
+
+  const watchIdRef = useRef<number | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isUnmountedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    if (watchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
+
+  // Check if geolocation is supported
+  const isSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator;
+
+  // Use centralized logging service
+  const logGeolocation = useCallback((level: 'info' | 'warn' | 'error', message: string, data?: any) => {
+    switch (level) {
+      case 'info':
+        logger.info(message, data);
+        break;
+      case 'warn':
+        logger.warn(message, data);
+        break;
+      case 'error':
+        logger.error(message, data);
+        break;
+    }
+  }, []);
 
   // Check geolocation permissions
   const checkPermissions = useCallback(async (): Promise<PermissionState> => {
     try {
-      if ('permissions' in navigator) {
+      if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
         const permission = await navigator.permissions.query({ name: 'geolocation' });
         setPermissionState(permission.state);
         
@@ -74,21 +126,46 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
       case err.POSITION_UNAVAILABLE:
         return 'Información de ubicación no disponible. Verifica tu conexión GPS o de red.';
       case err.TIMEOUT:
-        return `Tiempo de espera agotado (${timeout}ms). Intenta nuevamente.`;
+        return `Tiempo de espera agotado (${opts.timeout}ms). Intenta nuevamente.`;
       default:
         return `Error desconocido al obtener ubicación: ${err.message}`;
     }
-  }, [timeout]);
+  }, [opts.timeout]);
+
+  // Anti-cycle mechanism: check if we should attempt location request
+  const shouldAttemptLocation = useCallback((): boolean => {
+    const now = Date.now();
+    
+    // Check if we've exceeded max retries
+    if (state.retryCount >= opts.maxRetries) {
+      logGeolocation('warn', `Máximo de reintentos alcanzado: ${opts.maxRetries}`);
+      return false;
+    }
+
+    // Check if we've exceeded max consecutive failures
+    if (state.consecutiveFailures >= opts.maxConsecutiveFailures) {
+      logGeolocation('warn', `Máximo de fallos consecutivos alcanzado: ${opts.maxConsecutiveFailures}`);
+      return false;
+    }
+
+    // Check minimum retry interval
+    if (state.lastAttempt && (now - state.lastAttempt) < opts.minRetryInterval) {
+      logGeolocation('warn', `Esperando intervalo mínimo de reintento: ${opts.minRetryInterval}ms`);
+      return false;
+    }
+
+    return true;
+  }, [state.retryCount, state.consecutiveFailures, state.lastAttempt, opts, logGeolocation]);
 
   // Retry logic for failed geolocation requests
-  const retryGetLocation = useCallback((attempt: number): Promise<Location> => {
+  const retryGetLocation = useCallback((attempt: number): Promise<GeolocationPosition> => {
     return new Promise((resolve, reject) => {
-      if (attempt >= retryAttempts) {
-        reject(new Error(`Falló después de ${retryAttempts} intentos`));
+      if (attempt >= options.maxRetries!) {
+        reject(new Error(`Falló después de ${options.maxRetries} intentos`));
         return;
       }
 
-      setRetryCount(attempt + 1);
+      setState(prev => ({ ...prev, retryCount: attempt + 1 }));
       
       // Clear any existing timeout
       if (retryTimeoutRef.current) {
@@ -96,227 +173,354 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
       }
       
       retryTimeoutRef.current = setTimeout(() => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const newLocation: Location = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: position.timestamp
-            };
-            
-            setLocation(newLocation);
-            setLoading(false);
-            setRetryCount(0);
-            resolve(newLocation);
-          },
-          (err) => {
-            if (err.code === err.PERMISSION_DENIED) {
-              // Don't retry on permission denied
-              const errorMessage = getErrorMessage(err);
-              setError(errorMessage);
-              setLoading(false);
-              setRetryCount(0);
-              reject(new Error(errorMessage));
-            } else {
-              // Retry on other errors
-              retryGetLocation(attempt + 1).then(resolve).catch(reject);
+        if (typeof navigator !== 'undefined' && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const newLocation: GeolocationPosition = position;
+              
+              setState(prev => ({
+                ...prev,
+                location: newLocation,
+                loading: false,
+                retryCount: 0,
+                consecutiveFailures: 0,
+                lastAttempt: Date.now()
+              }));
+              resolve(newLocation);
+            },
+            (err) => {
+              if (err.code === err.PERMISSION_DENIED) {
+                // Don't retry on permission denied
+                const errorMessage = getErrorMessage(err);
+                setState(prev => ({
+                  ...prev,
+                  error: errorMessage,
+                  loading: false,
+                  retryCount: 0,
+                  consecutiveFailures: prev.consecutiveFailures + 1
+                }));
+                reject(new Error(errorMessage));
+              } else {
+                // Retry on other errors
+                retryGetLocation(attempt + 1).then(resolve).catch(reject);
+              }
+            },
+            {
+              enableHighAccuracy: options.enableHighAccuracy,
+              timeout: Math.min(options.timeout!, 15000), // Cap timeout at 15 seconds
+              maximumAge: options.maximumAge
             }
-          },
-          {
-            enableHighAccuracy,
-            timeout: Math.min(timeout, 15000), // Cap timeout at 15 seconds
-            maximumAge
-          }
-        );
-      }, attempt > 0 ? retryDelay : 0);
+          );
+        } else {
+          reject(new Error('Geolocalización no soportada'));
+        }
+      }, attempt > 0 ? options.retryDelay! : 0);
     });
-  }, [enableHighAccuracy, timeout, maximumAge, retryAttempts, retryDelay, getErrorMessage]);
+  }, [options.maxRetries, options.enableHighAccuracy, options.timeout, options.maximumAge, options.retryDelay, getErrorMessage]);
 
   // Get current position with enhanced error handling and retry logic
-  const getCurrentLocation = useCallback((): Promise<Location> => {
-    return new Promise(async (resolve, reject) => {
-      if (!navigator.geolocation) {
+  const getCurrentLocation = useCallback(async (): Promise<GeolocationPosition> => {
+    if (!isSupported) {
+      const error = 'Geolocalización no soportada por este navegador';
+      logGeolocation('error', error);
+      throw new Error(error);
+    }
+
+    if (!shouldAttemptLocation()) {
+      const error = 'No se puede intentar obtener ubicación en este momento';
+      logGeolocation('warn', error);
+      throw new Error(error);
+    }
+
+    // Check permissions first
+    const permission = await checkPermissions();
+    if (permission === 'denied') {
+      const error = 'Permisos de ubicación denegados. Por favor, permite el acceso en la configuración del navegador.';
+      logGeolocation('error', error);
+      setState(prev => ({ ...prev, error }));
+      throw new Error(error);
+    }
+
+    setState(prev => ({ 
+      ...prev, 
+      loading: true, 
+      error: null, 
+      lastAttempt: Date.now() 
+    }));
+
+    logGeolocation('info', `Obteniendo ubicación (intento ${state.retryCount + 1}/${options.maxRetries})`);
+
+    return new Promise((resolve, reject) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      const timeoutId = setTimeout(() => {
+        const error = `Tiempo de espera agotado (${options.timeout}ms)`;
+        logGeolocation('error', error);
+        setState(prev => ({ 
+          ...prev, 
+          error, 
+          loading: false,
+          consecutiveFailures: prev.consecutiveFailures + 1
+        }));
+        reject(new Error(error));
+      }, options.timeout);
+
+      const successCallback = (position: GeolocationPosition) => {
+        clearTimeout(timeoutId);
+        if (isUnmountedRef.current) return;
+
+        logGeolocation('info', 'Ubicación obtenida exitosamente', {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+
+        setState(prev => ({
+          ...prev,
+          location: position,
+          loading: false,
+          error: null,
+          retryCount: 0,
+          consecutiveFailures: 0
+        }));
+
+        resolve(position);
+      };
+
+      const errorCallback = (error: GeolocationPositionError) => {
+        clearTimeout(timeoutId);
+        if (isUnmountedRef.current) return;
+
+        const errorMessage = getErrorMessage(error);
+        logGeolocation('error', `Error al obtener ubicación: ${errorMessage}`, error);
+
+        setState(prev => ({
+          ...prev,
+          error: errorMessage,
+          loading: false,
+          retryCount: prev.retryCount + 1,
+          consecutiveFailures: prev.consecutiveFailures + 1
+        }));
+
+        // Auto-retry for certain errors
+        if (error.code !== error.PERMISSION_DENIED && 
+            state.retryCount < options.maxRetries! - 1 &&
+            state.consecutiveFailures < options.maxConsecutiveFailures! - 1) {
+          
+          logGeolocation('info', `Reintentando en ${options.retryDelay}ms...`);
+          
+          retryTimeoutRef.current = setTimeout(() => {
+            getCurrentLocation().then(resolve).catch(reject);
+          }, options.retryDelay);
+        } else {
+          reject(new Error(errorMessage));
+        }
+      };
+
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          successCallback,
+          errorCallback,
+          {
+            enableHighAccuracy: options.enableHighAccuracy,
+            timeout: options.timeout,
+            maximumAge: options.maximumAge,
+          }
+        );
+      } else {
         const error = 'Geolocalización no soportada por este navegador';
-        setError(error);
+        logGeolocation('error', error);
+        setState(prev => ({ 
+          ...prev, 
+          error, 
+          loading: false,
+          consecutiveFailures: prev.consecutiveFailures + 1
+        }));
         reject(new Error(error));
-        return;
-      }
-
-      // Check permissions first
-      const permission = await checkPermissions();
-      if (permission === 'denied') {
-        const error = 'Permisos de ubicación denegados. Por favor, permite el acceso en la configuración del navegador.';
-        setError(error);
-        reject(new Error(error));
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-      setRetryCount(0);
-
-      // Clear any existing timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      // Timeout para casos donde la solicitud no resuelve
-      timeoutRef.current = setTimeout(() => {
-        const error = 'Tiempo de espera agotado. Verifica tu conexión y permisos de ubicación.';
-        setError(error);
-        setLoading(false);
-        reject(new Error(error));
-      }, Math.min(timeout + 2000, 20000)); // Cap total timeout at 20 seconds
-
-      try {
-        const location = await retryGetLocation(0);
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        resolve(location);
-      } catch (err) {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        const errorMessage = err instanceof Error ? err.message : 'Error desconocido al obtener ubicación';
-        setError(errorMessage);
-        setLoading(false);
-        reject(new Error(errorMessage));
       }
     });
-  }, [checkPermissions, retryGetLocation, timeout]);
+  }, [isSupported, shouldAttemptLocation, options, state.retryCount, state.consecutiveFailures, checkPermissions, getErrorMessage, logGeolocation]);
 
-  // Watch position changes with enhanced error handling
+  // Watch position with enhanced error handling
   const watchLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setError('Geolocalización no soportada por este navegador');
+    if (!isSupported) {
+      logGeolocation('error', 'Geolocation no soportada para watch');
       return;
     }
 
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
+    if (watchIdRef.current !== null) {
+      logGeolocation('warn', 'Ya hay un watch activo');
+      return;
     }
 
-    setError(null);
-    setIsWatching(true);
-    
-    const id = navigator.geolocation.watchPosition(
-      (position) => {
-        const newLocation: Location = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp
-        };
-        
-        setLocation(newLocation);
-        setLoading(false);
-      },
-      (err) => {
-        const errorMessage = getErrorMessage(err);
-        setError(errorMessage);
-        setLoading(false);
-        
-        // Stop watching on permission denied
-        if (err.code === err.PERMISSION_DENIED) {
-          setIsWatching(false);
-          if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
-            setWatchId(null);
-          }
-        }
-      },
-      {
-        enableHighAccuracy,
-        timeout,
-        maximumAge
-      }
-    );
+    setState(prev => ({ ...prev, isWatching: true, loading: true }));
+    logGeolocation('info', 'Iniciando watch de ubicación');
 
-    setWatchId(id);
-  }, [enableHighAccuracy, timeout, maximumAge, watchId, getErrorMessage]);
+    const successCallback = (position: GeolocationPosition) => {
+      if (isUnmountedRef.current) return;
+
+      logGeolocation('info', 'Ubicación actualizada via watch', {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
+      });
+
+      setState(prev => ({
+        ...prev,
+        location: position,
+        loading: false,
+        error: null,
+        retryCount: 0,
+        consecutiveFailures: 0
+      }));
+    };
+
+    const errorCallback = (error: GeolocationPositionError) => {
+      if (isUnmountedRef.current) return;
+
+      const errorMessage = getErrorMessage(error);
+      logGeolocation('error', `Error en watch de ubicación: ${errorMessage}`, error);
+
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+        loading: false,
+        consecutiveFailures: prev.consecutiveFailures + 1
+      }));
+
+      // Stop watching on persistent errors
+      if (state.consecutiveFailures >= options.maxConsecutiveFailures!) {
+        stopWatching();
+      }
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        successCallback,
+        errorCallback,
+        {
+          enableHighAccuracy: options.enableHighAccuracy,
+          timeout: options.timeout,
+          maximumAge: options.maximumAge,
+        }
+      );
+    }
+  }, [isSupported, options, getErrorMessage, logGeolocation, state.consecutiveFailures]);
 
   // Stop watching position
   const stopWatching = useCallback(() => {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
-      setIsWatching(false);
+    if (watchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      logGeolocation('info', 'Watch de ubicación detenido');
     }
-    
-    // Clear any pending retry timeouts
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-  }, [watchId]);
 
-  // Calculate distance between two points using Haversine formula
-  const calculateDistance = useCallback((
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ): number => {
+    setState(prev => ({ ...prev, isWatching: false }));
+  }, [logGeolocation]);
+
+  // Reset state
+  const reset = useCallback(() => {
+    cleanup();
+    setState({
+      location: null,
+      error: null,
+      loading: false,
+      permission: null,
+      retryCount: 0,
+      isWatching: false,
+      lastAttempt: null,
+      consecutiveFailures: 0,
+    });
+    logGeolocation('info', 'Estado de geolocalización reiniciado');
+  }, [cleanup, logGeolocation]);
+
+  // Calculate distance between two points (Haversine formula)
+  const calculateDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Earth's radius in kilometers
-    const dLat = toRadians(lat2 - lat1);
-    const dLon = toRadians(lon2 - lon1);
-    
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-    
-    return Math.round(distance * 100) / 100; // Round to 2 decimal places
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
   }, []);
 
-  // Helper function to convert degrees to radians
-  const toRadians = (degrees: number): number => {
-    return degrees * (Math.PI / 180);
-  };
+  // Set permission state helper
+  const setPermissionState = useCallback((permission: PermissionState) => {
+    setState(prev => ({ ...prev, permission }));
+  }, []);
 
-  // Check permissions on mount
+  // Check permissions on mount and when needed
   useEffect(() => {
-    checkPermissions();
-  }, [checkPermissions]);
+    let mounted = true;
 
-  // Auto-start watching if enabled (only if explicitly requested)
+    const initPermissions = async () => {
+      try {
+        const permission = await checkPermissions();
+        if (mounted) {
+          setState(prev => ({ ...prev, permission }));
+        }
+      } catch (error) {
+        logGeolocation('error', 'Error al inicializar permisos', error);
+      }
+    };
+
+    initPermissions();
+
+    return () => {
+      mounted = false;
+    };
+  }, [checkPermissions, logGeolocation]);
+
+  // Auto-start watching if enabled
   useEffect(() => {
-    if (watch) {
+    if (options.watchPosition && !state.isWatching && state.permission === 'granted') {
       watchLocation();
     }
 
     return () => {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
+      if (options.watchPosition) {
+        stopWatching();
       }
     };
-  }, [watch, watchLocation, watchId]);
+  }, [options.watchPosition, state.isWatching, state.permission, watchLocation, stopWatching]);
 
   // Cleanup on unmount
   useEffect(() => {
+    isUnmountedRef.current = false;
+
     return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
+      isUnmountedRef.current = true;
+      cleanup();
     };
-  }, []);
+  }, [cleanup]);
 
   return {
-    location,
-    loading,
-    error,
-    permissionState,
+    // State
+    location: state.location,
+    error: state.error,
+    loading: state.loading,
+    permission: state.permission,
+    retryCount: state.retryCount,
+    isWatching: state.isWatching,
+    consecutiveFailures: state.consecutiveFailures,
+    lastAttempt: state.lastAttempt,
+    
+    // Actions
     getCurrentLocation,
     watchLocation,
     stopWatching,
-    calculateDistance,
+    reset,
     checkPermissions,
-    retryCount,
-    isWatching
+    calculateDistance,
+    
+    // Utils
+    isSupported,
+    shouldAttemptLocation,
   };
 }

@@ -65,7 +65,7 @@ export class FCMService {
         isSecureContext,
         protocol: location.protocol,
         hostname: location.hostname,
-        userAgent: navigator.userAgent.substring(0, 100) + '...'
+        userAgent: typeof window !== 'undefined' ? window.navigator.userAgent.substring(0, 100) + '...' : 'server-side'
       });
 
       if (!hasServiceWorker) {
@@ -169,8 +169,8 @@ export class FCMService {
         const registration = await navigator.serviceWorker.ready;
         await registration.showNotification(title, {
           body,
-          icon: icon || '/logo.svg',
-          badge: '/logo.svg',
+          icon: icon || '/icons/notification-icon-192x192.png',
+          badge: '/icons/notification-badge-72x72.png',
           tag: payload.data?.type || 'general',
           data: payload.data,
           requireInteraction: true,
@@ -227,12 +227,44 @@ export class FCMService {
         console.warn('FCM: Notification API not available');
         return false;
       }
+
+      // Verificar el estado actual del permiso antes de solicitar
+      const currentPermission = window.Notification.permission;
       
-      const permission = await window.Notification.requestPermission();
-      console.log('FCM: Notification permission:', permission);
-      return permission === 'granted';
+      // Si ya está concedido, no necesitamos solicitar de nuevo
+      if (currentPermission === 'granted') {
+        console.log('FCM: Notification permission already granted');
+        return true;
+      }
+      
+      // Si está denegado, no podemos solicitar de nuevo
+      if (currentPermission === 'denied') {
+        console.warn('FCM: Notification permission already denied');
+        return false;
+      }
+
+      // Solo solicitar si está en 'default' y estamos en un contexto de interacción del usuario
+      if (currentPermission === 'default') {
+        console.log('FCM: Requesting notification permission...');
+        
+        // Verificar que estamos en un contexto seguro
+        if (!window.isSecureContext) {
+          console.warn('FCM: Cannot request permission in insecure context');
+          return false;
+        }
+        
+        const permission = await window.Notification.requestPermission();
+        console.log('FCM: Notification permission result:', permission);
+        return permission === 'granted';
+      }
+      
+      return false;
     } catch (error) {
       console.error('FCM: Error requesting permission:', error);
+      // Si el error es por falta de interacción del usuario, registrarlo específicamente
+      if (error instanceof Error && error.message.includes('user gesture')) {
+        console.error('FCM: Permission request failed - requires user gesture');
+      }
       return false;
     }
   }

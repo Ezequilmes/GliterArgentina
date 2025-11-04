@@ -2,36 +2,45 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 
-// Inicializar Firebase Admin si no está inicializado
-if (!getApps().length) {
-  const serviceAccount = {
-    type: "service_account",
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    client_id: process.env.FIREBASE_CLIENT_ID,
-    auth_uri: "https://accounts.google.com/o/oauth2/auth",
-    token_uri: "https://oauth2.googleapis.com/token",
-    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-    client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.FIREBASE_CLIENT_EMAIL}`
-  };
-  
-  initializeApp({
-    credential: cert(serviceAccount),
-  });
-}
+export const dynamic = 'force-dynamic';
+export const revalidate = false;
 
-const db = getFirestore();
+function ensureAdminInitialized() {
+  if (getApps().length) return;
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\n/g, '\n');
+  try {
+    if (projectId && clientEmail && privateKey) {
+      initializeApp({
+        credential: cert({ projectId, clientEmail, privateKey }),
+        projectId,
+      });
+    } else {
+      console.warn('⚠️ Credenciales Firebase Admin incompletas (users-list).');
+    }
+  } catch (err) {
+    console.warn('⚠️ Firebase Admin no pudo inicializarse (users-list):', err);
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
+    ensureAdminInitialized();
+    if (!getApps().length) {
+      return NextResponse.json(
+        { error: 'Firebase Admin no configurado. Verifica FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y FIREBASE_PRIVATE_KEY.' },
+        { status: 500 }
+      );
+    }
+
+    const db = getFirestore();
+
     const { searchParams } = new URL(request.url);
     const adminEmail = searchParams.get('adminEmail');
     const search = searchParams.get('search') || '';
     const limit = parseInt(searchParams.get('limit') || '100');
 
-    // Verificar que el usuario es administrador
     if (adminEmail !== 'admin@gliter.com.ar') {
       return NextResponse.json(
         { error: 'No autorizado' },
@@ -39,9 +48,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Obtener usuarios
     let query = db.collection('users').limit(limit);
-    
     const usersSnapshot = await query.get();
 
     let users = usersSnapshot.docs.map(doc => ({
@@ -53,7 +60,6 @@ export async function GET(request: NextRequest) {
       lastActive: doc.data().lastActive?.toDate?.()?.toISOString() || doc.data().lastActive
     }));
 
-    // Filtrar por búsqueda si se proporciona
     if (search) {
       const searchLower = search.toLowerCase();
       users = users.filter(user => 

@@ -237,8 +237,11 @@ export function formatBytes(bytes: number, decimals: number = 2): string {
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return false;
   } catch (error) {
     console.error('Error al copiar al portapapeles:', error);
     return false;
@@ -251,9 +254,8 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 export function isMobile(): boolean {
   if (typeof window === 'undefined') return false;
   
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent
-  );
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
 }
 
 /**
@@ -262,7 +264,8 @@ export function isMobile(): boolean {
 export function isTouchDevice(): boolean {
   if (typeof window === 'undefined') return false;
   
-  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const maxTouchPoints = typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0;
+  return 'ontouchstart' in window || maxTouchPoints > 0;
 }
 
 /**

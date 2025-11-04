@@ -3,7 +3,7 @@
 import React from 'react';
 import { MapPin, Navigation, AlertCircle, CheckCircle, Clock, RefreshCw, Shield, Wifi } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
-import { Button } from '@/components/ui';
+import Button from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 interface LocationStatusProps {
@@ -21,7 +21,7 @@ export const LocationStatus: React.FC<LocationStatusProps> = ({
     location, 
     loading, 
     error, 
-    permissionState,
+    permission: permissionState,
     getCurrentLocation, 
     watchLocation, 
     stopWatching,
@@ -173,7 +173,7 @@ export const LocationStatus: React.FC<LocationStatusProps> = ({
         
         {location && (
           <div className="mt-2 text-xs text-green-600 dark:text-green-400">
-            Precisión: ±{location.accuracy?.toFixed(0) || 'N/A'}m
+            Precisión: ±{location.coords.accuracy?.toFixed(0) || 'N/A'}m
             {location.timestamp && (
               <span className="ml-2">
                 • Actualizado: {new Date(location.timestamp).toLocaleTimeString()}
@@ -190,29 +190,28 @@ export const LocationStatus: React.FC<LocationStatusProps> = ({
             <div>
               <span className="text-gray-500 dark:text-gray-400">Latitud:</span>
               <div className="font-mono text-gray-900 dark:text-gray-100">
-                {location.latitude.toFixed(6)}
+                {location.coords.latitude.toFixed(6)}
               </div>
             </div>
             <div>
               <span className="text-gray-500 dark:text-gray-400">Longitud:</span>
               <div className="font-mono text-gray-900 dark:text-gray-100">
-                {location.longitude.toFixed(6)}
+                {location.coords.longitude.toFixed(6)}
               </div>
             </div>
-            {location.city && (
+            {location.coords && (
               <div className="col-span-2">
                 <span className="text-gray-500 dark:text-gray-400">Ciudad:</span>
                 <div className="text-gray-900 dark:text-gray-100">
-                  {location.city}
-                  {location.country && `, ${location.country}`}
+                  Coordenadas disponibles
                 </div>
               </div>
             )}
-            {location.accuracy && (
+            {location.coords.accuracy && (
               <div className="col-span-2">
                 <span className="text-gray-500 dark:text-gray-400">Precisión:</span>
                 <div className="text-gray-900 dark:text-gray-100">
-                  ±{location.accuracy.toFixed(0)} metros
+                  ±{location.coords.accuracy.toFixed(0)} metros
                 </div>
               </div>
             )}

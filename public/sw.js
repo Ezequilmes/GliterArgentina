@@ -1,6 +1,7 @@
 const CACHE_NAME = 'gliter-v1';
 const STATIC_CACHE = 'gliter-static-v1';
 const DYNAMIC_CACHE = 'gliter-dynamic-v1';
+const CACHE_VERSION = 'v1.0.0';
 
 // Resources to cache immediately
 const STATIC_ASSETS = [
@@ -235,8 +236,6 @@ async function syncFileUploads() {
 }
 
 // Firebase Messaging configuration
-let messaging;
-
 // Import Firebase scripts
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
@@ -283,8 +282,8 @@ function setupBackgroundMessageHandler() {
   const notificationTitle = payload.notification?.title || 'Gliter Argentina';
   const notificationOptions = {
     body: payload.notification?.body || 'Tienes una nueva notificación',
-    icon: payload.notification?.icon || '/icons/icon-192x192.png',
-    badge: '/icons/icon-144x144.png',
+    icon: payload.notification?.icon || '/icons/notification-icon-192x192.png',
+    badge: '/icons/notification-badge-72x72.png',
     vibrate: [200, 100, 200],
     data: payload.data || {},
     requireInteraction: true,
@@ -295,14 +294,14 @@ function setupBackgroundMessageHandler() {
   // Add actions based on notification type
   if (payload.data?.type === 'message') {
     notificationOptions.actions = [
-      { action: 'reply', title: '💬 Responder' },
-      { action: 'open', title: '👀 Ver chat' },
-      { action: 'close', title: '❌ Cerrar' }
+      { action: 'reply', title: 'Responder' },
+      { action: 'open', title: 'Ver chat' },
+      { action: 'close', title: 'Cerrar' }
     ];
   } else if (payload.data?.type === 'match') {
     notificationOptions.actions = [
-      { action: 'open', title: '💖 Ver matches' },
-      { action: 'close', title: '❌ Cerrar' }
+      { action: 'open', title: 'Ver matches' },
+      { action: 'close', title: 'Cerrar' }
     ];
   }
   
@@ -317,8 +316,8 @@ self.addEventListener('push', (event) => {
   let notificationData = {
     title: 'Gliter Argentina',
     body: 'Tienes una nueva notificación',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-144x144.png',
+    icon: '/icons/notification-icon-192x192.png',
+    badge: '/icons/notification-badge-72x72.png',
     vibrate: [200, 100, 200],
     data: {
       url: '/chat',
@@ -328,7 +327,7 @@ self.addEventListener('push', (event) => {
       {
         action: 'open',
         title: 'Abrir',
-        icon: '/icons/icon-144x144.png'
+        icon: '/icons/notification-badge-72x72.png'
       },
       {
         action: 'close',
@@ -360,40 +359,40 @@ self.addEventListener('push', (event) => {
         // Customize based on notification type
         switch (pushData.data.type) {
           case 'message':
-            notificationData.title = `💬 ${pushData.data.senderName || 'Nuevo mensaje'}`;
+            notificationData.title = `Mensaje de ${pushData.data.senderName || 'Nuevo mensaje'}`;
             notificationData.body = pushData.data.messagePreview || 'Tienes un nuevo mensaje';
             notificationData.data.url = `/chat/${pushData.data.chatId}`;
             notificationData.actions = [
-              { action: 'reply', title: '💬 Responder' },
-              { action: 'open', title: '👀 Ver chat' },
-              { action: 'close', title: '❌ Cerrar' }
+              { action: 'reply', title: 'Responder' },
+              { action: 'open', title: 'Ver chat' },
+              { action: 'close', title: 'Cerrar' }
             ];
             break;
             
           case 'match':
-            notificationData.title = '💖 ¡Nuevo match!';
+            notificationData.title = 'Nuevo match!';
             notificationData.body = `¡Hiciste match con ${pushData.data.matchName || 'alguien especial'}!`;
             notificationData.data.url = '/matches';
             notificationData.actions = [
-              { action: 'open', title: '💖 Ver matches' },
-              { action: 'close', title: '❌ Cerrar' }
+              { action: 'open', title: 'Ver matches' },
+              { action: 'close', title: 'Cerrar' }
             ];
             break;
             
           case 'like':
-            notificationData.title = '👍 ¡Te dieron like!';
+            notificationData.title = 'Te dieron like!';
             notificationData.body = `A ${pushData.data.likerName || 'alguien'} le gustas`;
             notificationData.data.url = '/discover';
             break;
             
           case 'super_like':
-            notificationData.title = '⭐ ¡Super Like!';
+            notificationData.title = 'Super Like!';
             notificationData.body = `¡${pushData.data.superLikerName || 'Alguien'} te dio un Super Like!`;
             notificationData.data.url = '/discover';
             break;
             
           case 'visit':
-            notificationData.title = '👀 Visita a tu perfil';
+            notificationData.title = 'Visita a tu perfil';
             notificationData.body = `${pushData.data.visitorName || 'Alguien'} visitó tu perfil`;
             notificationData.data.url = '/profile';
             break;

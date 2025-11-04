@@ -61,7 +61,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Detectar si es dispositivo móvil
   const isMobileDevice = (): boolean => {
     if (typeof window === 'undefined') return false;
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(window.navigator.userAgent) ||
            (window.innerWidth <= 768 && 'ontouchstart' in window);
   };
 
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await logAuthEvent('auth_retry_attempt', { retryCount: retryCount + 1 });
 
     // Solo recargar en el último intento y solo si es un error crítico
-    if (retryCount >= 1) {
+    if (retryCount >= 1 && typeof window !== 'undefined') {
       setTimeout(() => {
         window.location.reload();
       }, 2000); // Aumentado el delay
@@ -185,25 +185,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
 
-      // Si los permisos están en 'default', solicitar automáticamente
+      // Si los permisos están en 'default', solo registrar el estado
+      // No solicitar automáticamente para cumplir con las políticas del navegador
       if (currentPermission === 'default' || currentPermission === null) {
-        try {
-          const hasPermission = await fcmService.requestPermission();
-          if (hasPermission) {
-            const token = await fcmService.getRegistrationToken();
-            if (token) {
-              await fcmService.saveTokenToServer(userId, token);
-              await logAuthEvent('fcm_auto_token_generated', { userId, hasToken: !!token });
-            }
-          } else {
-            await logAuthEvent('fcm_permission_auto_denied', { userId });
-          }
-        } catch (error) {
-          await logAuthEvent('fcm_auto_generation_error', { 
-            userId, 
-            error: error instanceof Error ? error.message : 'Unknown error' 
-          });
-        }
+        await logAuthEvent('fcm_permission_default', { 
+          userId, 
+          message: 'Permission in default state, waiting for user interaction' 
+        });
       }
     } catch (error) {
       await logAuthEvent('fcm_auto_generation_critical_error', { 

@@ -1,9 +1,36 @@
 import { PremiumPlan, PaymentIntent } from '@/types';
 
-// Configuración de MercadoPago
-const MP_PUBLIC_KEY = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY;
-const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN;
+// Configuración de MercadoPago con validación para producción
+const MP_PUBLIC_KEY = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || '';
+const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || '';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const WEBHOOK_SECRET = process.env.MERCADOPAGO_WEBHOOK_SECRET || '';
+
+// Validación de configuración para producción
+export function validateMercadoPagoConfig(): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!MP_PUBLIC_KEY) {
+    errors.push('NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY no está configurada');
+  }
+  
+  if (!MP_ACCESS_TOKEN) {
+    errors.push('MERCADOPAGO_ACCESS_TOKEN no está configurada');
+  }
+  
+  if (process.env.NODE_ENV === 'production' && !WEBHOOK_SECRET) {
+    errors.push('MERCADOPAGO_WEBHOOK_SECRET no está configurada (recomendado para producción)');
+  }
+  
+  if (process.env.NODE_ENV === 'production' && APP_URL === 'http://localhost:3000') {
+    errors.push('NEXT_PUBLIC_APP_URL está usando localhost en producción');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
 
 // Planes premium disponibles
 export const PREMIUM_PLANS: PremiumPlan[] = [
@@ -70,6 +97,11 @@ export function initializeMercadoPago(): Promise<any> {
       return;
     }
 
+    if (!MP_PUBLIC_KEY) {
+      reject(new Error('Public key de MercadoPago no configurada (NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY)'));
+      return;
+    }
+
     // Cargar el SDK de MercadoPago si no está cargado
     if (!(window as any).MercadoPago) {
       const script = document.createElement('script');
@@ -98,9 +130,24 @@ export async function createPaymentPreference(
   userEmail: string,
   userName: string
 ): Promise<PaymentIntent> {
+  // Validate configuration first
+  const config = validateMercadoPagoConfig();
+  if (!config.isValid) {
+    throw new Error(`Invalid MercadoPago configuration: ${config.errors.join(', ')}`);
+  }
+
   const plan = PREMIUM_PLANS.find(p => p.id === planId);
   if (!plan) {
     throw new Error('Plan no encontrado');
+  }
+
+  // Validate input parameters
+  if (!userId || !userEmail || !userEmail.includes('@')) {
+    throw new Error('Invalid user data');
+  }
+
+  if (!plan.price || plan.price <= 0) {
+    throw new Error('Invalid plan configuration');
   }
 
   const preference = {
@@ -152,10 +199,38 @@ export async function createPaymentPreference(
     });
 
     if (!response.ok) {
-      throw new Error('Error al crear la preferencia de pago');
+      let errorPayload: any = null;
+      try {
+        errorPayload = await response.json();
+      } catch {
+        errorPayload = { raw: await response.text() };
+      }
+      console.error('MercadoPago preference creation failed:', {
+        status: response.status,
+        error: errorPayload,
+      });
+      
+      if (response.status === 401) {
+        throw new Error('Invalid MercadoPago credentials');
+      } else if (response.status === 400) {
+        throw new Error('Invalid payment preference data');
+      } else {
+        const mpMessage =
+          errorPayload?.mpError?.message ||
+          errorPayload?.error ||
+          errorPayload?.raw ||
+          'Error al crear la preferencia de pago';
+        const mpCause = errorPayload?.mpError?.cause?.[0]?.description;
+        const composedMessage = mpCause ? `${mpMessage} - ${mpCause}` : mpMessage;
+        throw new Error(composedMessage);
+      }
     }
 
     const data = await response.json();
+    
+    if (!data.id) {
+      throw new Error('Invalid response from MercadoPago API');
+    }
     
     return {
       id: data.id,
@@ -171,6 +246,117 @@ export async function createPaymentPreference(
     };
   } catch (error) {
     console.error('Error al crear preferencia de pago:', error);
+    
+    // Re-throw with more context
+    if (error instanceof Error) {
+      throw error;
+    } else {
+      throw new Error('Failed to create payment preference');
+    }
+  }
+}
+
+/**
+ * Crea una preferencia de donación en MercadoPago
+ */
+export async function createDonationPreference(
+  userId: string,
+  amountCents: number,
+  currency: string,
+  userEmail: string,
+  userName: string,
+  options?: { campaignId?: string; note?: string }
+): Promise<PaymentIntent> {
+  if (!amountCents || amountCents <= 0) {
+    throw new Error('Monto de donación inválido');
+  }
+
+  const preference = {
+    items: [
+      {
+        id: options?.campaignId ? `donation_${options.campaignId}` : 'donation',
+        title: options?.campaignId ? 'Donación (Campaña)' : 'Donación',
+        description: options?.note || 'Donación voluntaria para apoyar el proyecto',
+        quantity: 1,
+        unit_price: amountCents / 100,
+        currency_id: currency,
+      },
+    ],
+    payer: {
+      email: userEmail,
+      name: userName,
+    },
+    back_urls: {
+      success: `${APP_URL}/donation/success`,
+      failure: `${APP_URL}/donation/failure`,
+      pending: `${APP_URL}/donation/pending`,
+    },
+    auto_return: 'approved',
+    external_reference: `${userId}_${options?.campaignId || 'donation'}_${Date.now()}`,
+    notification_url: `${APP_URL}/api/webhooks/mercadopago`,
+    metadata: {
+      user_id: userId,
+      type: 'donation',
+      campaign_id: options?.campaignId,
+      note: options?.note,
+    },
+    payment_methods: {
+      excluded_payment_types: [],
+      excluded_payment_methods: [],
+      installments: 12,
+    },
+    shipments: {
+      cost: 0,
+      mode: 'not_specified',
+    },
+  };
+
+  try {
+    const response = await fetch('/api/mercadopago/create-preference', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(preference),
+    });
+
+    if (!response.ok) {
+      let errorPayload: any = null;
+      try {
+        errorPayload = await response.json();
+      } catch {
+        errorPayload = { raw: await response.text() };
+      }
+      console.error('MercadoPago donation preference creation failed:', {
+        status: response.status,
+        error: errorPayload,
+      });
+      const mpMessage =
+        errorPayload?.mpError?.message ||
+        errorPayload?.error ||
+        errorPayload?.raw ||
+        'Error al crear la preferencia de donación';
+      const mpCause = errorPayload?.mpError?.cause?.[0]?.description;
+      const composedMessage = mpCause ? `${mpMessage} - ${mpCause}` : mpMessage;
+      throw new Error(composedMessage);
+    }
+
+    const data = await response.json();
+
+    return {
+      id: data.id,
+      preferenceId: data.id,
+      initPoint: data.init_point,
+      sandboxInitPoint: data.sandbox_init_point,
+      amount: amountCents,
+      currency,
+      status: 'pending',
+      userId,
+      planId: 'donation',
+      createdAt: new Date(),
+    };
+  } catch (error) {
+    console.error('Error al crear preferencia de donación:', error);
     throw error;
   }
 }

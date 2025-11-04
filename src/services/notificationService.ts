@@ -189,7 +189,7 @@ export class NotificationService {
   async createMatchNotification(userId: string, matchedUser: { name: string; id: string }): Promise<string> {
     return this.createNotification(userId, {
       type: 'match',
-      title: '¡Nuevo Match! 💕',
+      title: '¡Nuevo Match!',
       message: `¡Tienes un nuevo match con ${matchedUser.name}!`,
       data: { matchedUserId: matchedUser.id }
     });
@@ -207,7 +207,7 @@ export class NotificationService {
   async createLikeNotification(userId: string, liker: { name: string; id: string }): Promise<string> {
     return this.createNotification(userId, {
       type: 'like',
-      title: '¡Te han dado like! 👍',
+      title: '¡Te han dado like!',
       message: `A ${liker.name} le gustas`,
       data: { likerId: liker.id },
       expiresIn: 24 * 60 * 60 * 1000 // 24 horas
@@ -217,7 +217,7 @@ export class NotificationService {
   async createSuperLikeNotification(userId: string, superLiker: { name: string; id: string }): Promise<string> {
     return this.createNotification(userId, {
       type: 'super_like',
-      title: '¡Super Like! ⭐',
+      title: '¡Super Like!',
       message: `¡${superLiker.name} te ha dado un Super Like!`,
       data: { superLikerId: superLiker.id }
     });
@@ -226,7 +226,7 @@ export class NotificationService {
   async createVisitNotification(userId: string, visitor: { name: string; id: string }): Promise<string> {
     return this.createNotification(userId, {
       type: 'visit',
-      title: 'Visita a tu perfil 👀',
+      title: 'Visita a tu perfil',
       message: `${visitor.name} visitó tu perfil`,
       data: { visitorId: visitor.id },
       expiresIn: 7 * 24 * 60 * 60 * 1000 // 7 días
@@ -237,7 +237,7 @@ export class NotificationService {
     const isApproved = status === 'approved';
     return this.createNotification(userId, {
       type: 'verification',
-      title: isApproved ? '✅ Verificación Aprobada' : '❌ Verificación Rechazada',
+      title: isApproved ? 'Verificación Aprobada' : 'Verificación Rechazada',
       message: isApproved 
         ? `Tu verificación de ${type} ha sido aprobada`
         : `Tu verificación de ${type} ha sido rechazada`,
@@ -249,7 +249,7 @@ export class NotificationService {
     const isActivated = action === 'activated';
     return this.createNotification(userId, {
       type: 'premium',
-      title: isActivated ? '🌟 Premium Activado' : '⏰ Premium Expirado',
+      title: isActivated ? 'Premium Activado' : 'Premium Expirado',
       message: isActivated 
         ? '¡Bienvenido a Gliter Premium! Disfruta de todas las funciones exclusivas'
         : 'Tu suscripción Premium ha expirado. Renueva para seguir disfrutando de las funciones exclusivas',

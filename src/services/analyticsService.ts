@@ -74,6 +74,48 @@ export interface AnalyticsEvents {
     price: number;
     payment_method: 'mercadopago';
   };
+  premium_purchase_failed: {
+    plan_type?: 'monthly' | 'yearly';
+    price?: number;
+    reason?: string;
+    payment_method?: 'mercadopago';
+    error_code?: string;
+    retry_count?: number;
+  };
+  premium_payment_verification_failed: {
+    payment_id: string;
+    reason: string;
+    retry_count: number;
+    user_id?: string;
+  };
+  premium_payment_verification_recovered: {
+    payment_id: string;
+    retry_count: number;
+    time_to_recovery_ms: number;
+    user_id?: string;
+  };
+
+  // Eventos de donaciones
+  donation_viewed: {
+    source: 'dashboard' | 'settings' | 'popup' | 'modal';
+  };
+  donation_started: {
+    amount: number;
+    currency: string;
+    campaign?: string;
+  };
+  donation_completed: {
+    amount: number;
+    currency: string;
+    payment_method: 'mercadopago';
+    campaign?: string;
+  };
+  donation_failed: {
+    amount?: number;
+    currency?: string;
+    reason?: string;
+    campaign?: string;
+  };
 
   // Eventos de ubicación
   location_permission_granted: {};
@@ -316,6 +358,57 @@ class AnalyticsService {
       price,
       payment_method: 'mercadopago'
     });
+  }
+
+  trackPremiumPurchaseFailed(reason: string, planType?: 'monthly' | 'yearly', price?: number, errorCode?: string, retryCount?: number) {
+    this.trackEvent('premium_purchase_failed', {
+      plan_type: planType,
+      price,
+      reason,
+      payment_method: 'mercadopago',
+      error_code: errorCode,
+      retry_count: retryCount
+    });
+  }
+
+  trackPremiumPaymentVerificationFailed(paymentId: string, reason: string, retryCount: number, userId?: string) {
+    this.trackEvent('premium_payment_verification_failed', {
+      payment_id: paymentId,
+      reason,
+      retry_count: retryCount,
+      user_id: userId
+    });
+  }
+
+  trackPremiumPaymentVerificationRecovered(paymentId: string, retryCount: number, timeToRecoveryMs: number, userId?: string) {
+    this.trackEvent('premium_payment_verification_recovered', {
+      payment_id: paymentId,
+      retry_count: retryCount,
+      time_to_recovery_ms: timeToRecoveryMs,
+      user_id: userId
+    });
+  }
+
+  // Donaciones
+  trackDonationViewed(source: 'dashboard' | 'settings' | 'popup' | 'modal') {
+    this.trackEvent('donation_viewed', { source });
+  }
+
+  trackDonationStarted(amount: number, currency: string, campaign?: string) {
+    this.trackEvent('donation_started', { amount, currency, campaign });
+  }
+
+  trackDonationCompleted(amount: number, currency: string, campaign?: string) {
+    this.trackEvent('donation_completed', {
+      amount,
+      currency,
+      payment_method: 'mercadopago',
+      campaign,
+    });
+  }
+
+  trackDonationFailed(reason?: string, amount?: number, currency?: string, campaign?: string) {
+    this.trackEvent('donation_failed', { reason, amount, currency, campaign });
   }
 
   // Ubicación

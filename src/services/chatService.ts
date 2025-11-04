@@ -30,6 +30,7 @@ import { userService } from '@/lib/firestore';
 import { PopulatedChat } from '@/types';
 import { notificationService } from '@/services/notificationService';
 import { realtimeService } from '@/services/realtimeService';
+import { BackgroundSyncPlugin } from 'workbox-background-sync';
 
 export interface ChatMessage {
   id: string;
@@ -96,6 +97,7 @@ export interface OnlineStatus {
 class ChatService {
   private onlineStatusCache = new Map<string, OnlineStatus>();
   private typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private serviceWorkerRegistration: ServiceWorkerRegistration | null = null;
   // Mejorado: Cache para tracking de mensajes pendientes de acknowledgment con cleanup automático
   private pendingAcknowledgments = new Map<string, { 
     messageId: string; 
@@ -108,7 +110,7 @@ class ChatService {
   private messageListeners = new Map<string, { unsubscribe: () => void; lastDoc?: any; hasMore: boolean }>();
   // Nuevo: Sistema de reintento automático
   private retryQueue = new Map<string, { messageData: any; attempts: number; nextRetry: number }>();
-  private isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  private isOnline = true; // will be updated on client
   private retryInterval: ReturnType<typeof setInterval> | null = null;
   private maxRetryAttempts = 5;
   private baseRetryDelay = 1000; // 1 segundo
@@ -130,8 +132,12 @@ class ChatService {
   };
 
   constructor() {
-    this.setupNetworkListeners();
-    this.startRetryProcessor();
+    if (typeof window !== 'undefined') {
+      this.isOnline = navigator.onLine;
+      this.setupNetworkListeners();
+      this.startRetryProcessor();
+      this.initializeServiceWorker();
+    }
   }
 
   // Nuevo: Configurar listeners de conectividad
@@ -296,6 +302,59 @@ class ChatService {
     console.log(`📝 Mensaje ${messageId} agregado a cola de reintento`);
   }
 
+  // Inicializar Service Worker para sincronización en segundo plano
+  private async initializeServiceWorker(): Promise<void> {
+    if ('serviceWorker' in navigator) {
+      try {
+        this.serviceWorkerRegistration = await navigator.serviceWorker.ready;
+        console.log('🔄 Service Worker inicializado para sincronización en segundo plano');
+      } catch (error) {
+        console.warn('⚠️ No se pudo inicializar Service Worker:', error);
+      }
+    }
+  }
+
+  // Registrar mensaje fallido para sincronización en segundo plano
+  private async registerBackgroundSync(messageId: string, messageData: any): Promise<void> {
+    try {
+      if (this.serviceWorkerRegistration && 'sync' in window.ServiceWorkerRegistration.prototype) {
+        // Usar Background Sync API
+        await this.serviceWorkerRegistration.sync.register(`retry-message-${messageId}`);
+        
+        // Almacenar datos del mensaje en IndexedDB para el Service Worker
+        const request = indexedDB.open('gliter-offline-messages', 1);
+        
+        request.onupgradeneeded = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          if (!db.objectStoreNames.contains('messages')) {
+            db.createObjectStore('messages', { keyPath: 'id' });
+          }
+        };
+        
+        request.onsuccess = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          const transaction = db.transaction(['messages'], 'readwrite');
+          const store = transaction.objectStore('messages');
+          
+          store.put({
+            id: messageId,
+            data: messageData,
+            timestamp: Date.now(),
+            attempts: 0
+          });
+        };
+        
+        console.log(`🔄 Mensaje ${messageId} registrado para sincronización en segundo plano`);
+      } else {
+        // Fallback a cola de reintentos en memoria
+        this.addToRetryQueue(messageId, messageData);
+      }
+    } catch (error) {
+      console.warn('⚠️ Error al registrar sincronización en segundo plano, usando fallback:', error);
+      this.addToRetryQueue(messageId, messageData);
+    }
+  }
+
   // Modificado: sendMessage con manejo de reintento automático
   async sendMessage(
     chatId: string, 
@@ -441,7 +500,7 @@ class ChatService {
         
         // Agregar a cola de reintento si estamos online
         if (this.isOnline) {
-          this.addToRetryQueue(docRef.id, {
+          await this.registerBackgroundSync(docRef.id, {
             chatId,
             senderId,
             receiverId,

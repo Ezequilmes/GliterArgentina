@@ -1,5 +1,55 @@
 import { NextResponse } from 'next/server';
 
+function generateRequestId() {
+  return `mp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function validatePreferenceBody(body: any) {
+  const errors: string[] = [];
+  if (!body || typeof body !== 'object') {
+    errors.push('Cuerpo de la solicitud inválido');
+    return errors;
+  }
+
+  // Validate items
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    errors.push('items es requerido y debe tener al menos un elemento');
+  } else {
+    const item = body.items[0];
+    if (!item.title || typeof item.title !== 'string') {
+      errors.push('items[0].title es requerido');
+    }
+    if (typeof item.quantity !== 'number' || item.quantity < 1) {
+      errors.push('items[0].quantity debe ser un número >= 1');
+    }
+    if (typeof item.unit_price !== 'number' || item.unit_price <= 0) {
+      errors.push('items[0].unit_price debe ser un número > 0');
+    }
+    if (!item.currency_id || typeof item.currency_id !== 'string') {
+      errors.push('items[0].currency_id es requerido');
+    }
+  }
+
+  // Optional: validate back_urls
+  if (body.back_urls) {
+    const { success, failure, pending } = body.back_urls;
+    for (const [key, url] of Object.entries({ success, failure, pending })) {
+      if (url && typeof url === 'string' && !/^https?:\/\//.test(url)) {
+        errors.push(`back_urls.${key} debe ser una URL válida http/https`);
+      }
+    }
+  }
+
+  // Optional: validate notification_url
+  if (body.notification_url && typeof body.notification_url === 'string') {
+    if (!/^https?:\/\//.test(body.notification_url)) {
+      errors.push('notification_url debe ser una URL válida http/https');
+    }
+  }
+
+  return errors;
+}
+
 // Configuración para exportación estática
 export const dynamic = 'force-dynamic';
 export const revalidate = false;
@@ -13,7 +63,18 @@ export const revalidate = false;
  */
 export async function POST(req: Request) {
   try {
+    const requestId = generateRequestId();
     const body = await req.json();
+
+    // Basic payload validation to catch client-side issues early
+    const validationErrors = validatePreferenceBody(body);
+    if (validationErrors.length > 0) {
+      console.error(`[${requestId}] Validation errors:`, validationErrors);
+      return NextResponse.json(
+        { error: 'Parámetros inválidos', details: validationErrors, requestId },
+        { status: 400 }
+      );
+    }
 
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
     if (!accessToken) {
@@ -36,20 +97,31 @@ export async function POST(req: Request) {
     );
 
     if (!mpResponse.ok) {
-      const error = await mpResponse.text();
-      console.error('Error al crear preferencia en Mercado Pago:', error);
+      let errorPayload: any = null;
+      try {
+        errorPayload = await mpResponse.json();
+      } catch {
+        errorPayload = { raw: await mpResponse.text() };
+      }
+      console.error(`[${requestId}] Error al crear preferencia en Mercado Pago:`, errorPayload);
       return NextResponse.json(
-        { error: 'Error al crear preferencia de pago' },
-        { status: 500 }
+        {
+          error: 'Error al crear preferencia de pago',
+          status: mpResponse.status,
+          mpError: errorPayload,
+          requestId,
+        },
+        { status: 502 }
       );
     }
 
     const data = await mpResponse.json();
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, requestId });
   } catch (err) {
-    console.error('Error en create-preference API:', err);
+    const requestId = generateRequestId();
+    console.error(`[${requestId}] Error en create-preference API:`, err);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { error: 'Error interno del servidor', requestId },
       { status: 500 }
     );
   }

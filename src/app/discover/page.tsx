@@ -1,27 +1,68 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { AppLayout, Header } from '@/components/layout';
-import { DiscoverFilters, FilterOptions } from '@/components/discover';
-import { ProfileGrid } from '@/components/discover/ProfileGrid';
-import { Button, Loading } from '@/components/ui';
-import { SuperLikeCounter, PremiumModal } from '@/components/premium';
-import { LocationStatus } from '@/components/location';
-import { useToast } from '@/components/ui/Toast';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import ActionFeedback from '@/components/ui/ActionFeedback';
-import { UserCard } from '@/components/profile';
-import { Settings, Filter, MapPin, User as UserIcon, MessageCircle, Users, Shield, RefreshCw, AlertCircle, Check, AlertTriangle } from 'lucide-react';
-import { userService } from '@/lib/firestore';
-import { matchService } from '@/lib/matchService';
-import { chatService } from '@/services/chatService';
-import { useGeolocation } from '@/hooks/useGeolocation';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
+import { useGeolocation } from '@/hooks/useGeolocation';
+import { userService } from '@/lib/firestore';
+import { User, UserDistance } from '@/types';
+import DiscoverCard from '@/components/discover/DiscoverCard';
+import LocationStatus from '@/components/location/LocationStatus';
+import LoadingSpinner from '@/components/ui/Loading';
+import Button from '@/components/ui/Button';
+import { createLogger } from '@/services/loggingService';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { AppLayout } from '@/components/layout';
+import ActionFeedback from '@/components/ui/ActionFeedback';
+import { DiscoverFilters } from '@/components/discover';
+import { PremiumModal, SuperLikeCounter } from '@/components/premium';
+import { UserCard } from '@/components/profile';
+import { ProfileGrid } from '@/components/discover';
+import { Header } from '@/components/layout';
+import { Shield, MapPin, RefreshCw, AlertTriangle, Heart, Users, Filter, Settings, UserIcon } from 'lucide-react';
+import { chatService } from '@/services/chatService';
 import { analyticsService } from '@/services/analyticsService';
-import type { User, UserDistance } from '@/types';
+
+// Types
+interface UseToastReturn {
+  addToast: (toast: { title: string; message: string; type: 'success' | 'error' | 'warning' | 'info' }) => void;
+}
+
+interface FilterOptions {
+  ageRange: [number, number];
+  maxDistance: number;
+  showMe: 'everyone' | 'men' | 'women';
+  sexualRole: 'any' | 'active' | 'passive' | 'versatile';
+  onlineOnly: boolean;
+  verifiedOnly: boolean;
+  premiumOnly: boolean;
+  hasPhotos: boolean;
+  interests: string[];
+}
+
+// Mock useToast hook for now
+const useToast = (): UseToastReturn => ({
+  addToast: ({ title, message, type }) => {
+    console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
+  }
+});
+
+// Create component-specific logger
+const logger = createLogger('DiscoverPage');
+
+interface DiscoverPageState {
+  nearbyUsers: User[];
+  currentUser: User | null;
+  isLoadingUsers: boolean;
+  userError: string | null;
+  lastLoadTime: number;
+  locationAttempts: number;
+}
+
+// Constants for anti-cycle protection
+const MAX_LOCATION_ATTEMPTS = 3;
+const MIN_LOAD_INTERVAL = 10000; // 10 seconds minimum between loads
+const LOCATION_RETRY_DELAY = 5000; // 5 seconds between location retries
 
 export default function DiscoverPage() {
   const { user } = useAuth();
@@ -29,7 +70,7 @@ export default function DiscoverPage() {
     location, 
     error: locationError, 
     loading: locationLoading,
-    permissionState,
+    permission: permissionState,
     retryCount,
     isWatching,
     getCurrentLocation,
@@ -68,6 +109,34 @@ export default function DiscoverPage() {
     interests: []
   });
 
+  // Anti-infinite loop mechanism
+  const [lastLoadTime, setLastLoadTime] = useState<number>(0);
+  const [locationAttempts, setLocationAttempts] = useState<number>(0);
+
+  // Enhanced logging with centralized service
+  const logDiscoverPage = useCallback((level: 'info' | 'warn' | 'error', message: string, data?: any) => {
+    const context = {
+      userId: user?.id,
+      hasLocation: !!location,
+      permissionState,
+      locationAttempts,
+      nearbyUsersCount: users.length,
+      ...data
+    };
+
+    switch (level) {
+      case 'info':
+        logger.info(message, context);
+        break;
+      case 'warn':
+        logger.warn(message, context);
+        break;
+      case 'error':
+        logger.error(message, context);
+        break;
+    }
+  }, [user?.id, location, permissionState, locationAttempts, users.length]);
+
   // Handle location retry
   const handleLocationRetry = async () => {
     try {
@@ -102,40 +171,65 @@ export default function DiscoverPage() {
     }
   };
 
+  // Constants for anti-cycle protection
+  const MAX_LOCATION_ATTEMPTS = 3;
+  const MIN_LOAD_INTERVAL = 2000; // 2 seconds minimum between loads
+
   useEffect(() => {
-    console.log('🔍 DiscoverPage useEffect triggered');
-    console.log('👤 User:', user ? `authenticated (${user.id})` : 'not authenticated');
-    console.log('📍 Location:', location ? `${location.latitude}, ${location.longitude}` : 'not available');
-    console.log('🔄 Loading state:', isLoading);
-    console.log('🌐 Location loading:', locationLoading);
-    console.log('❌ Location error:', locationError);
-    console.log('🔐 Permission state:', permissionState);
+    console.log('DiscoverPage useEffect triggered');
+    console.log('User:', user ? `authenticated (${user.id})` : 'not authenticated');
+    console.log('Location:', location ? `${location?.coords.latitude}, ${location?.coords.longitude}` : 'not available');
+    console.log('Loading state:', isLoading);
+    console.log('Location loading:', locationLoading);
+    console.log('Location error:', locationError);
+    console.log('Permission state:', permissionState);
     
     if (!user) {
-      console.log('❌ No user authenticated');
+      console.log('No user authenticated');
+      return;
+    }
+
+    // Anti-infinite loop: prevent too frequent location requests
+    const now = Date.now();
+    if (now - lastLoadTime < MIN_LOAD_INTERVAL) {
+      console.log('Skipping location request - too frequent');
       return;
     }
 
     if (!location) {
-      console.log('❌ No location available');
+      console.log('No location available');
       if (locationError) {
-        console.log('📍 Location error details:', locationError);
+        console.log('Location error details:', locationError);
       }
+      
+      // Limit location attempts to prevent infinite loops
+      if (locationAttempts >= MAX_LOCATION_ATTEMPTS) {
+        console.log('Max location attempts reached, stopping');
+        return;
+      }
+      
       // If no location and permission is granted or prompt, try to get it
       if ((permissionState === 'granted' || permissionState === 'prompt') && !locationLoading) {
-        console.log('🔄 Attempting to get current location...');
-        getCurrentLocation().catch(err => console.error('Error getting location on mount:', err));
+        console.log('Attempting to get current location...');
+        setLocationAttempts(prev => prev + 1);
+        getCurrentLocation().catch(err => {
+          console.error('Error getting location on mount:', err);
+          // Don't increment attempts on permission denied to allow manual retry
+          if (!err.message?.includes('denegado') && !err.message?.includes('denied')) {
+            setLocationAttempts(prev => prev + 1);
+          }
+        });
       }
       return;
     }
 
-    console.log('✅ Loading nearby users with location:', location);
+    console.log('Loading nearby users with location:', location);
     
     const loadData = async () => {
-      console.log('🔍 [DiscoverPage] loadData called', { user: !!user, location: !!location });
+      console.log('[DiscoverPage] loadData called', { user: !!user, location: !!location });
       
       if (!user || !location) {
-        console.log('⚠️ [DiscoverPage] Missing user or location', { 
+        console.log('[DiscoverPage] Missing user or location', { 
           hasUser: !!user, 
           hasLocation: !!location,
           locationError,
@@ -145,85 +239,87 @@ export default function DiscoverPage() {
         return;
       }
       
+      // Update last load time to prevent rapid successive calls
+      setLastLoadTime(Date.now());
       setIsLoading(true);
+      
       try {
-        console.log('📍 [DiscoverPage] Loading data with location:', { 
-          lat: location.latitude, 
-          lng: location.longitude, 
-          maxDistance: filters.maxDistance 
-        });
+        console.log('[DiscoverPage] Loading data with location:', { 
+            lat: location.coords.latitude, 
+            lng: location.coords.longitude, 
+            maxDistance: filters.maxDistance 
+          });
         
         // Load current user data
         const userData = await userService.getUser(user.id);
         setCurrentUserData(userData);
         setUserSuperLikes(userData?.superLikes || 0);
         setUserIsPremium(userData?.isPremium || false);
-        console.log('👤 [DiscoverPage] Current user data loaded:', userData?.name);
+        console.log('[DiscoverPage] Current user data loaded:', userData?.name);
 
         // Load nearby users
         const nearbyUsers = await userService.getNearbyUsers(
           user.id,
-          location.latitude,
-          location.longitude,
+          location.coords.latitude,
+          location.coords.longitude,
           filters.maxDistance
         );
         
-        console.log('👥 [DiscoverPage] Nearby users loaded:', nearbyUsers.length);
+        console.log('[DiscoverPage] Nearby users loaded:', nearbyUsers.length);
         
         // Apply additional filters
-        const filteredUsers = nearbyUsers.filter(userWithDistance => {
-          const targetUser = userWithDistance.user;
+        const filteredUsers = nearbyUsers.filter(targetUser => {
           
           // Exclude blocked users
-          if (userData?.blockedUsers?.includes(targetUser.id)) {
+          if (userData?.blockedUsers?.includes(targetUser.user.id)) {
             return false;
           }
           
           // Exclude users who blocked current user
-          if (targetUser.blockedUsers?.includes(user.id)) {
+          if (targetUser.user.blockedUsers?.includes(user.id)) {
             return false;
           }
           
           // Age filter
-          if (targetUser.age && (targetUser.age < filters.ageRange[0] || targetUser.age > filters.ageRange[1])) {
+          if (targetUser.user.age && (targetUser.user.age < filters.ageRange[0] || targetUser.user.age > filters.ageRange[1])) {
             return false;
           }
           
           // Gender/Show me filter
           if (filters.showMe !== 'everyone') {
-            if (filters.showMe === 'men' && targetUser.gender !== 'male') return false;
-            if (filters.showMe === 'women' && targetUser.gender !== 'female') return false;
+            if (filters.showMe === 'men' && targetUser.user.gender !== 'male') return false;
+            if (filters.showMe === 'women' && targetUser.user.gender !== 'female') return false;
           }
           
           // Sexual role filter
-          if (filters.sexualRole !== 'any' && targetUser.sexualRole !== filters.sexualRole) {
+          if (filters.sexualRole !== 'any' && targetUser.user.sexualRole !== filters.sexualRole) {
             return false;
           }
           
           // Online only filter
-          if (filters.onlineOnly && !targetUser.isOnline) {
+          if (filters.onlineOnly && !targetUser.user.isOnline) {
             return false;
           }
           
           // Verified only filter
-          if (filters.verifiedOnly && !targetUser.isVerified) {
+          if (filters.verifiedOnly && !targetUser.user.isVerified) {
             return false;
           }
           
           // Premium only filter
-          if (filters.premiumOnly && !targetUser.isPremium) {
+          if (filters.premiumOnly && !targetUser.user.isPremium) {
             return false;
           }
           
           // Has photos filter
-          if (filters.hasPhotos && (!targetUser.photos || targetUser.photos.length === 0)) {
+          if (filters.hasPhotos && (!targetUser.user.photos || targetUser.user.photos.length === 0)) {
             return false;
           }
           
           // Interests filter
           if (filters.interests.length > 0) {
             const hasMatchingInterest = filters.interests.some(interest => 
-              targetUser.interests?.includes(interest)
+              targetUser.user.interests?.includes(interest)
             );
             if (!hasMatchingInterest) return false;
           }
@@ -234,10 +330,14 @@ export default function DiscoverPage() {
         // Sort by distance
         filteredUsers.sort((a, b) => a.distance - b.distance);
         
-        console.log('🔍 [DiscoverPage] Filtered users:', filteredUsers.length);
-        console.log('📊 [DiscoverPage] Applied filters:', filters);
+        console.log('[DiscoverPage] Filtered users:', filteredUsers.length);
+        console.log('[DiscoverPage] Applied filters:', filters);
         
         setUsers(filteredUsers);
+        
+        // Reset location attempts on successful load
+        setLocationAttempts(0);
+        
       } catch (error) {
         console.error('Error loading data:', error);
         addToast({ 
@@ -251,7 +351,7 @@ export default function DiscoverPage() {
     };
 
     loadData();
-  }, [user, location, locationLoading, locationError, filters, permissionState]);
+  }, [user?.id, location?.coords.latitude, location?.coords.longitude, filters.maxDistance, filters.ageRange, filters.showMe, filters.sexualRole, filters.onlineOnly, filters.verifiedOnly, filters.premiumOnly, filters.hasPhotos, filters.interests]);
 
   // Enhanced location error handling
   const getLocationErrorMessage = () => {
@@ -436,8 +536,8 @@ export default function DiscoverPage() {
       // Load more users with pagination
       const moreUsers = await userService.getNearbyUsers(
         user.id,
-        location.latitude,
-        location.longitude,
+        location.coords.latitude,
+        location.coords.longitude,
         filters.maxDistance,
         users.length // offset
       );
@@ -525,7 +625,7 @@ export default function DiscoverPage() {
                 
                 <Button 
                   variant="outline" 
-                  onClick={() => window.location.reload()}
+                  onClick={() => typeof window !== 'undefined' && window.location.reload()}
                   className="hover:scale-105 transition-transform duration-300"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
@@ -568,7 +668,7 @@ export default function DiscoverPage() {
       }
       
       return {
-        icon: Users,
+        icon: Users as React.ComponentType<{ className?: string }>,
         title: 'Buscando personas increíbles',
         message: 'Estamos encontrando los mejores perfiles para ti',
         submessage: 'Preparando tu experiencia de descubrimiento...',

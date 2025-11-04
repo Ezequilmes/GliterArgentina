@@ -93,20 +93,71 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
   }, []);
 
   // Test actual connectivity by making a request
-  const testConnectivity = useCallback(async (): Promise<boolean> => {
+  const testConnectivity = useCallback(async (retryCount = 0): Promise<boolean> => {
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 segundo base
+    
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const response = await fetch('/api/health', {
-        method: 'GET',
-        signal: controller.signal,
+      
+      // Usar la URL correcta con trailing slash según la configuración de Next.js
+      const healthUrl = process.env.NODE_ENV === 'development' 
+        ? '/api/health/' 
+        : `${window.location.origin}/api/health/`;
+      
+      const response = await fetch(healthUrl, {
+        method: 'HEAD',
         cache: 'no-cache',
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+        },
       });
-
+      
       clearTimeout(timeoutId);
-      return response.ok;
+      
+      if (response.ok) {
+        return true;
+      }
+      
+      // Si la respuesta no es ok, intentar con GET como fallback
+      if (response.status === 405) { // Method Not Allowed
+        const getResponse = await fetch(healthUrl, {
+          method: 'GET',
+          cache: 'no-cache',
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+          },
+        });
+        clearTimeout(timeoutId);
+        return getResponse.ok;
+      }
+      
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      
     } catch (error) {
+      console.warn(`Connectivity test failed (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
+      
+      // Implementar backoff exponencial para reintentos
+      if (retryCount < maxRetries) {
+        const delay = baseDelay * Math.pow(2, retryCount) + Math.random() * 1000; // Jitter
+        console.log(`Retrying connectivity test in ${Math.round(delay)}ms...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return testConnectivity(retryCount + 1);
+      }
+      
+      // Si todos los reintentos fallan, verificar si es un error de red o del servidor
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('Network connectivity issue detected');
+      } else if (error instanceof DOMException && error.name === 'AbortError') {
+        console.error('Connectivity test timed out');
+      } else {
+        console.error('Server connectivity issue:', error);
+      }
+      
       return false;
     }
   }, []);
@@ -116,8 +167,10 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
     if (isRetrying) return false;
 
     setIsRetrying(true);
+    console.log('🔄 Attempting to restore connection...');
     
     try {
+      // Usar testConnectivity que ya tiene reintentos incorporados
       const isConnected = await testConnectivity();
       
       if (isConnected) {
@@ -129,11 +182,24 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
             message: 'La conexión a internet se ha restablecido'
           });
         }
+        
+        // Mostrar notificación de reconexión exitosa
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Conexión restaurada', {
+            body: 'La conexión a internet se ha restablecido',
+            icon: '/logo.svg',
+            tag: 'connection-restored'
+          });
+        }
+        
+        console.log('✅ Connection restored successfully');
         return true;
       }
       
+      console.log('❌ Connection retry failed');
       return false;
     } catch (error) {
+      console.error('Error during connection retry:', error);
       addToastRef.current({
         type: 'error',
         title: 'Error de conexión',
@@ -187,11 +253,23 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
     // Initial check
     updateConnectionInfo();
 
-    // Periodic connectivity check
-    const intervalId = setInterval(async () => {
-      if (navigator.onLine) {
+    // Periodic connectivity check con backoff inteligente
+    let consecutiveFailures = 0;
+    const maxConsecutiveFailures = 3;
+    const baseInterval = 30000; // 30 segundos base
+    
+    const performPeriodicCheck = async () => {
+      // Solo verificar si el navegador indica que está online
+      if (!navigator.onLine) {
+        consecutiveFailures = 0;
+        return;
+      }
+      
+      try {
         const isConnected = await testConnectivity();
+        
         if (!isConnected && isOnline) {
+          consecutiveFailures++;
           setIsOnline(false);
           addToastRef.current({
             type: 'error',
@@ -200,15 +278,35 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
             persistent: true
           });
         } else if (isConnected && !isOnline) {
+          consecutiveFailures = 0;
           setIsOnline(true);
           addToastRef.current({
             type: 'success',
             title: 'Conexión restablecida',
             message: 'La conexión a internet se ha restablecido'
           });
+        } else if (isConnected) {
+          consecutiveFailures = 0;
         }
+      } catch (error) {
+        console.warn('Periodic connectivity check failed:', error);
+        consecutiveFailures++;
       }
-    }, 30000); // Check every 30 seconds
+    };
+    
+    const scheduleNextCheck = () => {
+      // Aumentar el intervalo si hay fallos consecutivos para evitar spam
+      const interval = consecutiveFailures > maxConsecutiveFailures 
+        ? baseInterval * Math.min(Math.pow(2, consecutiveFailures - maxConsecutiveFailures), 8) // Max 4 minutos
+        : baseInterval;
+        
+      setTimeout(() => {
+        performPeriodicCheck().then(scheduleNextCheck);
+      }, interval);
+    };
+    
+    // Iniciar la verificación periódica
+    scheduleNextCheck();
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -218,7 +316,8 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
         connection.removeEventListener('change', handleConnectionChange);
       }
       
-      clearInterval(intervalId);
+      // La verificación periódica se limpia automáticamente cuando el componente se desmonta
+      // ya que usa setTimeout en lugar de setInterval
     };
   }, [isOnline, testConnectivity, updateConnectionInfo]);
 

@@ -1,31 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 
-// Inicializar Firebase Admin si no está inicializado
-if (!admin.apps.length) {
-  const serviceAccount = {
-    type: "service_account",
-    project_id: process.env.FIREBASE_PROJECT_ID,
-    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    client_id: process.env.FIREBASE_CLIENT_ID,
-    auth_uri: "https://accounts.google.com/o/oauth2/auth",
-    token_uri: "https://oauth2.googleapis.com/token",
-    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-    client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.FIREBASE_CLIENT_EMAIL}`
-  } as admin.ServiceAccount;
+// Evitar que Next intente prerender esta ruta y ejecute inicialización en build
+export const dynamic = 'force-dynamic';
+export const revalidate = false;
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: process.env.FIREBASE_PROJECT_ID
-  });
+function ensureAdminInitialized() {
+  if (admin.apps.length) return;
+
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  try {
+    if (projectId && clientEmail && privateKey) {
+      // Inicialización con credenciales explícitas (camelCase, compatibles con firebase-admin)
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+        projectId,
+      });
+    } else {
+      // Fallback a Application Default Credentials para evitar fallo en build
+      admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        projectId: projectId,
+      });
+    }
+  } catch (err) {
+    // No romper el build; la POST validará y responderá con error claro si falta configuración
+    console.warn('⚠️ Firebase Admin no pudo inicializarse durante build:', err);
+  }
 }
-
-const db = admin.firestore();
 
 export async function POST(request: NextRequest) {
   try {
+    // Inicializar Admin de forma perezosa en tiempo de petición
+    ensureAdminInitialized();
+    const db = admin.firestore();
+
+    // Validar que admin esté disponible
+    if (!admin.apps.length) {
+      return NextResponse.json(
+        { error: 'Firebase Admin no está configurado. Verifica variables FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y FIREBASE_PRIVATE_KEY.' },
+        { status: 500 }
+      );
+    }
+
     const { token, userId } = await request.json();
 
     // Validar datos requeridos

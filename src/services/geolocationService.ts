@@ -27,9 +27,9 @@ export class GeolocationService {
   private fallbacks = getWebViewFallbacks();
 
   constructor(private userId: string) {
-    console.log('🌍 GeolocationService initialized for browser:', this.browserInfo.browserName);
+    console.log('GeolocationService initialized for browser:', this.browserInfo.browserName);
     if (this.browserInfo.isTraeApp) {
-      console.log('🎯 Trae App detected - using WebView optimizations');
+      console.log('Trae App detected - using WebView optimizations');
     }
   }
 
@@ -43,7 +43,7 @@ export class GeolocationService {
 
     // Check browser support
     if (!this.browserInfo.supportsGeolocation) {
-      console.warn('🚫 Geolocation not supported in this browser:', this.browserInfo.browserName);
+      console.warn('Geolocation not supported in this browser:', this.browserInfo.browserName);
       if (this.browserInfo.isTraeApp) {
         throw new Error('La geolocalización no está disponible en el navegador integrado de Trae. Por favor, abre la aplicación en tu navegador principal para usar esta función.');
       } else {
@@ -51,7 +51,7 @@ export class GeolocationService {
       }
     }
 
-    if (!navigator.geolocation) {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
       throw new Error('Geolocation is not supported by this browser');
     }
 
@@ -80,18 +80,18 @@ export class GeolocationService {
     }
 
     // Start watching position
-    this.watchId = navigator.geolocation.watchPosition(
+    this.watchId = typeof navigator !== 'undefined' && navigator.geolocation ? navigator.geolocation.watchPosition(
       (position) => this.handlePositionUpdate(position),
       (error) => this.handlePositionError(error),
       geolocationOptions
-    );
+    ) : null;
   }
 
   /**
    * Stop tracking user location
    */
   stopTracking(): void {
-    if (this.watchId !== null) {
+    if (this.watchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.clearWatch(this.watchId);
       this.watchId = null;
     }
@@ -103,7 +103,11 @@ export class GeolocationService {
    */
   private getCurrentPosition(options: PositionOptions): Promise<GeolocationPosition> {
     return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      } else {
+        reject(new Error('Geolocation is not supported by this browser'));
+      }
     });
   }
 

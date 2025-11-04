@@ -41,7 +41,7 @@ export function calculateDistance(
  */
 export function getCurrentLocation(): Promise<Location> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
       reject(new Error('Geolocalización no soportada por este navegador'));
       return;
     }
@@ -88,7 +88,7 @@ export function watchLocation(
   onLocationUpdate: (location: Location) => void,
   onError: (error: Error) => void
 ): number | null {
-  if (!navigator.geolocation) {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
     onError(new Error('Geolocalización no soportada por este navegador'));
     return null;
   }
@@ -131,7 +131,9 @@ export function watchLocation(
  * Detiene el seguimiento de ubicación
  */
 export function stopWatchingLocation(watchId: number): void {
-  navigator.geolocation.clearWatch(watchId);
+  if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    navigator.geolocation.clearWatch(watchId);
+  }
 }
 
 /**
@@ -195,6 +197,9 @@ export async function requestLocationPermission(): Promise<boolean> {
   }
 
   try {
+    if (typeof navigator === 'undefined' || !navigator.permissions) {
+      return false;
+    }
     const permission = await navigator.permissions.query({ name: 'geolocation' });
     
     if (permission.state === 'granted') {

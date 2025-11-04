@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Crown, Star, Heart, Zap, Check, ArrowLeft, Loader2, Shield } from 'lucide-react';
+import { Crown, Star, Heart, Zap, Check, ArrowLeft, Loader2, Shield, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { Card } from '@/components/ui';
 import { toast } from 'react-hot-toast';
-import { PREMIUM_PLANS, createPaymentPreference } from '@/lib/mercadopago';
+import { PREMIUM_PLANS, createPaymentPreference, validateMercadoPagoConfig } from '@/lib/mercadopago';
 import Link from 'next/link';
 import { analyticsService } from '@/services/analyticsService';
 
@@ -15,6 +15,29 @@ export default function PremiumPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [configStatus, setConfigStatus] = useState<{ isValid: boolean; errors: string[] } | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Validate MercadoPago configuration on component mount
+  useEffect(() => {
+    const validateConfig = async () => {
+      try {
+        const config = validateMercadoPagoConfig();
+        setConfigStatus(config);
+        
+        if (!config.isValid) {
+          console.error('MercadoPago configuration errors:', config.errors);
+          setError(`Error de configuración: ${config.errors.join(', ')}`);
+        }
+      } catch (error) {
+        console.error('Error validating MercadoPago config:', error);
+        setConfigStatus({ isValid: false, errors: ['Error al validar configuración'] });
+      }
+    };
+
+    validateConfig();
+  }, []);
 
   // Track premium page view
   useEffect(() => {
@@ -25,10 +48,97 @@ export default function PremiumPage() {
     }
   }, []);
 
+  const validatePlanConsistency = (plan: typeof PREMIUM_PLANS[0]): boolean => {
+    // Validate plan price consistency
+    const expectedPrices = {
+      'premium-monthly': 4990,
+      'premium-quarterly': 12990,
+      'premium-yearly': 49990
+    };
+    
+    const expectedPrice = expectedPrices[plan.id as keyof typeof expectedPrices];
+    if (expectedPrice && plan.price !== expectedPrice) {
+      console.error(`Price inconsistency for plan ${plan.id}: expected ${expectedPrice}, got ${plan.price}`);
+      return false;
+    }
+    
+    // Validate duration consistency
+    const expectedDurations = {
+      'premium-monthly': 30,
+      'premium-quarterly': 90,
+      'premium-yearly': 365
+    };
+    
+    const expectedDuration = expectedDurations[plan.id as keyof typeof expectedDurations];
+    if (expectedDuration && plan.duration !== expectedDuration) {
+      console.error(`Duration inconsistency for plan ${plan.id}: expected ${expectedDuration}, got ${plan.duration}`);
+      return false;
+    }
+    
+    // Validate price progression (longer plans should be cheaper per month)
+    const monthlyEquivalent = (plan.price / plan.duration) * 30;
+    if (plan.id === 'premium-quarterly' && monthlyEquivalent >= 4990) {
+      console.error(`Quarterly plan not cost-effective: ${monthlyEquivalent} vs monthly 4990`);
+      return false;
+    }
+    if (plan.id === 'premium-yearly' && monthlyEquivalent >= 4000) {
+      console.error(`Yearly plan not cost-effective: ${monthlyEquivalent} vs monthly 4990`);
+      return false;
+    }
+    
+    return true;
+  };
+
+  const validatePaymentAmount = (amount: number): { isValid: boolean; error?: string } => {
+    // Validate minimum amount (MercadoPago minimum is usually 1 ARS)
+    if (amount < 100) { // 1 ARS in cents
+      return { isValid: false, error: 'El monto mínimo es de $1.00 ARS' };
+    }
+    
+    // Validate maximum amount (reasonable limit for premium plans)
+    if (amount > 1000000) { // $10,000 ARS
+      return { isValid: false, error: 'El monto excede el límite permitido' };
+    }
+    
+    // Validate that amount is in cents (should be whole number)
+    if (!Number.isInteger(amount)) {
+      return { isValid: false, error: 'El monto debe ser un número entero' };
+    }
+    
+    // Validate against known plan prices
+    const validAmounts = [4990, 12990, 49990];
+    if (!validAmounts.includes(amount)) {
+      console.warn(`Unusual payment amount detected: ${amount}`);
+      // Don't block, but log for monitoring
+      // Log unusual payment amount for monitoring
+      console.warn(`Unusual payment amount detected: ${amount} for user ${user?.id}`);
+    }
+    
+    return { isValid: true };
+  };
+
   const handlePurchase = async (planId: string) => {
     if (!user?.id) {
       toast.error('Debes iniciar sesión para continuar');
       router.push('/auth/login');
+      return;
+    }
+
+    // Validate configuration before attempting payment
+    const config = validateMercadoPagoConfig();
+    if (!config.isValid) {
+      const errorMessage = `Error de configuración: ${config.errors.join(', ')}`;
+      console.error('Configuration validation failed:', errorMessage);
+      toast.error('Error en la configuración del sistema. Por favor, contacta al soporte.');
+      setError(errorMessage);
+      
+      // Track configuration error
+      // Log configuration error for monitoring
+      console.error('Premium configuration error:', {
+        errors: config.errors,
+        planId: planId,
+        userId: user.id
+      });
       return;
     }
 
@@ -38,20 +148,77 @@ export default function PremiumPage() {
       return;
     }
 
+    // Validate plan consistency
+    if (!validatePlanConsistency(plan)) {
+      const errorMessage = 'Error en la configuración del plan. Por favor, contacta al soporte.';
+      console.error('Plan consistency validation failed for plan:', planId);
+      setError(errorMessage);
+      toast.error(errorMessage);
+      
+      analyticsService.trackEvent('premium_purchase_failed', {
+        plan_type: planId as 'monthly' | 'yearly',
+        price: plan.price,
+        reason: 'Plan consistency validation failed',
+        payment_method: 'mercadopago',
+        error_code: 'plan_consistency_error'
+      });
+      return;
+    }
+
+    // Validate payment amount
+    const amountValidation = validatePaymentAmount(plan.price);
+    if (!amountValidation.isValid) {
+      console.error('Payment amount validation failed:', amountValidation.error);
+      setError(amountValidation.error!);
+      toast.error(amountValidation.error!);
+      
+      analyticsService.trackEvent('premium_purchase_failed', {
+        plan_type: planId as 'monthly' | 'yearly',
+        price: plan.price,
+        reason: 'Payment amount validation failed',
+        payment_method: 'mercadopago',
+        error_code: 'amount_validation_error'
+      });
+      return;
+    }
+
+    // Validate user data
+    if (!user.email || !user.email.includes('@')) {
+      toast.error('Por favor, actualiza tu email en la configuración de tu perfil');
+      router.push('/settings');
+      return;
+    }
+
+    // Additional validation: prevent duplicate purchases if user is already premium
+    if (user.isPremium) {
+      toast.error('Ya tienes un plan premium activo');
+      router.push('/dashboard');
+      return;
+    }
+
     setLoading(planId);
+    setError(null);
+    
     try {
       // Track premium purchase started
-      const planType = plan.duration === 12 ? 'yearly' : 'monthly';
-      analyticsService.trackPremiumPurchaseStarted(planType, plan.price);
+      const planType = plan.duration === 12 ? 'yearly' : plan.duration === 90 ? 'quarterly' : 'monthly';
+      analyticsService.trackPremiumPurchaseStarted(planType as 'monthly' | 'yearly', plan.price);
 
       const preference = await createPaymentPreference(
         user.id,
         plan.id,
-        user.email || '',
+        user.email,
         user.name || 'Usuario'
       );
 
       if (preference.initPoint) {
+        // Track successful preference creation
+        analyticsService.trackEvent('premium_purchase_completed', {
+          plan_type: planType as 'monthly' | 'yearly',
+          price: plan.price,
+          payment_method: 'mercadopago'
+        });
+        
         // Redirigir a MercadoPago
         window.location.href = preference.initPoint;
       } else {
@@ -59,7 +226,42 @@ export default function PremiumPage() {
       }
     } catch (error) {
       console.error('Error al crear preferencia de pago:', error);
-      toast.error('Error al procesar el pago. Inténtalo de nuevo.');
+      
+      let errorMessage = 'Error al procesar el pago. Inténtalo de nuevo.';
+      let errorType = 'unknown';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('configuration')) {
+          errorMessage = 'Error en la configuración del sistema. Por favor, contacta al soporte.';
+          errorType = 'configuration';
+        } else if (error.message.includes('credentials')) {
+          errorMessage = 'Error de autenticación con el proveedor de pagos.';
+          errorType = 'credentials';
+        } else if (error.message.includes('Invalid')) {
+          errorMessage = 'Datos inválidos. Por favor, verifica tu información.';
+          errorType = 'validation';
+        } else if (error.message.includes('amount')) {
+          errorMessage = 'Error en el monto del pago. Por favor, contacta al soporte.';
+          errorType = 'amount_validation';
+        } else {
+          errorMessage = 'Error al procesar el pago. Por favor, intenta nuevamente.';
+          errorType = 'processing';
+        }
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
+      
+      // Track payment error
+      analyticsService.trackPremiumPurchaseFailed(
+        error instanceof Error ? error.message : 'Unknown error',
+        planId as 'monthly' | 'yearly',
+        plan.price,
+        errorType
+      );
+      
+      // Increment retry count
+      setRetryCount(prev => prev + 1);
     } finally {
       setLoading(null);
     }
@@ -85,9 +287,62 @@ export default function PremiumPage() {
     return Math.round(savings);
   };
 
+  const handleRetry = () => {
+    setError(null);
+    setRetryCount(0);
+    // Re-validate configuration
+    const config = validateMercadoPagoConfig();
+    setConfigStatus(config);
+    if (!config.isValid) {
+      setError(`Error de configuración: ${config.errors.join(', ')}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 dark:from-gray-900 dark:via-purple-900/20 dark:to-indigo-900/20">
       <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        
+        {/* Configuration Error Banner */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 rounded-lg">
+            <div className="flex items-center mb-2">
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
+              <h3 className="text-red-800 dark:text-red-200 font-medium">Error de Configuración</h3>
+            </div>
+            <p className="text-red-700 dark:text-red-300 text-sm mb-3">{error}</p>
+            <div className="flex space-x-2">
+              <Button
+                onClick={handleRetry}
+                variant="outline"
+                size="sm"
+                className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-600 dark:text-red-300 dark:hover:bg-red-900/20"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Reintentar
+              </Button>
+              <Button
+                onClick={() => window.location.href = '/support'}
+                variant="outline"
+                size="sm"
+                className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-600 dark:text-red-300 dark:hover:bg-red-900/20"
+              >
+                Contactar Soporte
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Configuration Status Indicator */}
+        {configStatus && !configStatus.isValid && !error && (
+          <div className="mb-6 p-4 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-600 rounded-lg">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" />
+              <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                Algunas configuraciones no están completas. El pago podría no funcionar correctamente.
+              </p>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between mb-6 sm:mb-8">
           <Link
@@ -221,12 +476,12 @@ export default function PremiumPage() {
                     
                     <Button
                       onClick={() => handlePurchase(plan.id)}
-                      disabled={loading === plan.id || user?.isPremium}
+                      disabled={loading === plan.id || user?.isPremium || !configStatus?.isValid}
                       className={`w-full py-2 sm:py-3 px-4 sm:px-6 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
                         isPopular
                           ? 'bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white shadow-lg hover:shadow-xl'
                           : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                      } ${loading === plan.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      } ${loading === plan.id || !configStatus?.isValid ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {loading === plan.id ? (
                         <div className="flex items-center justify-center">
@@ -235,6 +490,8 @@ export default function PremiumPage() {
                         </div>
                       ) : user?.isPremium ? (
                         'Plan Activo'
+                      ) : !configStatus?.isValid ? (
+                        'Pago no disponible'
                       ) : (
                         `Seleccionar ${plan.name}`
                       )}

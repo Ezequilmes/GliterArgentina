@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { CheckCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Loader2, ArrowLeft, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { analyticsService } from '@/services/analyticsService';
 
@@ -18,6 +18,7 @@ function PaymentSuccessContent() {
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -27,7 +28,12 @@ function PaymentSuccessContent() {
   const externalReference = searchParams.get('external_reference');
 
   useEffect(() => {
-    const verifyPayment = async () => {
+    const startTime = Date.now();
+    
+    const verifyPayment = async (currentRetryCount = 0) => {
+      const maxRetries = 3;
+      const retryDelay = 2000; // 2 seconds
+
       if (!paymentId) {
         setError('ID de pago no encontrado');
         setLoading(false);
@@ -43,6 +49,7 @@ function PaymentSuccessContent() {
 
         const data = await response.json();
         setPaymentInfo(data);
+        setRetryCount(currentRetryCount);
 
         // Track premium purchase completed if payment was successful
         if (data.status === 'approved') {
@@ -50,15 +57,53 @@ function PaymentSuccessContent() {
             // Determine plan type based on amount (this is a simplified approach)
             const planType = data.amount >= 10000 ? 'yearly' : 'monthly';
             analyticsService.trackPremiumPurchaseCompleted(planType, data.amount);
+            
+            // Track payment verification recovery if we had retries
+            if (currentRetryCount > 0) {
+              const timeToRecovery = Date.now() - startTime;
+              analyticsService.trackPremiumPaymentVerificationRecovered(
+                paymentId,
+                currentRetryCount,
+                timeToRecovery
+              );
+            }
           } catch (analyticsError) {
             console.error('Error tracking premium purchase completed:', analyticsError);
           }
+        } else if (data.status === 'pending' && currentRetryCount < maxRetries) {
+          console.log(`Payment still pending, retrying in ${retryDelay}ms... (attempt ${currentRetryCount + 1}/${maxRetries})`);
+          
+          // Track payment verification failure
+          analyticsService.trackPremiumPaymentVerificationFailed(
+            paymentId,
+            'Payment still pending',
+            currentRetryCount
+          );
+          
+          setTimeout(() => verifyPayment(currentRetryCount + 1), retryDelay);
+          return;
         }
       } catch (err) {
-        setError('Error al verificar el estado del pago');
         console.error('Error:', err);
+        
+        // Track payment verification failure
+        analyticsService.trackPremiumPaymentVerificationFailed(
+          paymentId,
+          err instanceof Error ? err.message : 'Unknown error',
+          currentRetryCount
+        );
+        
+        // Retry on network errors
+        if (currentRetryCount < maxRetries) {
+          console.log(`Error verifying payment, retrying in ${retryDelay}ms... (attempt ${currentRetryCount + 1}/${maxRetries})`);
+          setTimeout(() => verifyPayment(currentRetryCount + 1), retryDelay);
+          return;
+        }
+        setError('Error al verificar el estado del pago');
       } finally {
-        setLoading(false);
+        if (currentRetryCount === 0) {
+          setLoading(false);
+        }
       }
     };
 
@@ -82,58 +127,42 @@ function PaymentSuccessContent() {
     });
   };
 
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    setRetryCount(0);
+    // Restart the verification process
+    window.location.reload();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
-        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8">
-          <div className="text-center space-y-6">
-            {/* Animated Payment Icon */}
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500/20 to-pink-500/20 border border-green-500/30 flex items-center justify-center mx-auto animate-pulse">
-              <CheckCircle className="w-10 h-10 text-green-500 animate-bounce" />
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+          <div className="text-center">
+            <div className="relative mx-auto mb-6">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-pink-500 mx-auto"></div>
+              <div className="absolute inset-0 rounded-full h-16 w-16 border-t-2 border-purple-500 animate-spin animation-delay-200"></div>
             </div>
-
-            {/* Loading Dots */}
-            <div className="flex justify-center space-x-2">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="w-2 h-2 bg-green-500 rounded-full animate-bounce"
-                  style={{ animationDelay: `${i * 0.2}s` }}
-                />
-              ))}
-            </div>
-
-            {/* Title and Message */}
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-foreground">
-                Verificando tu pago
-              </h3>
-              <p className="text-muted-foreground">
-                Confirmando los detalles de tu transacción...
-              </p>
-              <p className="text-sm text-muted-foreground/60">
-                Esto solo tomará unos segundos
-              </p>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="w-full bg-muted rounded-full h-2">
-              <div 
-                className="h-2 bg-gradient-to-r from-green-500 to-pink-500 rounded-full animate-pulse"
-                style={{ width: '80%', animation: 'pulse 2s infinite' }}
-              />
-            </div>
-
-            {/* Payment ID if available */}
-            {paymentId && (
-              <div className="text-xs text-muted-foreground/60 font-mono bg-muted/50 px-3 py-2 rounded">
-                ID: {paymentId}
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Verificando tu pago...</h2>
+            <p className="text-gray-600 mb-6">Por favor espera mientras confirmamos tu transacción.</p>
+            
+            <div className="space-y-4">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-gradient-to-r from-pink-500 to-purple-500 h-2.5 rounded-full transition-all duration-500 ease-out" 
+                  style={{ width: `${Math.min((retryCount || 0) * 25, 100)}%` }}
+                ></div>
               </div>
-            )}
-
-            {/* Tip */}
-            <div className="text-xs text-muted-foreground/60 italic">
-              💳 Verificando el estado de tu pago con Mercado Pago
+              <p className="text-sm text-gray-500">Intento {retryCount || 0} de 3</p>
+              
+              {(retryCount || 0) > 1 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800">
+                    <span className="font-medium">Nota:</span> Esto puede tomar unos momentos más de lo habitual.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -143,22 +172,56 @@ function PaymentSuccessContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
-        <div className="max-w-md mx-auto text-center bg-white rounded-2xl shadow-xl p-8">
-          <div className="text-red-500 mb-4">
-            <svg className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+          <div className="text-center">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <XCircle className="w-10 h-10 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-3">Error al verificar el pago</h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+            
+            {retryCount >= 3 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold text-red-800 mb-2">¿Qué puedes hacer?</h3>
+                <ul className="text-sm text-red-700 space-y-1 text-left">
+                  <li>• Verifica tu conexión a internet</li>
+                  <li>• Comprueba que el pago se haya procesado en Mercado Pago</li>
+                  <li>• Contacta a soporte si el problema persiste</li>
+                </ul>
+              </div>
+            )}
+            
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={handleRetry}
+                disabled={retryCount >= 3}
+                className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  retryCount >= 3
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-pink-500 text-white hover:bg-pink-600 hover:shadow-lg'
+                }`}
+              >
+                {retryCount >= 3 ? 'Límite de intentos alcanzado' : 'Reintentar'}
+              </button>
+              <button
+                onClick={() => window.location.href = '/premium'}
+                className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              >
+                Volver a Premium
+              </button>
+            </div>
+            
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-500 mb-3">¿Necesitas ayuda?</p>
+              <a
+                href="mailto:soporte@glitterargentina.com"
+                className="text-pink-600 hover:text-pink-700 font-medium text-sm"
+              >
+                Contactar a soporte
+              </a>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Error de Verificación</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Link
-            href="/premium"
-            className="inline-flex items-center px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver a Premium
-          </Link>
         </div>
       </div>
     );

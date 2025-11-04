@@ -7,9 +7,12 @@ import { firebaseConfig } from '@/lib/firebase-config';
 // Declaración de tipos para Background Sync API
 declare global {
   interface ServiceWorkerRegistration {
-    sync: {
-      register(tag: string): Promise<void>;
-    };
+    readonly sync: SyncManager;
+  }
+  
+  interface SyncManager {
+    register(tag: string): Promise<void>;
+    getTags(): Promise<string[]>;
   }
 }
 
@@ -214,6 +217,33 @@ export function useServiceWorker(): UseServiceWorkerReturn {
         return;
       }
 
+      // Check network connectivity before attempting registration
+      if (!navigator.onLine) {
+        console.warn('No network connection available for Service Worker registration');
+        addToastRef.current({
+          type: 'warning',
+          title: 'Sin conexión',
+          message: 'Se requiere conexión a internet para la configuración inicial',
+        });
+        return;
+      }
+
+      // Verify Service Worker file is accessible
+      try {
+        const response = await fetch('/sw.js', { method: 'HEAD' });
+        if (!response.ok) {
+          throw new Error(`Service Worker file not accessible: ${response.status}`);
+        }
+      } catch (fetchError) {
+        console.error('Service Worker file check failed:', fetchError);
+        addToastRef.current({
+          type: 'error',
+          title: 'Error de configuración',
+          message: 'No se puede acceder al archivo de configuración offline',
+        });
+        return;
+      }
+
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/',
         updateViaCache: 'imports'
@@ -224,18 +254,12 @@ export function useServiceWorker(): UseServiceWorkerReturn {
       // Register Firebase Messaging Service Worker
       try {
         const firebaseRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-          scope: '/firebase-cloud-messaging-push-scope',
+          scope: '/',
           updateViaCache: 'imports'
         });
         console.log('Firebase Messaging Service Worker registered:', firebaseRegistration);
         
-        // Send Firebase config to firebase messaging service worker
-        if (firebaseRegistration.active) {
-          firebaseRegistration.active.postMessage({
-            type: 'FIREBASE_CONFIG',
-            config: firebaseConfig
-          });
-        }
+        // No need to send config since it's embedded in the service worker
       } catch (firebaseError) {
         console.error('Firebase Messaging Service Worker registration failed:', firebaseError);
         // Continue even if Firebase SW fails to register
@@ -247,14 +271,6 @@ export function useServiceWorker(): UseServiceWorkerReturn {
         isInstalling: false,
         registration,
       }));
-
-      // Send Firebase config to service worker
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'FIREBASE_CONFIG',
-          config: firebaseConfig
-        });
-      }
 
       // Listen for updates
       registration.addEventListener('updatefound', () => {
@@ -355,11 +371,22 @@ export function useServiceWorker(): UseServiceWorkerReturn {
 
           case 'TypeError':
             console.error('TypeError: Service Worker script failed to load or parse');
-            addToastRef.current({
-              type: 'error',
-              title: 'Error de carga',
-              message: 'No se pudo cargar la configuración offline',
-            });
+            console.error('Error details:', error.message);
+            
+            // Check if it's a network issue or script parsing issue
+            if (error.message.includes('Failed to fetch') || error.message.includes('network')) {
+              addToastRef.current({
+                type: 'warning',
+                title: 'Conexión requerida',
+                message: 'Se requiere conexión a internet para la configuración inicial',
+              });
+            } else {
+              addToastRef.current({
+                type: 'error',
+                title: 'Error de configuración',
+                message: 'Error en el archivo de configuración offline. Recargue la página.',
+              });
+            }
             break;
 
           default:
@@ -598,7 +625,7 @@ export function usePushNotifications() {
     setPermission(getPermission());
   }, []);
 
-  const requestPermission = async (): Promise<NotificationPermission> => {
+  const requestPermission = useCallback(async (): Promise<NotificationPermission> => {
     if (!isSupported) {
       console.warn('Push notifications are not supported');
       return 'denied';
@@ -621,9 +648,9 @@ export function usePushNotifications() {
       console.error('Permission request failed:', error);
       return 'denied';
     }
-  };
+  }, [isSupported]);
 
-  const subscribe = async (): Promise<PushSubscription | null> => {
+  const subscribe = useCallback(async (): Promise<PushSubscription | null> => {
     if (!isSupported || permission !== 'granted') {
       return null;
     }
@@ -701,9 +728,9 @@ export function usePushNotifications() {
       console.error('Push subscription failed:', error);
       return null;
     }
-  };
+  }, [isSupported, permission]);
 
-  const unsubscribe = async (): Promise<void> => {
+  const unsubscribe = useCallback(async (): Promise<void> => {
     if (!subscription) return;
 
     try {
@@ -725,7 +752,7 @@ export function usePushNotifications() {
     } catch (error) {
       console.error('Push unsubscription failed:', error);
     }
-  };
+  }, [subscription, addToast]);
 
   return {
     isSupported,

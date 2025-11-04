@@ -63,14 +63,33 @@ export function PWAInitializer() {
     }
 
     // Request notification permission after user interaction
-    const handleUserInteraction = async () => {
+    const handleUserInteraction = async (event: Event) => {
+      // Verificar que el evento sea una interacción real del usuario
+      if (!event.isTrusted) {
+        console.warn('PWA: Ignoring untrusted user interaction event');
+        return;
+      }
+
       // Evitar suscripción repetida si ya está habilitada previamente
       if (localStorage.getItem('pushEnabled') === 'true') {
         return;
       }
 
+      // Verificar que el permiso actual permita la solicitud
+      const currentPermission = typeof window !== 'undefined' && window.Notification 
+        ? window.Notification.permission 
+        : 'default';
+      
+      if (currentPermission === 'denied') {
+        console.log('PWA: Notification permission already denied, skipping request');
+        return;
+      }
+
       if (pushSupported && isOnline) {
         try {
+          // Agregar un pequeño delay para asegurar que la interacción del usuario sea válida
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           const permission = await requestPermission();
           if (permission === 'granted') {
             const subscription = await subscribe();
@@ -98,14 +117,15 @@ export function PWAInitializer() {
     };
 
     // Wait for user interaction before requesting permissions
-    document.addEventListener('click', handleUserInteraction, { once: true });
-    document.addEventListener('touchstart', handleUserInteraction, { once: true });
+    // Usar passive: false para asegurar que podemos detectar eventos trusted
+    document.addEventListener('click', handleUserInteraction, { once: true, passive: false });
+    document.addEventListener('touchstart', handleUserInteraction, { once: true, passive: false });
 
     return () => {
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
     };
-  }, [pushSupported, isOnline, requestPermission, subscribe, addToast]);
+  }, [pushSupported, isOnline, requestPermission, subscribe, addToast, browserInfo.isWebView, browserInfo.isTraeApp]);
 
   // This component doesn't render anything
   return null;

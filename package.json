@@ -15,11 +15,11 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "type-check": "tsc --noEmit",
+    "generate:notification-icons": "node scripts/generate-notification-icons.js",
     "prepare:ci": "rm -rf node_modules package-lock.json && npm ci --omit=dev && npm run type-check",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "mcp": "node scripts/mcp-server.js",
     "setup:production": "npm run build:production && npm run type-check",
     "deploy:apphosting": "firebase apphosting:backends:create --project gliter-argentina",
     "deploy:functions": "firebase deploy --only functions --project gliter-argentina",
@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@dataconnect/generated": "file:src/dataconnect-generated",
+    "@modelcontextprotocol/sdk": "^1.21.0",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -50,6 +51,7 @@
     "tailwind-merge": "^3.3.1",
     "typescript": "5.9.3",
     "uuid": "^13.0.0",
+    "workbox-background-sync": "^7.3.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -72,7 +74,8 @@
     "tailwindcss": "^3.4.18",
     "tailwindcss-animate": "^1.0.7",
     "ts-jest": "^29.4.4",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "sharp": "^0.33.5"
   },
   "resolutions": {
     "@firebase/logger": "0.5.0"

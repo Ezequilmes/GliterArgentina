@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -14,13 +14,18 @@ import {
   Crown,
   Shield,
   MapPin,
-  Calendar
+  Calendar,
+  HeartHandshake
 } from 'lucide-react';
+import { createDonationPreference } from '@/lib/mercadopago';
+import { analyticsService } from '@/services/analyticsService';
 
 
 export default function DashboardPage() {
   const { user, loading, initializing } = useAuth();
   const router = useRouter();
+  const [donating, setDonating] = useState(false);
+  const [donationError, setDonationError] = useState<string | null>(null);
 
   if (loading || initializing) {
     return (
@@ -218,7 +223,7 @@ export default function DashboardPage() {
                       Hoy
                     </span>
                   </div>
-                </div>
+              </div>
               </Card>
 
               {/* Membership Status */}
@@ -243,6 +248,78 @@ export default function DashboardPage() {
                     </Button>
                   )}
                 </div>
+              </Card>
+
+              {/* Donations Card */}
+              <Card padding="lg">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center">
+                      <HeartHandshake className="w-5 h-5 mr-2 text-pink-500" />
+                      Apoya el proyecto
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      Tu aporte nos ayuda a mantener y mejorar Gliter Argentina.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {[100000, 300000, 1000000].map((amount) => (
+                    <Button
+                      key={amount}
+                      variant="primary"
+                      disabled={donating}
+                      onClick={async () => {
+                        if (!user?.email || !(user as any)?.name) {
+                          setDonationError('Completa tu perfil (nombre y email) para donar');
+                          return;
+                        }
+                        const userId = (user as any)?.id ?? (user as any)?.uid;
+                        if (!userId) {
+                          setDonationError('No se encontró tu usuario. Intenta iniciar sesión nuevamente.');
+                          return;
+                        }
+                        setDonationError(null);
+                        setDonating(true);
+                        try {
+                          analyticsService.trackDonationStarted(amount, 'ARS', 'general');
+                          const pref = await createDonationPreference(
+                            userId,
+                            amount,
+                            'ARS',
+                            user.email!,
+                            (user as any).name,
+                            { campaignId: 'general' }
+                          );
+                          if (pref?.initPoint) {
+                            window.location.href = pref.initPoint;
+                          }
+                        } catch (e: any) {
+                          console.error(e);
+                          setDonationError(e?.message || 'No se pudo iniciar la donación');
+                          analyticsService.trackDonationFailed(e?.message, amount, 'ARS', 'general');
+                        } finally {
+                          setDonating(false);
+                        }
+                      }}
+                      className="h-12"
+                    >
+                      <div className="flex items-center justify-center">
+                        <Heart className="w-5 h-5 mr-2" />
+                        <span>
+                          Donar {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount / 100)}
+                        </span>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+
+                {donationError && (
+                  <div className="mt-4 text-sm text-destructive">
+                    {donationError}
+                  </div>
+                )}
               </Card>
             </div>
           </div>

@@ -272,6 +272,16 @@ service cloud.firestore {
       // Solo admins pueden leer y escribir estadísticas
       allow read, write: if isAdmin();
     }
+
+    // Donations collection - registros de donaciones
+    match /donations/{donationId} {
+      // Lectura: el dueño del documento (userId) o admins
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin());
+      // Listado: solo admins
+      allow list: if isAuthenticated() && isAdmin();
+      // Escritura: solo admins (la app/servidor crea y actualiza estos registros)
+      allow create, update, delete: if isAdmin();
+    }
     
     // Exclusive registrations - registros del formulario de exclusivos
     match /exclusive-registrations/{registrationId} {

@@ -82,7 +82,7 @@ export default function RootLayout({
                                    window.navigator.standalone ||
                                    document.referrer.includes('android-app://');
                 
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(window.navigator.userAgent);
                 
                 // Only run cleanup in production and not in standalone mode
                 if (${process.env.NODE_ENV === 'production'} && !isStandalone && 'serviceWorker' in navigator) {

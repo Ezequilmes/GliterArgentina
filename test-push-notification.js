@@ -51,8 +51,8 @@ async function testPushNotification() {
         notification: {
           title: '🧪 Prueba de Notificación',
           body: 'Esta es una prueba de notificación push con sonido',
-          icon: '/icons/icon-192x192.png',
-          badge: '/icons/icon-144x144.png',
+          icon: '/icons/notification-icon-192x192.png',
+          badge: '/icons/notification-badge-72x72.png',
           vibrate: [200, 100, 200],
           requireInteraction: true,
           silent: false,

@@ -142,15 +142,19 @@ export class ErrorBoundary extends Component<Props, State> {
     const reportData = {
       errorId,
       message: error?.message || 'Unknown error',
-      userAgent: navigator.userAgent,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'server-side',
       timestamp: new Date().toISOString(),
       isMobile
     };
     
     // Copiar información del error al clipboard
-    navigator.clipboard?.writeText(JSON.stringify(reportData, null, 2))
-      .then(() => alert('Información del error copiada al portapapeles'))
-      .catch(() => alert(`Error ID: ${errorId}\nPor favor, reporta este ID al soporte.`));
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(JSON.stringify(reportData, null, 2))
+        .then(() => alert('Información del error copiada al portapapeles'))
+        .catch(() => alert(`Error ID: ${errorId}\nPor favor, reporta este ID al soporte.`));
+    } else {
+      alert(`Error ID: ${errorId}\nPor favor, reporta este ID al soporte.`);
+    }
   };
 
   render() {
