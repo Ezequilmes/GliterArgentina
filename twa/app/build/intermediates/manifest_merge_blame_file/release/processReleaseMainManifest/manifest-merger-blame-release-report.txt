@@ -1,0 +1,471 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<!--
+3    Copyright 2019 Google Inc. All Rights Reserved.
+4
+5     Licensed under the Apache License, Version 2.0 (the "License");
+6     you may not use this file except in compliance with the License.
+7     You may obtain a copy of the License at
+8
+9         http://www.apache.org/licenses/LICENSE-2.0
+10
+11     Unless required by applicable law or agreed to in writing, software
+12     distributed under the License is distributed on an "AS IS" BASIS,
+13     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+14     See the License for the specific language governing permissions and
+15     limitations under the License.
+16-->
+17<!--
+18 The "package" attribute is rewritten by the Gradle build with the value of applicationId.
+19     It is still required here, as it is used to derive paths, for instance when referring
+20     to an Activity by ".MyActivity" instead of the full name. If more Activities are added to the
+21     application, the package attribute will need to reflect the correct path in order to use
+22     the abbreviated format.
+23-->
+24<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+25    package="ar.com.gliter.twa"
+26    android:versionCode="2"
+27    android:versionName="1.0.1" >
+28
+29    <uses-sdk
+30        android:minSdkVersion="21"
+31        android:targetSdkVersion="34" />
+32
+33    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+33-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:25:9-80
+33-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:25:26-78
+34    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+34-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:26:9-84
+34-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:26:26-82
+35    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+35-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:27:9-82
+35-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:27:26-80
+36
+37    <queries>
+37-->[com.google.androidbrowserhelper:androidbrowserhelper:2.5.0] C:\Users\Admin\.gradle\caches\8.13\transforms\c3ce819a3e6fd131387c4e7ecb32c9c9\transformed\androidbrowserhelper-2.5.0\AndroidManifest.xml:26:5-34:15
+38        <intent>
+38-->[com.google.androidbrowserhelper:androidbrowserhelper:2.5.0] C:\Users\Admin\.gradle\caches\8.13\transforms\c3ce819a3e6fd131387c4e7ecb32c9c9\transformed\androidbrowserhelper-2.5.0\AndroidManifest.xml:27:9-33:18
+39            <action android:name="android.intent.action.VIEW" />
+39-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:149:17-68
+39-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:149:25-66
+40
+41            <category android:name="android.intent.category.BROWSABLE" />
+41-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:151:17-77
+41-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:151:27-75
+42
+43            <data android:scheme="https" />
+43-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:152:17-155:19
+43-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:152:23-45
+44        </intent>
+45        <intent>
+45-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:13:9-15:18
+46            <action android:name="com.android.vending.billing.InAppBillingService.BIND" />
+46-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:14:13-91
+46-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:14:21-88
+47        </intent>
+48        <intent>
+48-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:16:9-18:18
+49            <action android:name="com.google.android.apps.play.billingtestcompanion.BillingOverrideService.BIND" />
+49-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:17:13-116
+49-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:17:21-113
+50        </intent>
+51    </queries>
+52
+53    <uses-permission android:name="com.android.vending.BILLING" /> <!-- Although the *SdkVersion is captured in gradle build files, this is required for non gradle builds -->
+53-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:10:5-67
+53-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:10:22-64
+54    <!-- <uses-sdk android:minSdkVersion="14"/> -->
+55    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+55-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:24:5-79
+55-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:24:22-76
+56    <uses-permission android:name="android.permission.INTERNET" />
+56-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:25:5-67
+56-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:25:22-64
+57
+58    <application
+58-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:36:5-238:19
+59        android:name="ar.com.gliter.twa.Application"
+59-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:37:9-35
+60        android:allowBackup="true"
+60-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:38:9-35
+61        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+61-->[androidx.core:core:1.2.0] C:\Users\Admin\.gradle\caches\8.13\transforms\f4413e7412bd76221fa785b038bcf512\transformed\core-1.2.0\AndroidManifest.xml:24:18-86
+62        android:extractNativeLibs="true"
+63        android:icon="@mipmap/ic_launcher"
+63-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:39:9-43
+64        android:label="@string/appName"
+64-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:40:9-40
+65        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+65-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:42:9-105
+66        android:supportsRtl="true"
+66-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:44:9-35
+67        android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+67-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:45:9-68
+68        <meta-data
+68-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:47:9-49:58
+69            android:name="asset_statements"
+69-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:48:13-44
+70            android:resource="@string/assetStatements" />
+70-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:49:13-55
+71        <meta-data
+71-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:52:13-54:58
+72            android:name="web_manifest_url"
+72-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:53:17-48
+73            android:value="@string/webManifestUrl" />
+73-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:54:17-55
+74        <meta-data
+74-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:57:9-59:52
+75            android:name="twa_generator"
+75-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:58:13-41
+76            android:value="@string/generatorApp" />
+76-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:59:13-49
+77
+78        <activity
+78-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:66:13-77:24
+79            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+79-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:66:23-104
+80            android:enabled="true"
+80-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:68:17-39
+81            android:excludeFromRecents="true"
+81-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:69:17-50
+82            android:exported="false" >
+82-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:67:17-41
+83            <meta-data
+83-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:70:17-72:57
+84                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
+84-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:71:21-87
+85                android:value="@string/launchUrl" />
+85-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:72:21-54
+86
+87            <intent-filter>
+87-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:73:17-76:33
+88                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+88-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:74:21-92
+88-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:74:29-89
+89
+90                <category android:name="android.intent.category.DEFAULT" />
+90-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:75:21-80
+90-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:75:31-77
+91            </intent-filter>
+92        </activity>
+93        <activity
+93-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:80:9-161:20
+94            android:name="ar.com.gliter.twa.LauncherActivity"
+94-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:80:19-50
+95            android:alwaysRetainTaskState="true"
+95-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:81:13-49
+96            android:exported="true"
+96-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:83:13-36
+97            android:label="@string/launcherName" >
+97-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:82:13-49
+98            <meta-data
+98-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:84:13-85:53
+99                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+99-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:84:24-85
+100                android:value="@string/launchUrl" />
+100-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:85:17-50
+101            <meta-data
+101-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:87:13-89:58
+102                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+102-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:88:17-83
+103                android:resource="@color/colorPrimary" />
+103-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:89:17-55
+104            <meta-data
+104-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:93:13-95:62
+105                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR_DARK"
+105-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:94:17-88
+106                android:resource="@color/colorPrimaryDark" />
+106-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:95:17-59
+107            <meta-data
+107-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:97:13-99:61
+108                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+108-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:98:17-87
+109                android:resource="@color/navigationColor" />
+109-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:99:17-58
+110            <meta-data
+110-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:101:13-103:65
+111                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR_DARK"
+111-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:102:17-92
+112                android:resource="@color/navigationColorDark" />
+112-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:103:17-62
+113            <meta-data
+113-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:105:13-107:68
+114                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR"
+114-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:106:17-84
+115                android:resource="@color/navigationDividerColor" />
+115-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:107:17-65
+116            <meta-data
+116-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:109:13-111:72
+117                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR_DARK"
+117-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:110:17-89
+118                android:resource="@color/navigationDividerColorDark" />
+118-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:111:17-69
+119            <meta-data
+119-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:113:13-114:54
+120                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+120-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:113:24-95
+121                android:resource="@drawable/splash" />
+121-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:114:17-52
+122            <meta-data
+122-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:116:13-117:60
+123                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+123-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:116:24-104
+124                android:resource="@color/backgroundColor" />
+124-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:117:17-58
+125            <meta-data
+125-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:119:13-120:71
+126                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
+126-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:119:24-105
+127                android:value="@integer/splashScreenFadeOutDuration" />
+127-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:120:17-69
+128            <meta-data
+128-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:122:13-123:60
+129                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+129-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:122:24-97
+130                android:value="@string/providerAuthority" />
+130-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:123:17-58
+131            <meta-data
+131-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:125:13-97
+132                android:name="android.app.shortcuts"
+132-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:125:24-60
+133                android:resource="@xml/shortcuts" />
+133-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:125:61-94
+134            <meta-data
+134-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:127:13-128:56
+135                android:name="android.support.customtabs.trusted.FALLBACK_STRATEGY"
+135-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:127:24-91
+136                android:value="@string/fallbackType" />
+136-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:128:17-53
+137            <meta-data
+137-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:134:13-135:54
+138                android:name="android.support.customtabs.trusted.SCREEN_ORIENTATION"
+138-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:134:24-92
+139                android:value="@string/orientation" />
+139-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:135:17-52
+140
+141            <intent-filter>
+141-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:143:13-146:29
+142                <action android:name="android.intent.action.MAIN" />
+142-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:144:17-69
+142-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:144:25-66
+143
+144                <category android:name="android.intent.category.LAUNCHER" />
+144-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:145:17-77
+144-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:145:27-74
+145            </intent-filter>
+146            <intent-filter android:autoVerify="true" >
+146-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:148:13-156:29
+146-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:148:28-53
+147                <action android:name="android.intent.action.VIEW" />
+147-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:149:17-68
+147-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:149:25-66
+148
+149                <category android:name="android.intent.category.DEFAULT" />
+149-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:75:21-80
+149-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:75:31-77
+150                <category android:name="android.intent.category.BROWSABLE" />
+150-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:151:17-77
+150-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:151:27-75
+151
+152                <data
+152-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:152:17-155:19
+153                    android:host="@string/hostName"
+153-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:153:21-52
+154                    android:scheme="https" />
+154-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:152:23-45
+155            </intent-filter>
+156        </activity>
+157        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
+157-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:163:9-90
+157-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:163:19-87
+158        <activity
+158-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:165:9-166:62
+159            android:name="com.google.androidbrowserhelper.trusted.WebViewFallbackActivity"
+159-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:165:19-97
+160            android:configChanges="orientation|screenSize" />
+160-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:166:13-59
+161
+162        <provider
+162-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:168:9-176:20
+163            android:name="androidx.core.content.FileProvider"
+163-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:169:13-62
+164            android:authorities="@string/providerAuthority"
+164-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:170:13-60
+165            android:exported="false"
+165-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:172:13-37
+166            android:grantUriPermissions="true" >
+166-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:171:13-47
+167            <meta-data
+167-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:173:13-175:53
+168                android:name="android.support.FILE_PROVIDER_PATHS"
+168-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:174:17-67
+169                android:resource="@xml/filepaths" />
+169-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:175:17-50
+170        </provider>
+171
+172        <service
+172-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:178:9-193:19
+173            android:name="ar.com.gliter.twa.DelegationService"
+173-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:179:13-46
+174            android:enabled="@bool/enableNotification"
+174-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:180:13-55
+175            android:exported="@bool/enableNotification" >
+175-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:181:13-56
+176            <meta-data
+176-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:184:17-186:73
+177                android:name="android.support.customtabs.trusted.SMALL_ICON"
+177-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:185:21-81
+178                android:resource="@drawable/ic_notification_icon" />
+178-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:186:21-70
+179
+180            <intent-filter>
+180-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:189:13-192:29
+181                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+181-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:190:17-105
+181-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:190:25-103
+182
+183                <category android:name="android.intent.category.DEFAULT" />
+183-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:75:21-80
+183-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:75:31-77
+184            </intent-filter>
+185        </service>
+186
+187        <!-- Delegate runtime permission requests (location, camera, mic) to browser -->
+188        <service
+188-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:196:9-203:19
+189            android:name="com.google.androidbrowserhelper.permissiondelegation.PermissionDelegationService"
+189-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:197:13-108
+190            android:exported="true" >
+190-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:198:13-36
+191            <intent-filter>
+191-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:199:13-202:29
+192                <action android:name="android.support.customtabs.permission.ACTION_PERMISSION_REQUEST" />
+192-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:200:17-106
+192-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:200:25-103
+193
+194                <category android:name="android.intent.category.DEFAULT" />
+194-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:75:21-80
+194-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:75:31-77
+195            </intent-filter>
+196        </service>
+197
+198        <activity android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity" />
+198-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:206:13-118
+198-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:206:23-115
+199        <activity android:name="com.google.androidbrowserhelper.locationdelegation.PermissionRequestActivity" />
+199-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:210:13-211:89
+199-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:210:23-123
+200        <activity
+200-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:214:9-227:20
+201            android:name="com.google.androidbrowserhelper.playbilling.provider.PaymentActivity"
+201-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:215:13-96
+202            android:configChanges="keyboardHidden|keyboard|orientation|screenLayout|screenSize"
+202-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:217:13-96
+203            android:exported="true"
+203-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:218:13-36
+204            android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+204-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:216:13-72
+205            <intent-filter>
+205-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:220:13-222:29
+206                <action android:name="org.chromium.intent.action.PAY" />
+206-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:221:17-73
+206-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:221:25-70
+207            </intent-filter>
+208
+209            <meta-data
+209-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:224:13-226:67
+210                android:name="org.chromium.default_payment_method_name"
+210-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:225:17-72
+211                android:value="https://play.google.com/billing" />
+211-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:226:17-64
+212        </activity>
+213
+214        <!-- This service checks who calls it at runtime. -->
+215        <service
+215-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:230:9-236:19
+216            android:name="com.google.androidbrowserhelper.playbilling.provider.PaymentService"
+216-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:231:13-95
+217            android:exported="true" >
+217-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:232:13-36
+218            <intent-filter>
+218-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:233:13-235:29
+219                <action android:name="org.chromium.intent.action.IS_READY_TO_PAY" />
+219-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:234:17-85
+219-->C:\Users\Admin\Documents\trae_projects\Gliter Argentina\twa\app\src\main\AndroidManifest.xml:234:25-82
+220            </intent-filter>
+221        </service>
+222
+223        <meta-data
+223-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:22:9-24:37
+224            android:name="com.google.android.play.billingclient.version"
+224-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:23:13-73
+225            android:value="7.1.1" />
+225-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:24:13-34
+226
+227        <activity
+227-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:26:9-30:75
+228            android:name="com.android.billingclient.api.ProxyBillingActivity"
+228-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:27:13-78
+229            android:configChanges="keyboard|keyboardHidden|screenLayout|screenSize|orientation"
+229-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:28:13-96
+230            android:exported="false"
+230-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:29:13-37
+231            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+231-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:30:13-72
+232        <activity
+232-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:31:9-35:75
+233            android:name="com.android.billingclient.api.ProxyBillingActivityV2"
+233-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:32:13-80
+234            android:configChanges="keyboard|keyboardHidden|screenLayout|screenSize|orientation"
+234-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:33:13-96
+235            android:exported="false"
+235-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:34:13-37
+236            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+236-->[com.android.billingclient:billing:7.1.1] C:\Users\Admin\.gradle\caches\8.13\transforms\7c52fb7671c11a70ad63ab15eb092b20\transformed\billing-7.1.1\AndroidManifest.xml:35:13-72
+237        <activity
+237-->[com.google.android.gms:play-services-base:18.5.0] C:\Users\Admin\.gradle\caches\8.13\transforms\711a955bbd75eeec2413e9f2c2032307\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:9-173
+238            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+238-->[com.google.android.gms:play-services-base:18.5.0] C:\Users\Admin\.gradle\caches\8.13\transforms\711a955bbd75eeec2413e9f2c2032307\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:19-85
+239            android:exported="false"
+239-->[com.google.android.gms:play-services-base:18.5.0] C:\Users\Admin\.gradle\caches\8.13\transforms\711a955bbd75eeec2413e9f2c2032307\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:146-170
+240            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+240-->[com.google.android.gms:play-services-base:18.5.0] C:\Users\Admin\.gradle\caches\8.13\transforms\711a955bbd75eeec2413e9f2c2032307\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:86-145
+241
+242        <meta-data
+242-->[com.google.android.gms:play-services-basement:18.4.0] C:\Users\Admin\.gradle\caches\8.13\transforms\314e02195268dd2e2e956b513ca73628\transformed\play-services-basement-18.4.0\AndroidManifest.xml:6:9-122
+243            android:name="com.google.android.gms.version"
+243-->[com.google.android.gms:play-services-basement:18.4.0] C:\Users\Admin\.gradle\caches\8.13\transforms\314e02195268dd2e2e956b513ca73628\transformed\play-services-basement-18.4.0\AndroidManifest.xml:6:20-65
+244            android:value="@integer/google_play_services_version" />
+244-->[com.google.android.gms:play-services-basement:18.4.0] C:\Users\Admin\.gradle\caches\8.13\transforms\314e02195268dd2e2e956b513ca73628\transformed\play-services-basement-18.4.0\AndroidManifest.xml:6:66-119
+245
+246        <service
+246-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:28:9-34:19
+247            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+247-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:29:13-103
+248            android:exported="false" >
+248-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:30:13-37
+249            <meta-data
+249-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:31:13-33:39
+250                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+250-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:32:17-94
+251                android:value="cct" />
+251-->[com.google.android.datatransport:transport-backend-cct:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\94d749a8c3ddabf7fe449679d136eb4d\transformed\transport-backend-cct-3.1.8\AndroidManifest.xml:33:17-36
+252        </service>
+253        <service
+253-->[com.google.android.datatransport:transport-runtime:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\df61c1f05387a5460f637a527d0231a0\transformed\transport-runtime-3.1.8\AndroidManifest.xml:26:9-30:19
+254            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+254-->[com.google.android.datatransport:transport-runtime:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\df61c1f05387a5460f637a527d0231a0\transformed\transport-runtime-3.1.8\AndroidManifest.xml:27:13-117
+255            android:exported="false"
+255-->[com.google.android.datatransport:transport-runtime:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\df61c1f05387a5460f637a527d0231a0\transformed\transport-runtime-3.1.8\AndroidManifest.xml:28:13-37
+256            android:permission="android.permission.BIND_JOB_SERVICE" >
+256-->[com.google.android.datatransport:transport-runtime:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\df61c1f05387a5460f637a527d0231a0\transformed\transport-runtime-3.1.8\AndroidManifest.xml:29:13-69
+257        </service>
+258
+259        <receiver
+259-->[com.google.android.datatransport:transport-runtime:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\df61c1f05387a5460f637a527d0231a0\transformed\transport-runtime-3.1.8\AndroidManifest.xml:32:9-34:40
+260            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"
+260-->[com.google.android.datatransport:transport-runtime:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\df61c1f05387a5460f637a527d0231a0\transformed\transport-runtime-3.1.8\AndroidManifest.xml:33:13-132
+261            android:exported="false" />
+261-->[com.google.android.datatransport:transport-runtime:3.1.8] C:\Users\Admin\.gradle\caches\8.13\transforms\df61c1f05387a5460f637a527d0231a0\transformed\transport-runtime-3.1.8\AndroidManifest.xml:34:13-37
+262    </application>
+263
+264</manifest>

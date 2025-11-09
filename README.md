@@ -126,7 +126,7 @@ gliter-argentina/
 - `GET /api/mercadopago/payment/:id` - Obtener estado del pago
 
 ### Webhooks
-- `POST /api/webhooks/mercadopago` - Webhook de Mercado Pago
+- `POST /api/mercadopago/webhook` - Webhook de Mercado Pago
 
 ## 🌐 Despliegue
 

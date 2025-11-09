@@ -327,7 +327,7 @@ Aprobado: ${data.date_approved || 'N/A'}</div>
                     }
                 };
 
-                const response = await fetch('/api/webhooks/mercadopago', {
+                const response = await fetch('/api/mercadopago/webhook', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

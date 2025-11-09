@@ -20,15 +20,17 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "setup:production": "npm run build:production && npm run type-check",
-    "deploy:apphosting": "firebase apphosting:backends:create --project gliter-argentina",
+    "setup:production": "node scripts/setup-production.js",
+    "verify:deployment": "node scripts/verify-deployment.js",
+    "deploy:apphosting": "firebase deploy --only apphosting --project gliter-argentina",
     "deploy:functions": "firebase deploy --only functions --project gliter-argentina",
     "deploy:firestore": "firebase deploy --only firestore --project gliter-argentina",
     "deploy:storage": "firebase deploy --only storage --project gliter-argentina",
     "deploy:backend": "npm run deploy:functions && npm run deploy:firestore && npm run deploy:storage",
-    "deploy:all": "npm run deploy:backend && npm run deploy:apphosting",
-    "logs:apphosting": "firebase apphosting:backends:logs --project gliter-argentina",
-    "logs:functions": "firebase functions:log --project gliter-argentina"
+    "deploy:all": "npm run deploy:all",
+    "_deploy:all:win": "npm run deploy:backend ; npm run deploy:apphosting",
+    "_deploy:all:unix": "npm run deploy:backend && npm run deploy:apphosting",
+    "_deploy:all": "npm run deploy:all:$(node -p \"process.platform==='win32'?'win':'unix'\")"
   },
   "dependencies": {
     "@dataconnect/generated": "file:src/dataconnect-generated",

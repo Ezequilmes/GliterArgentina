@@ -10,7 +10,7 @@ interface NetworkInformation {
 }
 import { Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db, isFirebaseClientReady } from '@/lib/firebase';
 import { User, AuthContextType, LoginForm, RegisterForm } from '@/types';
 import { 
   signIn, 
@@ -59,14 +59,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useServiceWorkerHandler();
 
   // Detectar si es dispositivo móvil
+  /**
+   * Detecta si el dispositivo es móvil según userAgent y capacidades táctiles.
+   * Retorna true si el UA parece móvil o si el viewport es pequeño y soporta tacto.
+   */
   const isMobileDevice = (): boolean => {
     if (typeof window === 'undefined') return false;
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(window.navigator.userAgent) ||
            (window.innerWidth <= 768 && 'ontouchstart' in window);
   };
 
-  // Función para logging de eventos de autenticación
+  /**
+   * Registra eventos de autenticación con contexto de dispositivo, viewport y red.
+   * En producción envía los logs a `/api/log-auth` para su análisis.
+   */
   const logAuthEvent = async (event: string, data: any = {}) => {
+    const connection: NetworkInformation | null = (typeof navigator !== 'undefined' && 'connection' in navigator)
+      ? (navigator as Navigator & { connection?: NetworkInformation }).connection || null
+      : null;
+
     const logData = {
       event,
       timestamp: new Date().toISOString(),
@@ -76,11 +87,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         width: window.innerWidth,
         height: window.innerHeight
       } : null,
-      connection: typeof navigator !== 'undefined' && 'connection' in navigator ? {
-        effectiveType: (navigator as Navigator & { connection?: NetworkInformation }).connection?.effectiveType,
-        downlink: (navigator as Navigator & { connection?: NetworkInformation }).connection?.downlink,
-        rtt: (navigator as Navigator & { connection?: NetworkInformation }).connection?.rtt
+      connection: connection ? {
+        effectiveType: connection.effectiveType,
+        downlink: connection.downlink,
+        rtt: connection.rtt
       } : null,
+      firebaseReady: isFirebaseClientReady(),
+      hasAuth: !!auth,
+      hasDb: !!db,
       ...data
     };
 
@@ -97,6 +111,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } catch (error) {
         console.warn('Failed to send auth log:', error);
       }
+    }
+  };
+
+  /**
+   * Calcula un timeout adaptativo para la inicialización de autenticación
+   * basado en el estado de la red del navegador.
+   */
+  const getAdaptiveAuthTimeout = (): number => {
+    const baseDesktop = 15000;
+    const baseMobile = 25000;
+    const isMobile = isMobileDevice();
+    const connection: NetworkInformation | null = (typeof navigator !== 'undefined' && 'connection' in navigator)
+      ? (navigator as Navigator & { connection?: NetworkInformation }).connection || null
+      : null;
+
+    const base = isMobile ? baseMobile : baseDesktop;
+    if (!connection || !connection.effectiveType) return base;
+
+    switch (connection.effectiveType) {
+      case 'slow-2g':
+        return Math.max(base, 35000);
+      case '2g':
+        return Math.max(base, 30000);
+      case '3g':
+        return Math.max(base, 20000);
+      case '4g':
+      default:
+        return base;
     }
   };
 
@@ -273,12 +315,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Efecto para escuchar cambios de autenticación
   useEffect(() => {
     let mounted = true;
+    const lastAuthUserIdRef = { current: authUser?.uid || null } as { current: string | null };
     
     const setupAuth = async () => {
-      await logAuthEvent('auth_setup_start', { isMobile: isMobileDevice() });
+      // Evitar logs duplicados en modo desarrollo (StrictMode/HMR)
+      const isDev = process.env.NODE_ENV !== 'production';
+      const alreadyLogged = isDev && ((globalThis as any).__AuthSetupLogged__ as boolean | undefined);
+      if (!alreadyLogged) {
+        await logAuthEvent('auth_setup_start', { 
+          isMobile: isMobileDevice(),
+          viewportHintMobileLike: typeof window !== 'undefined' ? window.innerWidth <= 360 && window.innerHeight <= 740 : false,
+        });
+        if (isDev) (globalThis as any).__AuthSetupLogged__ = true;
+      }
       
-      // Timeout más tolerante para móviles
-      const timeoutDuration = isMobileDevice() ? 25000 : 15000; // Aumentado significativamente
+      // Timeout adaptativo según red/dispositivo
+      const timeoutDuration = getAdaptiveAuthTimeout();
       
       const initTimeout = setTimeout(() => {
         if (mounted && initializing) {
@@ -304,8 +356,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
           if (!mounted) return;
           
-          setLoading(true);
-          setAuthError(null);
+          // Emit only if auth user truly changed
+          const nextUserId = authUser?.uid || null;
+          const prevUserId = lastAuthUserIdRef.current;
+          const hasRealChange = nextUserId !== prevUserId;
+
+          if (!hasRealChange) {
+            // Avoid redundant state churn
+            await logAuthEvent('auth_state_no_change', { userId: nextUserId });
+          } else {
+            setLoading(true);
+            setAuthError(null);
+          }
           
           try {
             await logAuthEvent('auth_state_change', { 
@@ -318,6 +380,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
               setAuthUser(authUser as AuthUser);
               const userData: User | null = await loadUserData(authUser as AuthUser);
               setUser(userData);
+              // Update last known id after successful set
+              lastAuthUserIdRef.current = authUser.uid;
               
               // Inicializar presencia en Realtime Database
               try {
@@ -340,6 +404,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             } else {
               setAuthUser(null);
               setUser(null);
+              lastAuthUserIdRef.current = null;
               
               // Limpiar presencia cuando el usuario se desautentica
               try {
@@ -368,9 +433,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setAuthUser(null);
             setUser(null);
           } finally {
-            if (mounted) {
+            if (mounted && hasRealChange) {
               setLoading(false);
               setInitializing(false);
+            }
+            if (mounted) {
               clearTimeout(initTimeout);
             }
           }

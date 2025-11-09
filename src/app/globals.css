@@ -103,6 +103,8 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Mejorar interacción táctil en Android */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -115,6 +117,9 @@ body {
   letter-spacing: -0.01em;
   transition: background-color 0.3s, color 0.3s;
   overflow-x: hidden;
+  /* Reducir latencia de gestos y evitar zoom accidental */
+  touch-action: manipulation;
+  -ms-touch-action: manipulation;
   /* Gradiente sutil inspirado en apps de dating modernas */
   background-image:
     radial-gradient(circle at 20% 20%, rgba(168, 85, 247, 0.03) 0%, transparent 50%),
@@ -285,4 +290,26 @@ p {
 
 .scale-hover:hover {
   transform: scale(1.05);
+}
+
+/* Botones y enlaces más amigables al toque */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Evitar selección accidental en elementos interactivos */
+.no-select, button, [role="button"], .btn {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Ajustes para pantallas pequeñas */
+@media (max-width: 480px) {
+  .container, .content, main {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
 }

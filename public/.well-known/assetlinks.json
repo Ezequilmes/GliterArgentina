@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.use_as_origin"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ar.com.gliter.twa",
+      "sha256_cert_fingerprints": [
+        "B6:2D:7D:A7:23:32:D2:A0:69:96:44:41:CD:2C:BD:D0:3B:78:41:77:DB:7C:10:4B:CA:31:8A:E5:C5:83:FA:00"
+      ]
+    }
+  }
+]

@@ -13,18 +13,18 @@ const messaging = getMessaging();
  */
 export const onMessageCreated = onDocumentCreated(
   'chats/{chatId}/messages/{messageId}',
-  async (event) => {
+  async (event: any) => {
     try {
       const messageData = event.data?.data();
-      const chatId = event.params.chatId;
-      const messageId = event.params.messageId;
+      const chatId = event.params.chatId as string;
+      const messageId = event.params.messageId as string;
 
       if (!messageData) {
         logger.warn('No message data found');
         return;
       }
 
-      logger.info(`New message created in chat ${chatId}:`, messageData);
+      logger.info(`New message created in chat ${chatId}:`, messageData as unknown as object);
 
       // Get chat information
       const chatDoc = await db.collection('chats').doc(chatId).get();
@@ -34,8 +34,8 @@ export const onMessageCreated = onDocumentCreated(
       }
 
       const chatData = chatDoc.data();
-      const participants = chatData?.participants || [];
-      const senderId = messageData.senderId;
+      const participants = (chatData?.participants as string[]) || [];
+      const senderId = (messageData as any).senderId as string;
 
       // Find the recipient (the participant who is not the sender)
       const recipientId = participants.find((id: string) => id !== senderId);
@@ -52,8 +52,8 @@ export const onMessageCreated = onDocumentCreated(
       }
 
       const senderData = senderDoc.data();
-      const senderName = senderData?.name || 'Usuario';
-      const senderAvatar = senderData?.photos?.[0]?.url;
+      const senderName = (senderData?.name as string) || 'Usuario';
+      const senderAvatar = (senderData?.photos?.[0]?.url as string) || undefined;
 
       // Get recipient's FCM tokens
       const recipientTokensDoc = await db.collection('fcm_tokens').doc(recipientId).get();
@@ -62,7 +62,7 @@ export const onMessageCreated = onDocumentCreated(
         return;
       }
 
-      const tokens = recipientTokensDoc.data()?.tokens || [];
+      const tokens = (recipientTokensDoc.data()?.tokens as string[]) || [];
       if (tokens.length === 0) {
         logger.info(`No active FCM tokens for recipient: ${recipientId}`);
         return;
@@ -70,15 +70,17 @@ export const onMessageCreated = onDocumentCreated(
 
       // Prepare message preview
       let messagePreview = 'Nuevo mensaje';
-      if (messageData.type === 'text') {
-        messagePreview = messageData.content?.substring(0, 100) || 'Nuevo mensaje';
-      } else if (messageData.type === 'image') {
+      const messageType = (messageData as any).type as string;
+      if (messageType === 'text') {
+        const content = (messageData as any).content as string | undefined;
+        messagePreview = content?.substring(0, 100) || 'Nuevo mensaje';
+      } else if (messageType === 'image') {
         messagePreview = '📷 Imagen';
-      } else if (messageData.type === 'audio') {
+      } else if (messageType === 'audio') {
         messagePreview = '🎵 Audio';
-      } else if (messageData.type === 'video') {
+      } else if (messageType === 'video') {
         messagePreview = '🎥 Video';
-      } else if (messageData.type === 'location') {
+      } else if (messageType === 'location') {
         messagePreview = '📍 Ubicación';
       }
 
@@ -134,7 +136,7 @@ export const onMessageCreated = onDocumentCreated(
       };
 
       // Send the notification
-      const response = await messaging.sendEachForMulticast(notificationPayload);
+      const response = await messaging.sendEachForMulticast(notificationPayload as any);
 
       logger.info(`Push notification sent to ${response.successCount} devices for recipient: ${recipientId}`);
 
@@ -144,7 +146,7 @@ export const onMessageCreated = onDocumentCreated(
         response.responses.forEach((resp, idx) => {
           if (!resp.success) {
             failedTokens.push(tokens[idx]);
-            logger.error(`Failed to send to token ${tokens[idx]}:`, resp.error);
+            logger.error(`Failed to send to token ${tokens[idx]}:`, resp.error as unknown as object);
           }
         });
 
@@ -157,7 +159,7 @@ export const onMessageCreated = onDocumentCreated(
       }
 
     } catch (error) {
-      logger.error('Error sending push notification for new message:', error);
+      logger.error('Error sending push notification for new message:', error as unknown as object);
     }
   }
 );
@@ -165,7 +167,7 @@ export const onMessageCreated = onDocumentCreated(
 /**
  * Cloud Function to send push notifications for matches
  */
-export const sendMatchNotification = onCall(async (request) => {
+export const sendMatchNotification = onCall(async (request: any) => {
   try {
     const { userId, matchName, matchAvatar } = request.data;
 
@@ -180,7 +182,7 @@ export const sendMatchNotification = onCall(async (request) => {
       return { success: false, message: 'No FCM tokens found' };
     }
 
-    const tokens = userTokensDoc.data()?.tokens || [];
+    const tokens = (userTokensDoc.data()?.tokens as string[]) || [];
     if (tokens.length === 0) {
       logger.info(`No active FCM tokens for user: ${userId}`);
       return { success: false, message: 'No active FCM tokens' };
@@ -215,12 +217,12 @@ export const sendMatchNotification = onCall(async (request) => {
       },
     };
 
-    const response = await messaging.sendEachForMulticast(notificationPayload);
+    const response = await messaging.sendEachForMulticast(notificationPayload as any);
     logger.info(`Match notification sent to ${response.successCount} devices for user: ${userId}`);
 
     return { success: true, sentCount: response.successCount };
   } catch (error) {
-    logger.error('Error sending match notification:', error);
+    logger.error('Error sending match notification:', error as unknown as object);
     throw error;
   }
 });
@@ -228,7 +230,7 @@ export const sendMatchNotification = onCall(async (request) => {
 /**
  * Cloud Function to send push notifications for likes
  */
-export const sendLikeNotification = onCall(async (request) => {
+export const sendLikeNotification = onCall(async (request: any) => {
   try {
     const { userId, likerName, likerAvatar, isSuper } = request.data;
 
@@ -243,7 +245,7 @@ export const sendLikeNotification = onCall(async (request) => {
       return { success: false, message: 'No FCM tokens found' };
     }
 
-    const tokens = userTokensDoc.data()?.tokens || [];
+    const tokens = (userTokensDoc.data()?.tokens as string[]) || [];
     if (tokens.length === 0) {
       logger.info(`No active FCM tokens for user: ${userId}`);
       return { success: false, message: 'No active FCM tokens' };
@@ -283,12 +285,12 @@ export const sendLikeNotification = onCall(async (request) => {
       },
     };
 
-    const response = await messaging.sendEachForMulticast(notificationPayload);
+    const response = await messaging.sendEachForMulticast(notificationPayload as any);
     logger.info(`Like notification sent to ${response.successCount} devices for user: ${userId}`);
 
     return { success: true, sentCount: response.successCount };
   } catch (error) {
-    logger.error('Error sending like notification:', error);
+    logger.error('Error sending like notification:', error as unknown as object);
     throw error;
   }
 });
@@ -296,7 +298,7 @@ export const sendLikeNotification = onCall(async (request) => {
 /**
  * Cloud Function to save FCM token
  */
-export const saveFCMToken = onCall(async (request) => {
+export const saveFCMToken = onCall(async (request: any) => {
   try {
     const { userId, token } = request.data;
 
@@ -309,7 +311,7 @@ export const saveFCMToken = onCall(async (request) => {
     
     let tokens: string[] = [];
     if (userTokensDoc.exists) {
-      tokens = userTokensDoc.data()?.tokens || [];
+      tokens = (userTokensDoc.data()?.tokens as string[]) || [];
     }
 
     // Add token if it doesn't exist
@@ -324,7 +326,7 @@ export const saveFCMToken = onCall(async (request) => {
 
     return { success: true };
   } catch (error) {
-    logger.error('Error saving FCM token:', error);
+    logger.error('Error saving FCM token:', error as unknown as object);
     throw error;
   }
 });
@@ -332,7 +334,7 @@ export const saveFCMToken = onCall(async (request) => {
 /**
  * Cloud Function to remove FCM token
  */
-export const removeFCMToken = onCall(async (request) => {
+export const removeFCMToken = onCall(async (request: any) => {
   try {
     const { userId, token } = request.data;
 
@@ -344,7 +346,7 @@ export const removeFCMToken = onCall(async (request) => {
     const userTokensDoc = await userTokensRef.get();
     
     if (userTokensDoc.exists) {
-      const tokens = userTokensDoc.data()?.tokens || [];
+      const tokens = (userTokensDoc.data()?.tokens as string[]) || [];
       const updatedTokens = tokens.filter((t: string) => t !== token);
       
       await userTokensRef.update({ tokens: updatedTokens });
@@ -353,7 +355,7 @@ export const removeFCMToken = onCall(async (request) => {
 
     return { success: true };
   } catch (error) {
-    logger.error('Error removing FCM token:', error);
+    logger.error('Error removing FCM token:', error as unknown as object);
     throw error;
   }
 });

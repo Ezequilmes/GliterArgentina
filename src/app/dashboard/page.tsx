@@ -157,7 +157,7 @@ export default function DashboardPage() {
                   Acciones Rápidas
                 </h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Button
                     variant="primary"
                     size="lg"
@@ -184,6 +184,21 @@ export default function DashboardPage() {
                       <div className="text-center">
                         <div className="font-semibold">Mensajes</div>
                         <div className="text-sm opacity-80">Revisa tus conversaciones</div>
+                      </div>
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant="soft"
+                    size="lg"
+                    className="h-16 flex items-center justify-center"
+                    onClick={() => router.push('/privacy')}
+                  >
+                    <div className="flex items-center">
+                      <Shield className="w-6 h-6 mr-3" />
+                      <div className="text-center">
+                        <div className="font-semibold">Políticas de privacidad</div>
+                        <div className="text-sm opacity-80">Lee términos y privacidad</div>
                       </div>
                     </div>
                   </Button>

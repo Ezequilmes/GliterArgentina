@@ -11,21 +11,34 @@ Esta guía detalla cómo desplegar y configurar el sistema de In-App Messaging p
 Copia el archivo `.env.production.example` y configura las siguientes variables:
 
 ```bash
-# Configuración básica de In-App Messaging
+# Firebase
+NEXT_PUBLIC_FIREBASE_API_KEY=tu_api_key_produccion
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_auth_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=tu_project_id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=tu_app_id
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=tu_measurement_id
+
+# App
+NEXT_PUBLIC_APP_URL=https://tu-dominio.com
+NEXT_PUBLIC_USE_FIREBASE_EMULATOR=false
+
+# In-App Messaging
 INAPP_MESSAGING_ENABLED=true
 INAPP_MAX_MESSAGES_PER_SESSION=3
 INAPP_DISPLAY_INTERVAL=30000
-INAPP_MAX_MESSAGES_PER_REQUEST=5
 
-# Google Analytics 4 (para analytics)
-GA4_API_SECRET=tu_clave_secreta_ga4
+# Analytics
+GA4_API_SECRET=tu_ga4_api_secret
 
-# Base de datos (opcional)
-DATABASE_URL=tu_conexion_base_datos
+# Mercado Pago (cliente)
+NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=tu_public_key
 
-# Redis (opcional, para caché)
-REDIS_URL=tu_conexion_redis
+# Web Push (opcional)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=tu_vapid_public_key
 ```
+
+Sugerencia: ejecuta `npm run setup:production` para generar `.env.production` de forma interactiva.
 
 ### 2. Configuración de Firebase
 
@@ -246,6 +259,12 @@ Después del despliegue, verifica:
 2. ✅ Los mensajes se cargan desde el servidor
 3. ✅ Los analytics se envían correctamente
 4. ✅ La configuración remota funciona
+
+Puedes usar el script de verificación:
+
+```bash
+npm run verify:deployment -- https://tu-dominio.com
+```
 
 ### 4. Monitoreo
 

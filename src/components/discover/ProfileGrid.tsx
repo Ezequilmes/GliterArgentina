@@ -32,8 +32,14 @@ interface ProfileCardProps {
   userSuperLikes?: number;
   userIsPremium?: boolean;
   onShowPremiumModal?: () => void;
+  /** Priorizar la imagen (LCP) si está above-the-fold */
+  priority?: boolean;
 }
 
+/**
+ * Renderiza una card de perfil con imagen de usuario y acciones.
+ * Si `priority` es true, marca la imagen principal como prioritaria para mejorar LCP.
+ */
 const ProfileCard: React.FC<ProfileCardProps> = ({
   userDistance,
   onLike,
@@ -43,7 +49,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   onClick,
   userSuperLikes = 0,
   userIsPremium = false,
-  onShowPremiumModal
+  onShowPremiumModal,
+  priority = false
 }) => {
   const { user, distance } = userDistance;
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -96,6 +103,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               className="object-cover"
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageLoaded(false)}
+              priority={priority}
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center">
@@ -231,12 +240,15 @@ export const ProfileGrid: React.FC<ProfileGridProps> = ({
     );
   }
 
+  /**
+   * Grid de perfiles. Marca la primera card como `priority` para optimizar LCP.
+   */
   return (
     <div className={cn(
       "grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-3 md:gap-4",
       className
     )}>
-      {users.map((userDistance) => (
+      {users.map((userDistance, index) => (
         <ProfileCard
           key={userDistance.user.id}
           userDistance={userDistance}
@@ -248,6 +260,7 @@ export const ProfileGrid: React.FC<ProfileGridProps> = ({
           userSuperLikes={userSuperLikes}
           userIsPremium={userIsPremium}
           onShowPremiumModal={onShowPremiumModal}
+          priority={index === 0}
         />
       ))}
     </div>

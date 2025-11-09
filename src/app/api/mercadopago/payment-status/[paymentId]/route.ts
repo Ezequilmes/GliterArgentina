@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { analyticsService } from '@/services/analyticsService';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 export const revalidate = false;
 
 // Simple in-memory cache for payment status (5 minute TTL)
@@ -79,7 +80,7 @@ export async function GET(
   if (!accessToken) {
     console.error('MERCADOPAGO_ACCESS_TOKEN not configured');
     return NextResponse.json(
-      { error: 'Access token de Mercado Pago no configurado' },
+      { error: 'Access token de Mercado Pago no configurado', code: 'MCP_TOKEN_MISSING' },
       { status: 500 }
     );
   }

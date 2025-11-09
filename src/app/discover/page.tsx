@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { userService } from '@/lib/firestore';
+import { isFirebaseClientReady } from '@/lib/firebase';
 import { User, UserDistance } from '@/types';
 import DiscoverCard from '@/components/discover/DiscoverCard';
 import LocationStatus from '@/components/location/LocationStatus';
@@ -64,6 +65,12 @@ const MAX_LOCATION_ATTEMPTS = 3;
 const MIN_LOAD_INTERVAL = 10000; // 10 seconds minimum between loads
 const LOCATION_RETRY_DELAY = 5000; // 5 seconds between location retries
 
+/**
+ * DiscoverPage: vista principal de descubrimiento.
+ * Implementa un gating coordinado (user + geolocation + Firebase listo) para evitar
+ * renders vacíos y cargas que se disparan antes de tener los datos necesarios.
+ * Además, usa caché local para render instantáneo y una pantalla de carga controlada.
+ */
 export default function DiscoverPage() {
   const { user } = useAuth();
   const { 
@@ -72,23 +79,64 @@ export default function DiscoverPage() {
     loading: locationLoading,
     permission: permissionState,
     retryCount,
-    isWatching,
     getCurrentLocation,
-    watchLocation,
-    stopWatching
+    
+    shouldAttemptLocation,
+    isWatching
   } = useGeolocation({ enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 });
   const { addToast } = useToast();
   const router = useRouter();
   
-  // Debug logs at component initialization
-  console.log('🚀 DiscoverPage component initialized');
-  console.log('👤 Auth user:', user);
-  console.log('📍 Geolocation:', { location, locationLoading, locationError, permissionState, retryCount });
+  // Debug logs at component initialization (avoid duplicates in dev StrictMode/HMR)
+  const isDev = process.env.NODE_ENV !== 'production';
+  const __initLogged = (globalThis as any).__DiscoverPageInitLogged__ as boolean | undefined;
+  if (!isDev || !__initLogged) {
+    console.log('🚀 DiscoverPage component initialized');
+    console.log('👤 Auth user:', user);
+    console.log('📍 Geolocation:', { location, locationLoading, locationError, permissionState, retryCount });
+    if (isDev) (globalThis as any).__DiscoverPageInitLogged__ = true;
+  }
   
   const [currentUserData, setCurrentUserData] = useState<User | null>(null);
+  // Track if we have already requested geolocation due to a user gesture
+  const [hasRequestedLocationByGesture, setHasRequestedLocationByGesture] = useState(false);
+  // Última ubicación conocida como fallback
+  const [lastCoords, setLastCoords] = useState<{ latitude: number; longitude: number; timestamp: number } | null>(null);
+
+  /**
+   * Solicita la ubicación explícitamente al hacer click en el botón.
+   * Asegura que la geolocalización se dispare por un gesto del usuario
+   * y reporta feedback si falla.
+   */
+  const requestLocationByButton = useCallback(async (): Promise<void> => {
+    if (locationLoading) return; // evita doble solicitud si ya está en curso
+    setHasRequestedLocationByGesture(true);
+    setLocationAttempts(prev => prev + 1);
+    try {
+      // Si no podemos intentar nueva ubicación, usar la última conocida
+      if (typeof shouldAttemptLocation === 'function' && !shouldAttemptLocation()) {
+        if (lastCoords) {
+          addToast({
+            title: 'Ubicación',
+            message: 'Usando tu última ubicación guardada.',
+            type: 'info'
+          });
+          return; // el efecto de carga usará lastCoords automáticamente
+        }
+      }
+      await getCurrentLocation();
+    } catch (err: any) {
+      console.error('Error al obtener ubicación desde botón:', err);
+      addToast({
+        title: 'Ubicación',
+        message: 'No se pudo obtener tu ubicación. Intenta otra vez.',
+        type: 'error'
+      });
+    }
+  }, [getCurrentLocation, addToast, locationLoading, shouldAttemptLocation, lastCoords]);
   
   const [users, setUsers] = useState<UserDistance[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [userSuperLikes, setUserSuperLikes] = useState(0);
@@ -175,183 +223,186 @@ export default function DiscoverPage() {
   const MAX_LOCATION_ATTEMPTS = 3;
   const MIN_LOAD_INTERVAL = 2000; // 2 seconds minimum between loads
 
+  // Coordinated readiness state
+  const firebaseReady = isFirebaseClientReady();
+  const ready = !!user && firebaseReady && (!!location || !!lastCoords);
+  const initStartRef = typeof window !== 'undefined'
+    ? ((window as any).__discoverInitStartRef ?? ((window as any).__discoverInitStartRef = Date.now()))
+    : Date.now();
+
+  // Prime UI from cache for instant render on first mount
   useEffect(() => {
-    console.log('DiscoverPage useEffect triggered');
-    console.log('User:', user ? `authenticated (${user.id})` : 'not authenticated');
-    console.log('Location:', location ? `${location?.coords.latitude}, ${location?.coords.longitude}` : 'not available');
-    console.log('Loading state:', isLoading);
-    console.log('Location loading:', locationLoading);
-    console.log('Location error:', locationError);
-    console.log('Permission state:', permissionState);
-    
-    if (!user) {
-      console.log('No user authenticated');
-      return;
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem('discoverCache');
+      if (!raw) return;
+      const cached = JSON.parse(raw) as { users?: UserDistance[]; currentUserData?: User | null; timestamp?: number };
+      if (cached?.users && Array.isArray(cached.users)) {
+        setUsers(cached.users);
+      }
+      if (cached?.currentUserData) {
+        setCurrentUserData(cached.currentUserData);
+      }
+    } catch (_) {
+      // Ignore cache errors
     }
+  }, []);
 
-    // Anti-infinite loop: prevent too frequent location requests
-    const now = Date.now();
-    if (now - lastLoadTime < MIN_LOAD_INTERVAL) {
-      console.log('Skipping location request - too frequent');
-      return;
-    }
-
-    if (!location) {
-      console.log('No location available');
-      if (locationError) {
-        console.log('Location error details:', locationError);
-      }
-      
-      // Limit location attempts to prevent infinite loops
-      if (locationAttempts >= MAX_LOCATION_ATTEMPTS) {
-        console.log('Max location attempts reached, stopping');
-        return;
-      }
-      
-      // If no location and permission is granted or prompt, try to get it
-      if ((permissionState === 'granted' || permissionState === 'prompt') && !locationLoading) {
-        console.log('Attempting to get current location...');
-        setLocationAttempts(prev => prev + 1);
-        getCurrentLocation().catch(err => {
-          console.error('Error getting location on mount:', err);
-          // Don't increment attempts on permission denied to allow manual retry
-          if (!err.message?.includes('denegado') && !err.message?.includes('denied')) {
-            setLocationAttempts(prev => prev + 1);
-          }
-        });
-      }
-      return;
-    }
-
-    console.log('Loading nearby users with location:', location);
-    
-    const loadData = async () => {
-      console.log('[DiscoverPage] loadData called', { user: !!user, location: !!location });
-      
-      if (!user || !location) {
-        console.log('[DiscoverPage] Missing user or location', { 
-          hasUser: !!user, 
-          hasLocation: !!location,
-          locationError,
-          locationLoading,
-          permissionState
-        });
-        return;
-      }
-      
-      // Update last load time to prevent rapid successive calls
-      setLastLoadTime(Date.now());
-      setIsLoading(true);
-      
+  // Guardar última ubicación conocida cuando se actualiza y cargarla al montar
+  useEffect(() => {
+    // carga inicial
+    if (typeof window !== 'undefined') {
       try {
-        console.log('[DiscoverPage] Loading data with location:', { 
-            lat: location.coords.latitude, 
-            lng: location.coords.longitude, 
-            maxDistance: filters.maxDistance 
-          });
-        
+        const raw = window.localStorage.getItem('lastCoords');
+        if (raw && !lastCoords) {
+          const parsed = JSON.parse(raw) as { latitude: number; longitude: number; timestamp: number };
+          if (typeof parsed?.latitude === 'number' && typeof parsed?.longitude === 'number') {
+            setLastCoords(parsed);
+          }
+        }
+      } catch (_) {}
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!location) return;
+    const coords = { latitude: location.coords.latitude, longitude: location.coords.longitude, timestamp: Date.now() };
+    setLastCoords(coords);
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.setItem('lastCoords', JSON.stringify(coords)); } catch (_) {}
+    }
+  }, [location]);
+
+  // Effect 1: Preparar el intento de ubicación, pero no solicitarla automáticamente.
+  // En su lugar, la pedimos en respuesta al primer gesto del usuario para evitar
+  // la advertencia: "Only request geolocation information in response to a user gesture".
+  useEffect(() => {
+    const now = Date.now();
+    if (now - lastLoadTime < MIN_LOAD_INTERVAL) return;
+    if (!user) return;
+    if (location) return; // ya tenemos ubicación
+
+    if (locationError) {
+      console.log('Location error:', locationError);
+    }
+    // No incrementamos aquí; lo haremos al producirse el gesto del usuario
+  }, [user, location, locationError, lastLoadTime]);
+
+  /**
+   * Solicita la geolocalización únicamente tras el primer gesto del usuario
+   * cuando el permiso ya está concedido y aún no tenemos ubicación.
+   * Esto evita la violación de timing que reporta Chrome y mantiene el flujo.
+   */
+  useEffect(() => {
+    if (!user) return;
+    if (location) return;
+    if (hasRequestedLocationByGesture) return;
+    if (permissionState !== 'granted') return;
+
+    const onFirstGesture = async () => {
+      setHasRequestedLocationByGesture(true);
+      setLocationAttempts(prev => prev + 1);
+      try {
+        await getCurrentLocation();
+      } catch (err) {
+        console.error('Error getting location after user gesture:', err);
+      }
+    };
+
+    // Usamos pointerdown para capturar el primer gesto (click/tap)
+    document.addEventListener('pointerdown', onFirstGesture, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', onFirstGesture);
+    };
+  }, [user, location, permissionState, hasRequestedLocationByGesture, getCurrentLocation, setLocationAttempts]);
+
+  // Effect 2: Load data only when fully ready
+  useEffect(() => {
+    if (!ready) return;
+
+    const loadData = async () => {
+      setIsLoading(true);
+      setLastLoadTime(Date.now());
+      const lat = location?.coords.latitude ?? lastCoords?.latitude;
+      const lng = location?.coords.longitude ?? lastCoords?.longitude;
+      console.log('[DiscoverPage] loadData (ready=TRUE)', {
+        user: user?.id,
+        lat,
+        lng,
+        source: location ? 'geolocation' : 'lastCoords'
+      });
+
+      try {
         // Load current user data
-        const userData = await userService.getUser(user.id);
+        const userData = await userService.getUser(user!.id);
         setCurrentUserData(userData);
         setUserSuperLikes(userData?.superLikes || 0);
         setUserIsPremium(userData?.isPremium || false);
-        console.log('[DiscoverPage] Current user data loaded:', userData?.name);
 
         // Load nearby users
         const nearbyUsers = await userService.getNearbyUsers(
-          user.id,
-          location.coords.latitude,
-          location.coords.longitude,
+          user!.id,
+          lat!,
+          lng!,
           filters.maxDistance
         );
-        
-        console.log('[DiscoverPage] Nearby users loaded:', nearbyUsers.length);
-        
-        // Apply additional filters
+
+        // Apply filters
         const filteredUsers = nearbyUsers.filter(targetUser => {
-          
-          // Exclude blocked users
-          if (userData?.blockedUsers?.includes(targetUser.user.id)) {
-            return false;
-          }
-          
-          // Exclude users who blocked current user
-          if (targetUser.user.blockedUsers?.includes(user.id)) {
-            return false;
-          }
-          
-          // Age filter
-          if (targetUser.user.age && (targetUser.user.age < filters.ageRange[0] || targetUser.user.age > filters.ageRange[1])) {
-            return false;
-          }
-          
-          // Gender/Show me filter
+          if (userData?.blockedUsers?.includes(targetUser.user.id)) return false;
+          if (targetUser.user.blockedUsers?.includes(user!.id)) return false;
+          if (targetUser.user.age && (targetUser.user.age < filters.ageRange[0] || targetUser.user.age > filters.ageRange[1])) return false;
           if (filters.showMe !== 'everyone') {
             if (filters.showMe === 'men' && targetUser.user.gender !== 'male') return false;
             if (filters.showMe === 'women' && targetUser.user.gender !== 'female') return false;
           }
-          
-          // Sexual role filter
-          if (filters.sexualRole !== 'any' && targetUser.user.sexualRole !== filters.sexualRole) {
-            return false;
-          }
-          
-          // Online only filter
-          if (filters.onlineOnly && !targetUser.user.isOnline) {
-            return false;
-          }
-          
-          // Verified only filter
-          if (filters.verifiedOnly && !targetUser.user.isVerified) {
-            return false;
-          }
-          
-          // Premium only filter
-          if (filters.premiumOnly && !targetUser.user.isPremium) {
-            return false;
-          }
-          
-          // Has photos filter
-          if (filters.hasPhotos && (!targetUser.user.photos || targetUser.user.photos.length === 0)) {
-            return false;
-          }
-          
-          // Interests filter
+          if (filters.sexualRole !== 'any' && targetUser.user.sexualRole !== filters.sexualRole) return false;
+          if (filters.onlineOnly && !targetUser.user.isOnline) return false;
+          if (filters.verifiedOnly && !targetUser.user.isVerified) return false;
+          if (filters.premiumOnly && !targetUser.user.isPremium) return false;
+          if (filters.hasPhotos && (!targetUser.user.photos || targetUser.user.photos.length === 0)) return false;
           if (filters.interests.length > 0) {
-            const hasMatchingInterest = filters.interests.some(interest => 
-              targetUser.user.interests?.includes(interest)
-            );
+            const hasMatchingInterest = filters.interests.some(interest => targetUser.user.interests?.includes(interest));
             if (!hasMatchingInterest) return false;
           }
-          
           return true;
         });
-        
-        // Sort by distance
+
         filteredUsers.sort((a, b) => a.distance - b.distance);
-        
-        console.log('[DiscoverPage] Filtered users:', filteredUsers.length);
-        console.log('[DiscoverPage] Applied filters:', filters);
-        
         setUsers(filteredUsers);
-        
-        // Reset location attempts on successful load
         setLocationAttempts(0);
-        
+
+        // Cache for instant subsequent loads
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem('discoverCache', JSON.stringify({
+              users: filteredUsers,
+              currentUserData: userData,
+              timestamp: Date.now()
+            }));
+          } catch (_) {}
+        }
+
+        // Single-time ready log
+        if (typeof window !== 'undefined') {
+          if (!(window as any).__discoverReadyLogged) {
+            const elapsed = Date.now() - initStartRef;
+            console.log(`🚀 Discover initialized with user + location in ~${elapsed}ms`);
+            (window as any).__discoverReadyLogged = true;
+          }
+        }
       } catch (error) {
         console.error('Error loading data:', error);
-        addToast({ 
-          title: 'Error al cargar datos', 
-          message: 'Hubo un problema al cargar los usuarios cercanos', 
-          type: 'error' 
-        });
+        addToast({ title: 'Error al cargar datos', message: 'Hubo un problema al cargar los usuarios cercanos', type: 'error' });
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [user?.id, location?.coords.latitude, location?.coords.longitude, filters.maxDistance, filters.ageRange, filters.showMe, filters.sexualRole, filters.onlineOnly, filters.verifiedOnly, filters.premiumOnly, filters.hasPhotos, filters.interests]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, user?.id, location?.coords.latitude, location?.coords.longitude, lastCoords?.latitude, lastCoords?.longitude, filters.maxDistance, filters.ageRange, filters.showMe, filters.sexualRole, filters.onlineOnly, filters.verifiedOnly, filters.premiumOnly, filters.hasPhotos, filters.interests]);
 
   // Enhanced location error handling
   const getLocationErrorMessage = () => {
@@ -651,8 +702,18 @@ export default function DiscoverPage() {
     );
   }
 
-  if (isLoading || locationLoading) {
+  // Controlled loading screen while initializing or actively loading
+  if (!ready || isLoading || locationLoading) {
     const getLoadingInfo = () => {
+      if (!ready) {
+        return {
+          icon: Users as React.ComponentType<{ className?: string }>,
+          title: 'Inicializando Discover',
+          message: 'Preparando autenticación, ubicación y servicios',
+          submessage: 'Cargando contexto y permisos...',
+          color: 'secondary'
+        };
+      }
       if (locationLoading) {
         return {
           icon: MapPin,
@@ -818,6 +879,25 @@ export default function DiscoverPage() {
               <span>Mostrando personas en un radio de {filters.maxDistance}km</span>
             </div>
             <LocationStatus compact={true} />
+            <div className="mt-3 w-full max-w-md">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 bg-muted/40 border rounded-xl p-3">
+                <p className="text-xs sm:text-sm text-muted-foreground flex-1">
+                  {location 
+                    ? '¿Cambiaste de lugar? Actualiza tu ubicación cuando quieras.'
+                    : 'Para mostrar personas cerca, toca para actualizar tu ubicación.'}
+                </p>
+                <Button 
+                  variant="primary" 
+                  size="sm"
+                  onClick={requestLocationByButton}
+                  disabled={locationLoading}
+                  className="justify-center"
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  {locationLoading ? 'Actualizando…' : 'Actualizar ubicación'}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Current User Card */}

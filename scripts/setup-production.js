@@ -14,10 +14,22 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
+/**
+ * Pregunta por consola y devuelve la respuesta del usuario.
+ * @param {string} query - Texto de la pregunta a mostrar.
+ * @returns {Promise<string>} Respuesta ingresada por el usuario.
+ */
 function question(query) {
   return new Promise(resolve => rl.question(query, resolve));
 }
 
+/**
+ * Configura variables y scripts necesarios para despliegue en producción.
+ * - Verifica archivos requeridos.
+ * - Solicita variables de entorno clave.
+ * - Genera `.env.production` y script de verificación.
+ * @returns {Promise<void>} Promesa que se resuelve al finalizar la configuración.
+ */
 async function setupProduction() {
   console.log('🚀 Configuración de In-App Messaging para Producción\n');
 
@@ -51,12 +63,28 @@ async function setupProduction() {
     envConfig.NEXT_PUBLIC_FIREBASE_API_KEY = await question('Firebase API Key: ');
     envConfig.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = await question('Firebase Auth Domain: ');
     envConfig.NEXT_PUBLIC_FIREBASE_PROJECT_ID = await question('Firebase Project ID: ');
+    envConfig.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = await question('Firebase Messaging Sender ID: ');
+    envConfig.NEXT_PUBLIC_FIREBASE_APP_ID = await question('Firebase App ID: ');
     envConfig.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID = await question('Firebase Measurement ID (opcional): ');
 
     // App Configuration
     console.log('\n🌐 Configuración de la aplicación:');
-    envConfig.NEXT_PUBLIC_APP_URL = await question('URL de la aplicación (ej: https://miapp.com): ');
+    envConfig.NEXT_PUBLIC_APP_URL = (await question('URL de la aplicación (default: https://gliter.com.ar): ')) || 'https://gliter.com.ar';
     envConfig.NEXT_PUBLIC_USE_FIREBASE_EMULATOR = 'false';
+
+    // Mercado Pago (cliente)
+    console.log('\n💳 Configuración de Mercado Pago (cliente):');
+    const mpPublicKey = await question('MercadoPago Public Key (NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY): ');
+    if (mpPublicKey) {
+      envConfig.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY = mpPublicKey;
+    }
+
+    // Web Push (VAPID)
+    console.log('\n🔔 Configuración de Web Push (opcional):');
+    const vapidPublicKey = await question('VAPID Public Key (NEXT_PUBLIC_VAPID_PUBLIC_KEY - opcional): ');
+    if (vapidPublicKey) {
+      envConfig.NEXT_PUBLIC_VAPID_PUBLIC_KEY = vapidPublicKey;
+    }
 
     // In-App Messaging Configuration
     console.log('\n💬 Configuración de In-App Messaging:');
@@ -105,6 +133,11 @@ async function setupProduction() {
 
 import https from 'https';
 
+/**
+ * Verifica que los endpoints críticos respondan con 200.
+ * @param {string} baseUrl - URL base del despliegue (ej: https://miapp.com).
+ * @returns {Promise<void>} Promesa que se resuelve al finalizar las verificaciones.
+ */
 async function verifyEndpoints(baseUrl) {
   const endpoints = [
     '/api/in-app-messages/config',
@@ -137,6 +170,11 @@ async function verifyEndpoints(baseUrl) {
   }
 }
 
+/**
+ * Punto de entrada del script de verificación.
+ * Lee la URL base desde argumentos y ejecuta verificaciones.
+ * @returns {Promise<void>} Promesa que se resuelve al finalizar.
+ */
 async function main() {
   const baseUrl = process.argv[2];
   

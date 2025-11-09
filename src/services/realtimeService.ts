@@ -4,11 +4,9 @@ import {
   push, 
   onValue, 
   off, 
-  serverTimestamp, 
   onDisconnect,
   remove,
   update,
-  child,
   get
 } from 'firebase/database';
 import { database } from '@/lib/firebase';
@@ -43,6 +41,20 @@ export interface ChatPresence {
 
 export interface ChatTyping {
   [userId: string]: TypingData;
+}
+
+// Tipos para notificaciones instantáneas
+export interface InstantNotificationPayload {
+  type: 'message' | 'match' | 'like' | 'super_like';
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}
+
+export interface InstantNotification extends InstantNotificationPayload {
+  id: string;
+  timestamp: number;
+  read: boolean;
 }
 
 class RealtimeService {
@@ -177,13 +189,13 @@ class RealtimeService {
     return () => off(chatTypingRef, 'value', unsubscribe);
   }
 
-  // Enviar notificación instantánea
-  async sendInstantNotification(userId: string, notification: {
-    type: 'message' | 'match' | 'like' | 'super_like';
-    title: string;
-    body: string;
-    data?: any;
-  }): Promise<void> {
+  /**
+   * Envia una notificación instantánea al usuario en Realtime Database.
+   *
+   * @param userId - ID del usuario destino
+   * @param notification - Datos de la notificación a enviar
+   */
+  async sendInstantNotification(userId: string, notification: InstantNotificationPayload): Promise<void> {
     if (!isFirebaseAvailable()) {
       console.warn('Firebase not available on server side, skipping notification');
       return;
@@ -204,8 +216,14 @@ class RealtimeService {
     }
   }
 
-  // Escuchar notificaciones instantáneas
-  onInstantNotifications(userId: string, callback: (notifications: any[]) => void): () => void {
+  /**
+   * Escucha las notificaciones instantáneas de un usuario.
+   * Devuelve una función para cancelar la suscripción.
+   *
+   * @param userId - ID del usuario
+   * @param callback - Handler que recibe el listado de notificaciones
+   */
+  onInstantNotifications(userId: string, callback: (notifications: InstantNotification[]) => void): () => void {
     if (!isFirebaseAvailable()) {
       console.warn('Firebase not available on server side, returning empty unsubscribe function');
       return () => {};
@@ -214,9 +232,9 @@ class RealtimeService {
     const userNotificationsRef = ref(getDatabase(), `notifications/${userId}`);
     
     const unsubscribe = onValue(userNotificationsRef, (snapshot) => {
-      const data = snapshot.val();
+      const data = snapshot.val() as Record<string, Omit<InstantNotification, 'id'>> | null;
       if (data) {
-        const notifications = Object.keys(data).map(key => ({
+        const notifications: InstantNotification[] = Object.keys(data).map((key) => ({
           id: key,
           ...data[key]
         }));
@@ -337,5 +355,12 @@ class RealtimeService {
     }
   }
 }
+// Robust singleton export to avoid duplicate instances across HMR/SSR
+declare global {
+  var __RealtimeServiceInstance__: RealtimeService | undefined;
+}
 
-export const realtimeService = new RealtimeService();
+const realtimeSingleton = globalThis.__RealtimeServiceInstance__ || new RealtimeService();
+globalThis.__RealtimeServiceInstance__ = realtimeSingleton;
+
+export const realtimeService = realtimeSingleton;

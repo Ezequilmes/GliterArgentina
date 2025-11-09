@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gliter Store Icon Template (512x512) - No transparency -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Solid background to avoid transparency -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF6B6B"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#FCE7F3" stop-opacity="1"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background (rounded square) -->
+  <rect x="0" y="0" width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+
+  <!-- Central emblem: heart + sparkles (brand accent) -->
+  <g filter="url(#shadow)">
+    <!-- Heart shape -->
+    <path d="M256 382
+             C230 360,172 316,148 278
+             C120 236,126 188,160 162
+             C188 142,224 148,248 176
+             C256 186,264 196,272 206
+             C280 196,288 186,296 176
+             C320 148,356 142,384 162
+             C418 188,424 236,396 278
+             C372 316,314 360,288 382
+             C272 394,240 394,256 382Z"
+          fill="url(#accent)"/>
+    <!-- Sparkles -->
+    <circle cx="360" cy="160" r="10" fill="#FFFFFF" opacity="0.9"/>
+    <circle cx="150" cy="200" r="6" fill="#FFFFFF" opacity="0.9"/>
+    <circle cx="220" cy="120" r="8" fill="#FFFFFF" opacity="0.85"/>
+  </g>
+
+  <!-- Optional brand text (remove before export if not needed) -->
+  <g aria-label="Gliter" fill="#FFFFFF" opacity="0.95">
+    <text x="50%" y="460" text-anchor="middle" font-size="64" font-weight="700" font-family="system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans" >Gliter</text>
+  </g>
+</svg>
+

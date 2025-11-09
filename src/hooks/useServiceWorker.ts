@@ -228,23 +228,31 @@ export function useServiceWorker(): UseServiceWorkerReturn {
         return;
       }
 
-      // Verify Service Worker file is accessible
+      // Verify Service Worker file is accessible (HEAD fallback to GET)
+      const swPath = process.env.NEXT_PUBLIC_SW_PATH || '/sw.js';
+      const fcmSwPath = process.env.NEXT_PUBLIC_FCM_SW_PATH || '/firebase-messaging-sw.js';
+      let swAccessible = false;
       try {
-        const response = await fetch('/sw.js', { method: 'HEAD' });
-        if (!response.ok) {
-          throw new Error(`Service Worker file not accessible: ${response.status}`);
-        }
-      } catch (fetchError) {
-        console.error('Service Worker file check failed:', fetchError);
-        addToastRef.current({
-          type: 'error',
-          title: 'Error de configuración',
-          message: 'No se puede acceder al archivo de configuración offline',
-        });
-        return;
+        const headResponse = await fetch(swPath, { method: 'HEAD' });
+        swAccessible = headResponse.ok;
+      } catch (headError) {
+        swAccessible = false;
       }
 
-      const registration = await navigator.serviceWorker.register('/sw.js', {
+      if (!swAccessible) {
+        try {
+          const getResponse = await fetch(swPath, { method: 'GET', cache: 'no-store' });
+          swAccessible = getResponse.ok;
+        } catch (getError) {
+          swAccessible = false;
+        }
+      }
+
+      if (!swAccessible) {
+        console.warn('Service Worker file not accessible via HEAD/GET; attempting registration fallback');
+      }
+
+      const registration = await navigator.serviceWorker.register(swPath, {
         scope: '/',
         updateViaCache: 'imports'
       });
@@ -253,7 +261,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
 
       // Register Firebase Messaging Service Worker
       try {
-        const firebaseRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        const firebaseRegistration = await navigator.serviceWorker.register(fcmSwPath, {
           scope: '/',
           updateViaCache: 'imports'
         });

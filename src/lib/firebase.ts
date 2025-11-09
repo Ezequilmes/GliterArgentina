@@ -133,3 +133,11 @@ if (false && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && typeof 
 }
 
 export default app;
+
+/**
+ * Check whether Firebase client SDK and Realtime Database are initialized.
+ * Ensures readiness before triggering data flows depending on Firebase.
+ */
+export function isFirebaseClientReady(): boolean {
+  return typeof window !== 'undefined' && !!app && !!auth && !!database;
+}

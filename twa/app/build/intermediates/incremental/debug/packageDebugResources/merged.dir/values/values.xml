@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="enableNotification">true</bool>
+    <bool name="enableSiteSettingsShortcut">true</bool>
+    <color name="backgroundColor">#000000</color>
+    <color name="colorPrimary">#FF6B6B</color>
+    <color name="colorPrimaryDark">#000000</color>
+    <color name="navigationColor">#000000</color>
+    <color name="navigationColorDark">#000000</color>
+    <color name="navigationDividerColor">#000000</color>
+    <color name="navigationDividerColorDark">#000000</color>
+    <color name="shortcut_background">#F5F5F5</color>
+    <integer name="splashScreenFadeOutDuration">300</integer>
+    <string name="appName" translatable="false">Gliter Argentina</string>
+    <string name="assetStatements">
+    [{
+        \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+        \"target\": {
+            \"namespace\": \"web\",
+            \"site\": \"https://gliter.com.ar\"
+        }
+    }]
+    
+  </string>
+    <string name="fallbackType" translatable="false">customtabs</string>
+    <string name="fullScopeUrl" translatable="false">https://gliter.com.ar/</string>
+    <string name="generatorApp" translatable="false">bubblewrap-cli</string>
+    <string name="hostName" translatable="false">gliter.com.ar</string>
+    <string name="launchUrl" translatable="false">https://gliter.com.ar/</string>
+    <string name="launcherName" translatable="false">Gliter</string>
+    <string name="orientation" translatable="false">portrait</string>
+    <string name="providerAuthority" translatable="false">ar.com.gliter.twa.fileprovider</string>
+    <string name="shortcut_name_0" translatable="false">Nuevo Chat</string>
+    <string name="shortcut_name_1" translatable="false">Descubrir</string>
+    <string name="shortcut_short_name_0" translatable="false">Chat</string>
+    <string name="shortcut_short_name_1" translatable="false">Descubrir</string>
+    <string name="webManifestUrl" translatable="false">https://gliter.com.ar/manifest.json</string>
+</resources>

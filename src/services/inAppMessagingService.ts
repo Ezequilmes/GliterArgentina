@@ -415,5 +415,12 @@ class InAppMessagingService {
   }
 }
 
-// Exportar instancia singleton
-export const inAppMessagingService = new InAppMessagingService();
+// Exportar instancia singleton robusta (resistente a HMR/SSR)
+declare global {
+  var __InAppMessagingServiceInstance__: InAppMessagingService | undefined;
+}
+
+const inAppMessagingSingleton = globalThis.__InAppMessagingServiceInstance__ || new InAppMessagingService();
+globalThis.__InAppMessagingServiceInstance__ = inAppMessagingSingleton;
+
+export const inAppMessagingService = inAppMessagingSingleton;

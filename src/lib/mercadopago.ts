@@ -172,7 +172,7 @@ export async function createPaymentPreference(
     },
     auto_return: 'approved',
     external_reference: `${userId}_${planId}_${Date.now()}`,
-    notification_url: `${APP_URL}/api/webhooks/mercadopago`,
+    notification_url: `${APP_URL}/api/mercadopago/webhook`,
     metadata: {
       user_id: userId,
       plan_id: planId,
@@ -293,7 +293,7 @@ export async function createDonationPreference(
     },
     auto_return: 'approved',
     external_reference: `${userId}_${options?.campaignId || 'donation'}_${Date.now()}`,
-    notification_url: `${APP_URL}/api/webhooks/mercadopago`,
+    notification_url: `${APP_URL}/api/mercadopago/webhook`,
     metadata: {
       user_id: userId,
       type: 'donation',

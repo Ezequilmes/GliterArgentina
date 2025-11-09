@@ -239,7 +239,7 @@ const nextConfig = {
 ```javascript
 // En tu dashboard de Mercado Pago
 const webhookConfig = {
-  url: 'https://tu-dominio.com/api/webhooks/mercadopago',
+  url: 'https://tu-dominio.com/api/mercadopago/webhook',
   events: ['payment', 'merchant_order']
 }
 ```

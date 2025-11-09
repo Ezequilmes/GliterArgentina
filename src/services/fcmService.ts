@@ -580,4 +580,12 @@ export class FCMService {
   }
 }
 
-export const fcmService = FCMService.getInstance();
+// Exportar instancia singleton robusta (HMR/SSR)
+declare global {
+  var __FCMServiceInstance__: FCMService | undefined;
+}
+
+const fcmSingleton = globalThis.__FCMServiceInstance__ || FCMService.getInstance();
+globalThis.__FCMServiceInstance__ = fcmSingleton;
+
+export const fcmService = fcmSingleton;

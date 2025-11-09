@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+/**
+ * Middleware para compatibilidad con WebView y apps móviles.
+ *
+ * - Añade cabeceras para mejorar integración en WebView/TraeApp
+ * - Gestiona CORS para rutas bajo `/api/`
+ * - Excluye archivos críticos estáticos como Service Workers de ser interceptados
+ */
 export function middleware(request: NextRequest) {
   const userAgent = request.headers.get('user-agent') || '';
   const response = NextResponse.next();
@@ -37,13 +44,16 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
+  runtime: 'nodejs',
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - manifest.json (PWA manifest)
+     * - sw.js y firebase-messaging-sw.js (Service Workers)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest\.json|sw\.js|firebase-messaging-sw\.js).*)',
   ],
 };

@@ -33,7 +33,7 @@ env:
       - RUNTIME
   # MercadoPago configuration - Set these in Firebase Console -> App Hosting -> Environment Variables
   - key: MERCADOPAGO_ACCESS_TOKEN
-    value: "APP_USR-2100654215920021-090302-fcde5bf150a88e7b9f2223ca0dd2a1e0-93900446"
+    secret: MERCADOPAGO_ACCESS_TOKEN
     availability:
       - BUILD
       - RUNTIME

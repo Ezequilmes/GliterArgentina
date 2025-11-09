@@ -93,19 +93,31 @@ docs/
 ```bash
 # Firebase
 NEXT_PUBLIC_FIREBASE_API_KEY=tu_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_auth_domain
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=tu_project_id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=tu_app_id
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=tu_measurement_id
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true
+
+# Mercado Pago (cliente)
+NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=tu_public_key
+
+# Web Push (opcional)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=tu_vapid_public_key
 ```
 
 #### Producción (.env.production)
 ```bash
 # Firebase
 NEXT_PUBLIC_FIREBASE_API_KEY=tu_api_key_produccion
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_auth_domain
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=tu_project_id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=tu_app_id
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=tu_measurement_id
 
 # App
@@ -119,6 +131,12 @@ INAPP_DISPLAY_INTERVAL=30000
 
 # Analytics
 GA4_API_SECRET=tu_ga4_api_secret
+
+# Mercado Pago (cliente)
+NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=tu_public_key
+
+# Web Push (opcional)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=tu_vapid_public_key
 ```
 
 ## 💻 Uso del Sistema

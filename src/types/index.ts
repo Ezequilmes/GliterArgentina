@@ -208,7 +208,7 @@ export interface ButtonProps {
 export interface CardProps {
   children: React.ReactNode;
   className?: string;
-  variant?: 'default' | 'primary' | 'accent' | 'gold' | 'muted';
+  variant?: 'default' | 'primary' | 'accent' | 'gold' | 'muted' | 'modern';
   padding?: 'none' | 'sm' | 'default' | 'lg';
   hover?: boolean;
   onClick?: () => void;

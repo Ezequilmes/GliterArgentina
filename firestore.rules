@@ -239,7 +239,7 @@ service cloud.firestore {
     // Promo codes collection - códigos promocionales
     match /promo_codes/{codeId} {
       // Lectura: todos pueden leer códigos activos para validación, admins ven todos
-      allow read: if resource.data.active == true || isAdmin();
+      allow read: if isAuthenticated() && (resource.data.active == true || isAdmin());
       
       // Escritura: solo admins pueden crear, actualizar y eliminar códigos
       allow create, update, delete: if isAdmin();
@@ -261,7 +261,7 @@ service cloud.firestore {
     // App configuration - configuración general de la app
     match /app_config/{configId} {
       // Lectura: configuración pública accesible a todos
-      allow read: if true;
+      allow read: if isAuthenticated();
       
       // Escritura: solo admins pueden modificar configuración
       allow write: if isAdmin();
@@ -289,7 +289,7 @@ service cloud.firestore {
       allow read: if isAdmin();
       
       // Creación: cualquier usuario puede enviar un registro
-      allow create: if true;
+      allow create: if isAuthenticated();
       
       // Actualización: solo admins pueden cambiar el estado (aprobar/rechazar)
       allow update: if isAdmin();
