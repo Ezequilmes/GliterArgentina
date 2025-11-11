@@ -158,7 +158,7 @@ h3 {
   line-height: 1.3;
 }
 
-p {
+p:not([class]) {
   font-weight: 400;
   color: rgb(var(--foreground-muted));
   line-height: 1.7;
@@ -265,6 +265,17 @@ p {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Fallback para navegadores/escenarios donde el clip de fondo en texto no funciona
+   Evita que el texto quede transparente en modo claro. */
+@supports not (-webkit-background-clip: text) {
+  .text-gradient,
+  .text-gradient-primary {
+    background: none !important;
+    -webkit-text-fill-color: initial !important;
+    color: rgb(var(--primary)) !important;
+  }
 }
 
 .shadow-glow {

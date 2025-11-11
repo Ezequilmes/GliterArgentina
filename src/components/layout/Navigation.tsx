@@ -125,11 +125,11 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
       <div className="flex items-center justify-between sm:justify-between">
         {/* Logo/Title - Hidden on mobile */}
         <div className="hidden sm:flex items-center space-x-3 sm:space-x-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center p-1">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/40 backdrop-blur-sm rounded-lg flex items-center justify-center p-1">
             <img 
               src="/logo.svg" 
               alt="Gliter Logo" 
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain drop-shadow-md"
             />
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-white">Gliter</h1>

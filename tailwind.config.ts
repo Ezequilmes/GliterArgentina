@@ -17,7 +17,7 @@ const config: Config = {
         foreground: "rgb(var(--foreground) / <alpha-value>)",
         primary: {
           DEFAULT: "rgb(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          foreground: "rgb(var(--primary-foreground))",
           500: "rgb(var(--primary))",
           600: "rgb(var(--primary-dark))",
         },
