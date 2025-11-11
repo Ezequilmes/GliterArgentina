@@ -6,24 +6,53 @@ const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || '';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const WEBHOOK_SECRET = process.env.MERCADOPAGO_WEBHOOK_SECRET || '';
 
-// Validación de configuración para producción
+/**
+ * Valida configuración de Mercado Pago.
+ * En cliente evita verificar secretos (Access Token) ya que no están disponibles.
+ * En servidor exige presencia de `MERCADOPAGO_ACCESS_TOKEN`.
+ *
+ * @returns Estado de validez y lista de errores detectados.
+ */
 export function validateMercadoPagoConfig(): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
+  const isServer = typeof window === 'undefined';
   
   if (!MP_PUBLIC_KEY) {
     errors.push('NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY no está configurada');
   }
   
-  if (!MP_ACCESS_TOKEN) {
+  if (isServer && !MP_ACCESS_TOKEN) {
     errors.push('MERCADOPAGO_ACCESS_TOKEN no está configurada');
   }
   
-  if (process.env.NODE_ENV === 'production' && !WEBHOOK_SECRET) {
+  // En producción, MERCADOPAGO_WEBHOOK_SECRET solo se valida en servidor.
+  // Este secreto no debe estar disponible en el cliente.
+  if (isServer && process.env.NODE_ENV === 'production' && !WEBHOOK_SECRET) {
     errors.push('MERCADOPAGO_WEBHOOK_SECRET no está configurada (recomendado para producción)');
   }
   
-  if (process.env.NODE_ENV === 'production' && APP_URL === 'http://localhost:3000') {
-    errors.push('NEXT_PUBLIC_APP_URL está usando localhost en producción');
+  // Validación robusta de APP_URL en producción: no permitir localhost ni 127.0.0.1
+  if (process.env.NODE_ENV === 'production') {
+    let parsedUrl: URL | null = null;
+    try {
+      parsedUrl = new URL(APP_URL);
+    } catch {
+      // Si APP_URL no es una URL válida, se marcará como error con instrucciones
+      parsedUrl = null;
+    }
+
+    const hostname = parsedUrl?.hostname || '';
+    const protocol = parsedUrl?.protocol || '';
+    const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || /localhost|127\.0\.0\.1/i.test(APP_URL);
+    const isHttp = protocol === 'http:' || APP_URL.startsWith('http://');
+
+    if (!parsedUrl) {
+      errors.push('NEXT_PUBLIC_APP_URL no es una URL válida. Usa un dominio público HTTPS, por ejemplo: https://gliter.com.ar');
+    } else if (isLocalHost) {
+      errors.push('NEXT_PUBLIC_APP_URL no puede apuntar a localhost en producción. Configura un dominio público HTTPS (ej: https://gliter.com.ar) en tu entorno de despliegue.');
+    } else if (isHttp) {
+      errors.push('NEXT_PUBLIC_APP_URL debe usar HTTPS en producción. Actualiza la variable a un esquema https (ej: https://gliter.com.ar).');
+    }
   }
   
   return {
@@ -122,7 +151,17 @@ export function initializeMercadoPago(): Promise<any> {
 }
 
 /**
- * Crea una preferencia de pago en MercadoPago
+ * Crea una preferencia de pago en MercadoPago (Premium).
+ *
+ * Envia un payload mínimo y válido a la API de preferencias para aislar posibles
+ * causas del 500 en producción. Evitamos campos opcionales (installments, shipments)
+ * que no son requeridos por MP y pueden introducir variaciones.
+ *
+ * @param userId ID del usuario que compra
+ * @param planId ID del plan premium (coincide con PREMIUM_PLANS)
+ * @param userEmail Email del usuario (para payer)
+ * @param userName Nombre del usuario (para payer)
+ * @returns PaymentIntent con datos mínimos para redirigir al checkout
  */
 export async function createPaymentPreference(
   userId: string,
@@ -159,8 +198,10 @@ export async function createPaymentPreference(
         quantity: 1,
         unit_price: plan.price / 100, // Convertir de centavos a pesos
         currency_id: plan.currency,
+        category_id: 'services',
       },
     ],
+    binary_mode: true,
     payer: {
       email: userEmail,
       name: userName,
@@ -177,15 +218,6 @@ export async function createPaymentPreference(
       user_id: userId,
       plan_id: planId,
       plan_duration: plan.duration,
-    },
-    payment_methods: {
-      excluded_payment_types: [],
-      excluded_payment_methods: [],
-      installments: 12,
-    },
-    shipments: {
-      cost: 0,
-      mode: 'not_specified',
     },
   };
 
@@ -213,7 +245,8 @@ export async function createPaymentPreference(
       if (response.status === 401) {
         throw new Error('Invalid MercadoPago credentials');
       } else if (response.status === 400) {
-        throw new Error('Invalid payment preference data');
+        const requestId = errorPayload?.requestId || errorPayload?.mpError?.requestId;
+        throw new Error(`Invalid payment preference data${requestId ? ` (reqId: ${requestId})` : ''}`);
       } else {
         const mpMessage =
           errorPayload?.mpError?.message ||
@@ -222,7 +255,8 @@ export async function createPaymentPreference(
           'Error al crear la preferencia de pago';
         const mpCause = errorPayload?.mpError?.cause?.[0]?.description;
         const composedMessage = mpCause ? `${mpMessage} - ${mpCause}` : mpMessage;
-        throw new Error(composedMessage);
+        const requestId = errorPayload?.requestId || errorPayload?.mpError?.requestId;
+        throw new Error(`${composedMessage}${requestId ? ` (reqId: ${requestId})` : ''}`);
       }
     }
 
@@ -282,6 +316,7 @@ export async function createDonationPreference(
         currency_id: currency,
       },
     ],
+    binary_mode: true,
     payer: {
       email: userEmail,
       name: userName,

@@ -8,7 +8,22 @@ import { NextResponse } from 'next/server';
  * - Devuelve un resultado sanitizado sin exponer secretos.
  */
 async function checkMercadoPagoAccessToken(): Promise<Response> {
-  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  /**
+   * Obtiene el Access Token de Mercado Pago desde variables de entorno conocidas.
+   * Intenta con alias comunes para evitar fallas por nombre mal configurado.
+   *
+   * @returns Token de acceso o null si no está configurado.
+   */
+  function getMercadoPagoAccessToken(): string | null {
+    return (
+      process.env.MERCADOPAGO_ACCESS_TOKEN ||
+      (process.env as any).MERCADO_PAGO_ACCESS_TOKEN ||
+      (process.env as any).MP_ACCESS_TOKEN ||
+      null
+    );
+  }
+
+  const accessToken = getMercadoPagoAccessToken();
 
   if (!accessToken) {
     return NextResponse.json(

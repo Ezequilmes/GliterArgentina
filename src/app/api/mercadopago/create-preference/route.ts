@@ -1,14 +1,29 @@
 import { NextResponse } from 'next/server';
+import { assertMercadoPagoAccessToken, getStatementDescriptor } from '@/lib/server/mercadopagoAuth';
 
 /**
  * Genera un identificador único por solicitud para trazabilidad en logs.
+ */
+/**
+ * Genera un identificador único por solicitud para trazabilidad en logs.
+ *
+ * @returns Identificador único con prefijo 'mp_'
  */
 function generateRequestId(): string {
   return `mp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Token de acceso ahora centralizado en src/lib/server/mercadopagoAuth.ts
+
 /**
  * Valida el cuerpo de la preferencia y devuelve errores/advertencias.
+ */
+/**
+ * Valida el cuerpo de la preferencia de pago.
+ * Verifica campos requeridos y recomienda mejores prácticas (no bloqueantes).
+ *
+ * @param body Objeto de preferencia recibido desde el cliente
+ * @returns Listas de errores (bloqueantes) y advertencias (no bloqueantes)
  */
 function validatePreferenceBody(body: any): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
@@ -126,6 +141,11 @@ export const revalidate = false;
  * Resuelve la URL del webhook desde variables de entorno.
  * Si no está configurada explícitamente, intenta construirla desde NEXT_PUBLIC_APP_URL.
  */
+/**
+ * Resuelve la URL del webhook a partir de variables de entorno.
+ *
+ * @returns URL absoluta del webhook o null si no es posible construirla
+ */
 function resolveWebhookUrl(): string | null {
   const fromEnv = process.env.MERCADOPAGO_WEBHOOK_URL;
   if (fromEnv) return fromEnv;
@@ -142,6 +162,11 @@ function resolveWebhookUrl(): string | null {
 
 /**
  * Obtiene la base pública de la app para construir back_urls.
+ */
+/**
+ * Obtiene la base pública de la app para construir back_urls.
+ *
+ * @returns La URL base pública (string) o null si no es válida/no está configurada
  */
 function resolveAppUrl(): string | null {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -165,6 +190,17 @@ function resolveAppUrl(): string | null {
  * Esta ruta recibe un objeto de preferencia desde el frontend y lo reenvía a la API
  * de Mercado Pago usando el Access Token configurado en la variable de entorno
  * MERCADOPAGO_ACCESS_TOKEN. Devuelve la respuesta de Mercado Pago al cliente.
+ */
+/**
+ * POST /api/mercadopago/create-preference
+ *
+ * Recibe un objeto de preferencia desde el frontend y lo reenvía a la API de Mercado Pago
+ * usando el Access Token configurado en MERCADOPAGO_ACCESS_TOKEN.
+ * Devuelve la respuesta de Mercado Pago al cliente. En caso de errores, retorna mensajes
+ * más descriptivos para facilitar el diagnóstico en producción.
+ *
+ * @param req Request con el cuerpo JSON de la preferencia
+ * @returns Respuesta JSON con datos de la preferencia creada o detalles de error
  */
 export async function POST(req: Request) {
   try {
@@ -202,25 +238,67 @@ export async function POST(req: Request) {
       }
     }
 
-    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-    if (!accessToken) {
+    // Añadir binary_mode: true por defecto si falta
+    if (typeof body.binary_mode === 'undefined') {
+      body.binary_mode = true;
+    }
+
+    // Añadir statement_descriptor seguro desde entorno si falta
+    if (!body.statement_descriptor) {
+      const descriptor = getStatementDescriptor();
+      if (descriptor) {
+        body.statement_descriptor = descriptor;
+      }
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = assertMercadoPagoAccessToken();
+    } catch (e) {
+      // Token faltante: error de autenticación del lado servidor.
+      // Devolvemos 401 para que el frontend pueda manejarlo de forma clara.
       return NextResponse.json(
-        { error: 'Access token de Mercado Pago no configurado', code: 'MCP_TOKEN_MISSING', requestId },
-        { status: 500 }
+        {
+          error: 'Access token de Mercado Pago no configurado',
+          code: 'MCP_TOKEN_MISSING',
+          requestId,
+          diagnostics: {
+            checkedEnvVars: [
+              'MERCADOPAGO_ACCESS_TOKEN',
+              'MERCADO_PAGO_ACCESS_TOKEN',
+              'MP_ACCESS_TOKEN',
+            ],
+            appHostingEnv: Boolean(process.env.NEXT_PUBLIC_APP_URL) ? 'present' : 'missing',
+          },
+        },
+        { status: 401, headers: { 'x-request-id': requestId } }
       );
     }
 
-    const mpResponse = await fetch(
-      'https://api.mercadopago.com/checkout/preferences',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
+    let mpResponse: Response;
+    try {
+      mpResponse = await fetch(
+        'https://api.mercadopago.com/checkout/preferences',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    } catch (networkErr: any) {
+      console.error(`[${requestId}] Error de red contactando Mercado Pago:`, networkErr?.message || networkErr);
+      return NextResponse.json(
+        {
+          error: 'Error de red al contactar Mercado Pago',
+          code: 'MCP_NETWORK_ERROR',
+          requestId,
         },
-        body: JSON.stringify(body),
-      }
-    );
+        { status: 503, headers: { 'x-request-id': requestId } }
+      );
+    }
 
     if (!mpResponse.ok) {
       let errorPayload: any = null;
@@ -237,18 +315,30 @@ export async function POST(req: Request) {
           mpError: errorPayload,
           requestId,
         },
-        { status: 502 }
+        { status: 502, headers: { 'x-request-id': requestId } }
       );
     }
 
     const data = await mpResponse.json();
-    return NextResponse.json({ ...data, requestId });
-  } catch (err) {
+    return NextResponse.json({ ...data, requestId }, { status: 200, headers: { 'x-request-id': requestId } });
+  } catch (err: any) {
     const requestId = generateRequestId();
-    console.error(`[${requestId}] Error en create-preference API:`, err);
+    const message = err?.message || String(err);
+    console.error(`[${requestId}] Error en create-preference API:`, message, err?.stack ? `\nStack: ${err.stack}` : '');
+    // Intentar distinguir errores comunes para mejorar el feedback
+    if (/invalid url/i.test(message) || /URL/.test(message)) {
+      return NextResponse.json(
+        {
+          error: 'URL inválida en los parámetros de la preferencia (back_urls/notification_url)',
+          code: 'INVALID_URL_PARAMS',
+          requestId,
+        },
+        { status: 400, headers: { 'x-request-id': requestId } }
+      );
+    }
     return NextResponse.json(
       { error: 'Error interno del servidor', requestId },
-      { status: 500 }
+      { status: 500, headers: { 'x-request-id': requestId } }
     );
   }
 }

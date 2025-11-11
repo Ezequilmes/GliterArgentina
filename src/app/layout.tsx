@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import PWAInitializer from "@/components/PWAInitializer";
+import { validateMercadoPagoConfig } from "@/lib/mercadopago";
 
 import InAppMessageHandler from "@/components/notifications/InAppMessageHandler";
 
@@ -60,11 +61,29 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/**
+ * RootLayout de la App.
+ * Ejecuta una validación temprana de configuración de MercadoPago al inicio
+ * para alertar si `NEXT_PUBLIC_APP_URL` está mal configurada en producción.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Validación temprana en tiempo de render (servidor) para entornos productivos
+  // Registra errores claros si APP_URL es localhost/HTTP o inválida.
+  if (process.env.NODE_ENV === 'production') {
+    const config = validateMercadoPagoConfig();
+    const appUrlErrors = config.errors.filter((e) => e.includes('NEXT_PUBLIC_APP_URL'));
+    if (appUrlErrors.length > 0) {
+      // Alerta temprana en logs del servidor para facilitar corrección de despliegue
+      console.error('[Config] NEXT_PUBLIC_APP_URL inválida en producción:', {
+        errors: appUrlErrors,
+        hint: 'Configura NEXT_PUBLIC_APP_URL con tu dominio público y esquema HTTPS. Ejemplo: https://gliter.com.ar',
+      });
+    }
+  }
   return (
     <html lang="es" className="h-full" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>

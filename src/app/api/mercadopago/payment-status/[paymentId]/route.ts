@@ -44,6 +44,21 @@ function setCachedPayment(paymentId: string, data: any): void {
 }
 
 /**
+ * Obtiene el Access Token de Mercado Pago desde variables de entorno conocidas.
+ * Intenta con alias comunes para evitar fallas por nombre mal configurado.
+ *
+ * @returns Token de acceso o null si no está configurado.
+ */
+function getMercadoPagoAccessToken(): string | null {
+  return (
+    process.env.MERCADOPAGO_ACCESS_TOKEN ||
+    (process.env as any).MERCADO_PAGO_ACCESS_TOKEN ||
+    (process.env as any).MP_ACCESS_TOKEN ||
+    null
+  );
+}
+
+/**
  * GET /api/mercadopago/payment-status/[paymentId]
  * Consulta el estado de un pago en Mercado Pago y devuelve información relevante.
  * Enhanced with caching, rate limiting, and retry logic.
@@ -76,7 +91,7 @@ export async function GET(
     return NextResponse.json(cachedData);
   }
 
-  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  const accessToken = getMercadoPagoAccessToken();
   if (!accessToken) {
     console.error('MERCADOPAGO_ACCESS_TOKEN not configured');
     return NextResponse.json(

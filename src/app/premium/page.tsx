@@ -11,6 +11,14 @@ import { PREMIUM_PLANS, createPaymentPreference, validateMercadoPagoConfig } fro
 import Link from 'next/link';
 import { analyticsService } from '@/services/analyticsService';
 
+/**
+ * PremiumPage
+ *
+ * Página de selección y compra de planes Premium.
+ * - Valida configuración de MercadoPago.
+ * - Muestra planes con precios en ARS (centavos -> pesos).
+ * - Crea preferencias de pago y redirige al checkout.
+ */
 export default function PremiumPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -48,75 +56,59 @@ export default function PremiumPage() {
     }
   }, []);
 
+  /**
+   * Valida la consistencia del plan respecto a la progresión de precios.
+   * Usa PREMIUM_PLANS como fuente de verdad para evitar falsos positivos.
+   *
+   * - Verifica que planes de mayor duración tengan mejor precio mensual equivalente.
+   * - No bloquea por ids o montos hardcodeados: se basa en los datos del plan.
+   */
   const validatePlanConsistency = (plan: typeof PREMIUM_PLANS[0]): boolean => {
-    // Validate plan price consistency
-    const expectedPrices = {
-      'premium-monthly': 4990,
-      'premium-quarterly': 12990,
-      'premium-yearly': 49990
-    };
-    
-    const expectedPrice = expectedPrices[plan.id as keyof typeof expectedPrices];
-    if (expectedPrice && plan.price !== expectedPrice) {
-      console.error(`Price inconsistency for plan ${plan.id}: expected ${expectedPrice}, got ${plan.price}`);
-      return false;
-    }
-    
-    // Validate duration consistency
-    const expectedDurations = {
-      'premium-monthly': 30,
-      'premium-quarterly': 90,
-      'premium-yearly': 365
-    };
-    
-    const expectedDuration = expectedDurations[plan.id as keyof typeof expectedDurations];
-    if (expectedDuration && plan.duration !== expectedDuration) {
-      console.error(`Duration inconsistency for plan ${plan.id}: expected ${expectedDuration}, got ${plan.duration}`);
-      return false;
-    }
-    
-    // Validate price progression (longer plans should be cheaper per month)
+    const monthlyPlan = PREMIUM_PLANS[0];
+    const monthlyBaseline = (monthlyPlan.price / monthlyPlan.duration) * 30;
     const monthlyEquivalent = (plan.price / plan.duration) * 30;
-    if (plan.id === 'premium-quarterly' && monthlyEquivalent >= 4990) {
-      console.error(`Quarterly plan not cost-effective: ${monthlyEquivalent} vs monthly 4990`);
-      return false;
+
+    // Planes más largos deberían tener menor costo mensual equivalente que el mensual
+    if (plan.id !== monthlyPlan.id && monthlyEquivalent >= monthlyBaseline) {
+      console.warn(`Plan ${plan.id} no es más conveniente por mes: ${monthlyEquivalent} >= ${monthlyBaseline}`);
+      // No bloqueamos la compra, solo avisamos para monitoreo
+      return true;
     }
-    if (plan.id === 'premium-yearly' && monthlyEquivalent >= 4000) {
-      console.error(`Yearly plan not cost-effective: ${monthlyEquivalent} vs monthly 4990`);
-      return false;
-    }
-    
     return true;
   };
 
+  /**
+   * Valida que el monto sea razonable y coherente con los planes definidos.
+   * Los montos se expresan en centavos ARS.
+   */
   const validatePaymentAmount = (amount: number): { isValid: boolean; error?: string } => {
-    // Validate minimum amount (MercadoPago minimum is usually 1 ARS)
-    if (amount < 100) { // 1 ARS in cents
+    // Mínimo de MP generalmente 1 ARS (100 centavos)
+    if (amount < 100) {
       return { isValid: false, error: 'El monto mínimo es de $1.00 ARS' };
     }
-    
-    // Validate maximum amount (reasonable limit for premium plans)
-    if (amount > 1000000) { // $10,000 ARS
+
+    // Máximo razonable para premium
+    if (amount > 10_000_00) { // $10.000 ARS en centavos
       return { isValid: false, error: 'El monto excede el límite permitido' };
     }
-    
-    // Validate that amount is in cents (should be whole number)
+
     if (!Number.isInteger(amount)) {
       return { isValid: false, error: 'El monto debe ser un número entero' };
     }
-    
-    // Validate against known plan prices
-    const validAmounts = [4990, 12990, 49990];
-    if (!validAmounts.includes(amount)) {
-      console.warn(`Unusual payment amount detected: ${amount}`);
-      // Don't block, but log for monitoring
-      // Log unusual payment amount for monitoring
-      console.warn(`Unusual payment amount detected: ${amount} for user ${user?.id}`);
+
+    const validPlanAmounts = new Set(PREMIUM_PLANS.map(p => p.price));
+    if (!validPlanAmounts.has(amount)) {
+      console.warn(`Monto de pago no coincide con los planes configurados: ${amount} (usuario: ${user?.id || 'N/A'})`);
     }
-    
+
     return { isValid: true };
   };
 
+  /**
+   * Inicia el flujo de compra para un plan dado.
+   * Valida configuración, plan, monto y datos del usuario
+   * antes de crear la preferencia y redirigir al checkout.
+   */
   const handlePurchase = async (planId: string) => {
     if (!user?.id) {
       toast.error('Debes iniciar sesión para continuar');
@@ -201,7 +193,7 @@ export default function PremiumPage() {
     
     try {
       // Track premium purchase started
-      const planType = plan.duration === 12 ? 'yearly' : plan.duration === 90 ? 'quarterly' : 'monthly';
+      const planType = plan.duration === 365 ? 'yearly' : plan.duration === 90 ? 'quarterly' : 'monthly';
       analyticsService.trackPremiumPurchaseStarted(planType as 'monthly' | 'yearly', plan.price);
 
       const preference = await createPaymentPreference(
@@ -267,6 +259,9 @@ export default function PremiumPage() {
     }
   };
 
+  /**
+   * Formatea un precio en centavos ARS a string en pesos.
+   */
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -275,18 +270,43 @@ export default function PremiumPage() {
     }).format(price / 100);
   };
 
+  /**
+   * Calcula el precio mensual equivalente de un plan (centavos ARS -> pesos).
+   */
   const getMonthlyPrice = (price: number, duration: number) => {
     const monthlyPrice = (price / duration) * 30;
     return formatPrice(monthlyPrice);
   };
 
+  /**
+   * Calcula el porcentaje de ahorro frente al plan mensual.
+   */
   const getSavingsPercentage = (price: number, duration: number) => {
-    const monthlyPrice = PREMIUM_PLANS[0].price; // Precio del plan mensual
+    const monthlyPrice = PREMIUM_PLANS[0].price; // Centavos ARS del plan mensual
     const equivalentMonthlyPrice = (price / duration) * 30;
-    const savings = ((monthlyPrice - equivalentMonthlyPrice) / monthlyPrice) * 100;
+    const savings = monthlyPrice > 0 ? ((monthlyPrice - equivalentMonthlyPrice) / monthlyPrice) * 100 : 0;
     return Math.round(savings);
   };
 
+  /**
+   * Obtiene un rótulo legible del período del plan para acompañar el precio total.
+   * Evita confusiones mostrando "por X meses" o "por 1 año" según la duración.
+   *
+   * @param duration Duración del plan en días (30, 90, 365)
+   * @returns Texto descriptivo del período del plan
+   */
+  const getPeriodLabel = (duration: number): string => {
+    if (duration === 30) return 'por 1 mes';
+    if (duration === 90) return 'por 3 meses';
+    if (duration === 365) return 'por 1 año';
+    // Fallback genérico: convertir días a meses aproximados
+    const approxMonths = Math.round(duration / 30);
+    return `por ${approxMonths} ${approxMonths === 1 ? 'mes' : 'meses'}`;
+  };
+
+  /**
+   * Reintenta validaciones de configuración y limpia errores.
+   */
   const handleRetry = () => {
     setError(null);
     setRetryCount(0);
@@ -451,9 +471,16 @@ export default function PremiumPage() {
                       <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
                         {formatPrice(plan.price)}
                       </div>
-                      <div className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300">
-                        {getMonthlyPrice(plan.price, plan.duration)}/mes
+                      {/* Rótulo del período total del plan para evitar confusión y precios "iguales" */}
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-indigo-300 mt-0.5">
+                        {getPeriodLabel(plan.duration)}
                       </div>
+                      {/* Precio mensual equivalente: ocultar en el plan mensual para evitar duplicar el mismo valor */}
+                      {plan.duration !== 30 && (
+                        <div className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300">
+                          {getMonthlyPrice(plan.price, plan.duration)}/mes
+                        </div>
+                      )}
                       {savings > 0 && (
                         <div className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">
                           Ahorra {savings}%

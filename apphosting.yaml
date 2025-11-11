@@ -1,0 +1,43 @@
+# Firebase App Hosting configuration for Gliter Argentina
+# Defines environment variables and secrets bindings for the my-web-app backend.
+
+# Environment variables and secrets
+env:
+  # Mercado Pago access token (runtime only)
+  - variable: MERCADOPAGO_ACCESS_TOKEN
+    secret: MERCADOPAGO_ACCESS_TOKEN
+    availability:
+      - RUNTIME
+
+  # Webhook HMAC/secret (runtime only)
+  - variable: MERCADOPAGO_WEBHOOK_SECRET
+    secret: MERCADOPAGO_WEBHOOK_SECRET
+    availability:
+      - RUNTIME
+
+  # Webhook URL (runtime only)
+  - variable: MERCADOPAGO_WEBHOOK_URL
+    value: https://gliter.com.ar/api/mercadopago/webhook
+    availability:
+      - RUNTIME
+
+  # Statement descriptor shown on card statements (runtime only)
+  - variable: MERCADOPAGO_STATEMENT_DESCRIPTOR
+    value: GLITER
+    availability:
+      - RUNTIME
+
+  # Public key exposed in client (build + runtime)
+  - variable: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
+    secret: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # App base URL exposed in client (build + runtime)
+  - variable: NEXT_PUBLIC_APP_URL
+    value: https://gliter.com.ar
+    availability:
+      - BUILD
+      - RUNTIME
+

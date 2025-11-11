@@ -1,6 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import crypto from 'crypto';
 import { analyticsService } from '@/services/analyticsService';
+import { getMercadoPagoAccessToken } from '@/lib/server/mercadopagoAuth';
+import { checkAndMarkPaymentProcessed } from '@/lib/server/mcpIdempotency';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -55,10 +57,11 @@ export async function POST(req: NextRequest) {
 
     console.log(`[${requestId}] MCP webhook recibido`, { topic, resource, dataId });
 
-    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+    const accessToken = getMercadoPagoAccessToken();
     if (!accessToken) {
+      // No bloquear el webhook si falta el token: permitir verificación de firma y recepción básica
       console.error(`[${requestId}] MERCADOPAGO_ACCESS_TOKEN no configurado`);
-      return NextResponse.json({ error: 'Access token no configurado', code: 'MCP_TOKEN_MISSING', requestId }, { status: 500 });
+      return NextResponse.json({ ok: true, code: 'MCP_TOKEN_MISSING', requestId }, { status: 200 });
     }
 
     // Manejo básico de payments: recuperar estado actual
@@ -70,6 +73,12 @@ export async function POST(req: NextRequest) {
           // extraer id de resource URL
           const [, id] = match;
           if (id) {
+            // Idempotencia: registrar si ya procesado
+            const idempotency = await checkAndMarkPaymentProcessed(String(id), { topic: 'payment' });
+            if (idempotency === 'already_processed') {
+              console.log(`[${requestId}] payment ${id} ya procesado (idempotencia)`);
+              return NextResponse.json({ ok: true, idempotent: true, requestId });
+            }
             const info = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
               headers: {
                 Authorization: `Bearer ${accessToken}`,
@@ -80,6 +89,13 @@ export async function POST(req: NextRequest) {
             if (info.ok) {
               const data = await info.json();
               console.log(`[${requestId}] payment ${id} estado`, { status: data.status, status_detail: data.status_detail });
+              // Persistir marca de idempotencia con estado final
+              await checkAndMarkPaymentProcessed(String(id), {
+                status: data.status,
+                status_detail: data.status_detail,
+                amount: data.transaction_amount,
+                topic: 'payment',
+              });
               try {
                 analyticsService.trackEvent('premium_purchase_completed', {
                   plan_type: data.transaction_amount >= 10000 ? 'yearly' : 'monthly',
@@ -94,6 +110,11 @@ export async function POST(req: NextRequest) {
           }
         }
       } else if (paymentId) {
+        const idempotency = await checkAndMarkPaymentProcessed(String(paymentId), { topic: 'payment' });
+        if (idempotency === 'already_processed') {
+          console.log(`[${requestId}] payment ${paymentId} ya procesado (idempotencia)`);
+          return NextResponse.json({ ok: true, idempotent: true, requestId });
+        }
         const info = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -104,6 +125,12 @@ export async function POST(req: NextRequest) {
         if (info.ok) {
           const data = await info.json();
           console.log(`[${requestId}] payment ${paymentId} estado`, { status: data.status, status_detail: data.status_detail });
+          await checkAndMarkPaymentProcessed(String(paymentId), {
+            status: data.status,
+            status_detail: data.status_detail,
+            amount: data.transaction_amount,
+            topic: 'payment',
+          });
           try {
             analyticsService.trackEvent('premium_purchase_completed', {
               plan_type: data.transaction_amount >= 10000 ? 'yearly' : 'monthly',

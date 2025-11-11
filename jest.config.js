@@ -3,12 +3,9 @@ export default {
   preset: 'ts-jest/presets/default-esm',
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  moduleNameMapping: {
-    // Handle module aliases
-    '^@/components/(.*)$': '<rootDir>/components/$1',
-    '^@/pages/(.*)$': '<rootDir>/pages/$1',
-    '^@/lib/(.*)$': '<rootDir>/lib/$1',
-    '^@/src/(.*)$': '<rootDir>/src/$1',
+  moduleNameMapper: {
+    // Handle module aliases (map @/ to src/ root)
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
   testEnvironment: 'jest-environment-jsdom',
   collectCoverageFrom: [

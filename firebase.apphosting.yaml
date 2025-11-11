@@ -2,45 +2,56 @@ runtime: nodejs20
 entrypoint: npm run start
 
 env:
-  - key: NODE_ENV
+  - variable: NODE_ENV
     value: production
-  - key: NEXT_TELEMETRY_DISABLED
+  - variable: NEXT_TELEMETRY_DISABLED
     value: "1"
-  - key: PORT
+  - variable: PORT
     value: "8080"
-  - key: NEXT_PUBLIC_APP_URL
+  - variable: NEXT_PUBLIC_APP_URL
     value: "https://gliter.com.ar"
   # Firebase Admin SDK configuration - Set these in Firebase Console -> App Hosting -> Environment Variables
-  - key: FIREBASE_PROJECT_ID
+  - variable: FIREBASE_PROJECT_ID
     availability:
       - BUILD
       - RUNTIME
-  - key: FIREBASE_PRIVATE_KEY_ID
+  - variable: FIREBASE_PRIVATE_KEY_ID
     availability:
       - BUILD
       - RUNTIME
-  - key: FIREBASE_PRIVATE_KEY
+  - variable: FIREBASE_PRIVATE_KEY
     availability:
       - BUILD
       - RUNTIME
-  - key: FIREBASE_CLIENT_EMAIL
+  - variable: FIREBASE_CLIENT_EMAIL
     availability:
       - BUILD
       - RUNTIME
-  - key: FIREBASE_CLIENT_ID
+  - variable: FIREBASE_CLIENT_ID
     availability:
       - BUILD
       - RUNTIME
   # MercadoPago configuration - Set these in Firebase Console -> App Hosting -> Environment Variables
-  - key: MERCADOPAGO_ACCESS_TOKEN
-    secret: MERCADOPAGO_ACCESS_TOKEN
+  - variable: MERCADOPAGO_ACCESS_TOKEN
+    value: "APP_USR-2100654215920021-090302-fcde5bf150a88e7b9f2223ca0dd2a1e0-93900446"
     availability:
-      - BUILD
       - RUNTIME
-  - key: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
+  - variable: NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
     value: "APP_USR-eef5b234-f79b-46ab-aa28-ffd2369f8060"
     availability:
       - BUILD
+      - RUNTIME
+  - variable: MERCADOPAGO_WEBHOOK_SECRET
+    value: "6123b18eb72dba618750cb40a49ea1d26440e748bcf25dd13ce08f8a5fcfe2f2"
+    availability:
+      - RUNTIME
+  - variable: MERCADOPAGO_WEBHOOK_URL
+    value: "https://gliter.com.ar/api/mercadopago/webhook"
+    availability:
+      - RUNTIME
+  - variable: MERCADOPAGO_STATEMENT_DESCRIPTOR
+    value: "GLITER"
+    availability:
       - RUNTIME
 
 build:
@@ -54,7 +65,7 @@ build:
     echo ">>> Building Next.js app"
     npm run build
   environment:
-    - key: NODE_ENV
+    - variable: NODE_ENV
       value: production
 
 resources:
