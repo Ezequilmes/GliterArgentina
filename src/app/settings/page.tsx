@@ -1,30 +1,28 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AppLayout, Header } from '@/components/layout';
-import { Card, Button, Switch, Slider, Select, Badge, Modal } from '@/components/ui';
+import { Card, Button, Switch, Slider, Select, Modal } from '@/components/ui';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import PushNotificationSetup from '@/components/notifications/PushNotificationSetup';
 import { analyticsService } from '@/services/analyticsService';
 import { userService } from '@/lib/firestore';
 import { User } from '@/types';
 import { 
-  MapPin, 
   Users, 
-  Heart, 
   Moon, 
   Sun, 
-  Globe, 
   Smartphone,
   FileText,
   Mail,
   Star,
-  Filter,
-  Volume2,
-  Vibrate,
   Eye,
   Lock,
   HelpCircle,
@@ -34,8 +32,10 @@ import {
 export default function SettingsPage() {
   const { user } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const [ageRange, setAgeRange] = useState([18, 35]);
-  const [maxDistance, setMaxDistance] = useState([50]);
+  const router = useRouter();
+  const router = useRouter();
+  const [ageRange, setAgeRange] = useState<[number, number]>([18, 35]);
+  const [maxDistance, setMaxDistance] = useState<[number]>([50]);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   
   // Settings states
@@ -46,6 +46,62 @@ export default function SettingsPage() {
   const [superLikeNotifications, setSuperLikeNotifications] = useState(true);
   const [soundNotifications, setSoundNotifications] = useState(true);
   const [vibrationNotifications, setVibrationNotifications] = useState(true);
+
+  useEffect(() => {
+    if (!user?.settings) return;
+    const sp = user.settings.searchPreferences;
+    if (sp) {
+      if (typeof sp.maxDistance === 'number') setMaxDistance([sp.maxDistance]);
+      if (sp.ageRange) setAgeRange([sp.ageRange.min, sp.ageRange.max]);
+    }
+    const noti = user.settings.notifications;
+    if (noti) {
+      if (typeof noti.matches === 'boolean') setMatchNotifications(noti.matches);
+      if (typeof noti.messages === 'boolean') setMessageNotifications(noti.messages);
+    }
+  }, [user?.id]);
+
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const settingsPayload = useMemo(() => {
+    const current = user?.settings || {} as any;
+    const nextNotifications = {
+      ...(current.notifications || {}),
+      matches: matchNotifications,
+      messages: messageNotifications,
+    };
+    const nextSearch = {
+      ...(current.searchPreferences || {}),
+      maxDistance: maxDistance[0],
+      ageRange: { min: ageRange[0], max: ageRange[1] },
+      genders: (current.searchPreferences?.genders || ['male', 'female', 'other']),
+      sexualRoles: (current.searchPreferences?.sexualRoles || ['active', 'passive', 'versatile']),
+    };
+    return {
+      settings: {
+        ...(current || {}),
+        notifications: nextNotifications,
+        searchPreferences: nextSearch,
+      }
+    } as Partial<User>;
+  }, [user?.settings, matchNotifications, messageNotifications, maxDistance, ageRange]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        await userService.updateUser(user.id, settingsPayload);
+        toast.success('Preferencias guardadas');
+      } catch (error) {
+        toast.error('Error al guardar preferencias');
+        console.error('Error updating preferences:', error);
+      }
+    }, 600);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [settingsPayload, user?.id]);
 
   // Blocked users states
   const [isBlockedUsersModalOpen, setIsBlockedUsersModalOpen] = useState(false);
@@ -441,6 +497,7 @@ export default function SettingsPage() {
                     } catch (error) {
                       console.error('Error tracking premium viewed:', error);
                     }
+                    router.push('/premium');
                   }}
                 >
                   Actualizar a Premium
@@ -456,27 +513,47 @@ export default function SettingsPage() {
             </h3>
             
             <div className="space-y-4">
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => router.push('/help')}
+              >
                 <HelpCircle className="w-4 h-4 mr-3" />
                 Centro de ayuda
               </Button>
               
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => { if (typeof window !== 'undefined') window.location.href = 'mailto:soporte@gliter.com.ar'; }}
+              >
                 <Mail className="w-4 h-4 mr-3" />
                 Contactar soporte
               </Button>
               
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => router.push('/TERMINOS%20Y%20CONDICIONES.txt')}
+              >
                 <FileText className="w-4 h-4 mr-3" />
                 Términos de servicio
               </Button>
               
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => router.push('/privacy')}
+              >
                 <Shield className="w-4 h-4 mr-3" />
                 Política de privacidad
               </Button>
               
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => router.push('/store-assets')}
+              >
                 <Star className="w-4 h-4 mr-3" />
                 Calificar la app
               </Button>
@@ -535,9 +612,11 @@ export default function SettingsPage() {
                     <div className="flex items-center space-x-3">
                       <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
                         {blockedUser.photos && blockedUser.photos.length > 0 ? (
-                          <img
+                          <Image
                             src={blockedUser.photos[0]}
                             alt={blockedUser.name}
+                            width={48}
+                            height={48}
                             className="w-12 h-12 rounded-full object-cover"
                           />
                         ) : (
