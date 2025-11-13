@@ -1,48 +1,50 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/hooks/useChat';
-import { userService } from '@/lib/firestore';
 import { User } from '@/types';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AppLayout } from '@/components/layout';
 import { ChatList } from '@/components/chat/ChatList';
 import { ChatWindow } from '@/components/chat/ChatWindow';
-import { Loading } from '@/components/ui';
 import { 
   MessageCircle, 
   ArrowLeft
 } from 'lucide-react';
 
 export default function ChatPage() {
-  const router = useRouter();
+  const _router = useRouter();
   const { user } = useAuth();
   const {
     chats,
     currentChat,
-    messages,
-    isTyping,
     otherUserTyping,
     loading,
     error,
-    hasMoreMessages,
     sendMessage,
     createChat,
-    selectChat,
-    loadMoreMessages,
-    markAsRead,
-    editMessage,
-    addReaction,
-    removeReaction,
-    setTyping
+    selectChat
   } = useChat();
 
   const [selectedChatId, setSelectedChatId] = useState<string | undefined>(undefined);
   const [isMobile, setIsMobile] = useState(false);
   const [otherUser, setOtherUser] = useState<User | null>(null);
-  const [loadingOtherUser, setLoadingOtherUser] = useState(false);
+  const [loadingOtherUser, _setLoadingOtherUser] = useState(false);
+
+  const loadOtherUser = useCallback(async () => {
+    if (!currentChat || !user) {
+      setOtherUser(null);
+      return;
+    }
+    const otherUserFound = currentChat.participants.find(p => p.id !== user.id);
+    if (!otherUserFound) {
+      setOtherUser(null);
+      return;
+    }
+    setOtherUser(otherUserFound);
+  }, [currentChat, user]);
 
   // Check if mobile view
   useEffect(() => {
@@ -65,14 +67,14 @@ export default function ChatPage() {
   // Load other user when current chat changes
   useEffect(() => {
     loadOtherUser();
-  }, [currentChat, user]);
+  }, [loadOtherUser]);
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId);
     selectChat(chatId);
   };
 
-  const handleSendMessage = (content: string, replyTo?: string) => {
+  const _handleSendMessage = (content: string, replyTo?: string) => {
     if (selectedChatId) {
       sendMessage(selectedChatId, content, 'text', replyTo);
     }
@@ -83,20 +85,7 @@ export default function ChatPage() {
     selectChat(null);
   };
 
-  const loadOtherUser = async () => {
-    if (!currentChat || !user) {
-      setOtherUser(null);
-      return;
-    }
-    
-    const otherUser = currentChat.participants.find(p => p.id !== user.id);
-    if (!otherUser) {
-      setOtherUser(null);
-      return;
-    }
-    
-    setOtherUser(otherUser);
-  };
+  
 
   if (loading && chats.length === 0) {
     return (

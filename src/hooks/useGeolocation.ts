@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createLogger } from '@/services/loggingService';
 
 // Create component-specific logger
@@ -40,7 +40,7 @@ const DEFAULT_OPTIONS: Required<GeolocationOptions> = {
 };
 
 export const useGeolocation = (options: GeolocationOptions = {}) => {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const opts = useMemo(() => ({ ...DEFAULT_OPTIONS, ...options }), [options]);
   
   const [state, setState] = useState<GeolocationState>({
     location: null,
@@ -97,6 +97,11 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
     }
   }, []);
 
+  // Set permission state helper
+  const setPermissionState = useCallback((permission: PermissionState) => {
+    setState(prev => ({ ...prev, permission }));
+  }, []);
+
   // Check geolocation permissions
   const checkPermissions = useCallback(async (): Promise<PermissionState> => {
     try {
@@ -111,12 +116,12 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
         
         return permission.state;
       }
-    } catch (err) {
+    } catch {
       console.warn('Permissions API not supported');
     }
     
     return 'prompt';
-  }, []);
+  }, [setPermissionState]);
 
   // Enhanced error handling with detailed messages
   const getErrorMessage = useCallback((err: GeolocationPositionError): string => {
@@ -344,6 +349,17 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
     });
   }, [isSupported, shouldAttemptLocation, options, state.retryCount, state.consecutiveFailures, checkPermissions, getErrorMessage, logGeolocation]);
 
+  // Stop watching position
+  const stopWatching = useCallback(() => {
+    if (watchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      logGeolocation('info', 'Watch de ubicación detenido');
+    }
+
+    setState(prev => ({ ...prev, isWatching: false }));
+  }, [logGeolocation]);
+
   // Watch position with enhanced error handling
   const watchLocation = useCallback(() => {
     if (!isSupported) {
@@ -408,18 +424,9 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
         }
       );
     }
-  }, [isSupported, options, getErrorMessage, logGeolocation, state.consecutiveFailures]);
+  }, [isSupported, options, getErrorMessage, logGeolocation, state.consecutiveFailures, stopWatching]);
 
-  // Stop watching position
-  const stopWatching = useCallback(() => {
-    if (watchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      logGeolocation('info', 'Watch de ubicación detenido');
-    }
-
-    setState(prev => ({ ...prev, isWatching: false }));
-  }, [logGeolocation]);
+  // (moved above)
 
   // Reset state
   const reset = useCallback(() => {
@@ -450,10 +457,7 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
     return R * c;
   }, []);
 
-  // Set permission state helper
-  const setPermissionState = useCallback((permission: PermissionState) => {
-    setState(prev => ({ ...prev, permission }));
-  }, []);
+  // (moved above)
 
   // Check permissions on mount and when needed
   useEffect(() => {

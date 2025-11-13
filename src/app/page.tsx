@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Card } from '@/components/ui';
-import { Heart, Users, MessageCircle, Shield, Sparkles, Star, ArrowRight, Play } from 'lucide-react';
+import { Heart, Users, Shield, Sparkles, Star, ArrowRight, Play } from 'lucide-react';
 import BrowserCompatibility from '@/components/BrowserCompatibility';
+import Image from 'next/image';
 
 
 export default function Home() {
@@ -39,9 +40,11 @@ export default function Home() {
           <div className="flex justify-between items-center h-20">
             <Link href="/" className="flex items-center space-x-3 group">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center p-2 group-hover:scale-105 transition-transform duration-300">
-                <img 
-                  src="/logo.svg" 
+                <Image 
+                  src="/logo.svg?v=1" 
                   alt="Gliter Logo" 
+                  width={32}
+                  height={32}
                   className="w-8 h-8"
                 />
               </div>
@@ -235,9 +238,11 @@ export default function Home() {
           <div className="text-center">
             <div className="flex items-center justify-center space-x-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <img 
-                  src="/logo.svg" 
+                <Image 
+                  src="/logo.svg?v=1" 
                   alt="Gliter Logo" 
+                  width={24}
+                  height={24}
                   className="w-6 h-6"
                 />
               </div>

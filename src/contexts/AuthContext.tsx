@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 
 // Interfaz para NetworkInformation (no está incluida en TypeScript por defecto)
 interface NetworkInformation {
@@ -19,9 +19,7 @@ import {
   logout, 
   resetPassword, 
   changePassword,
-  onAuthStateChange,
   getUserProfile,
-  updateUserOnlineStatus,
   AuthUser
 } from '@/lib/auth';
 import { getCurrentLocation } from '@/lib/geolocation';
@@ -73,7 +71,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Registra eventos de autenticación con contexto de dispositivo, viewport y red.
    * En producción envía los logs a `/api/log-auth` para su análisis.
    */
-  const logAuthEvent = async (event: string, data: any = {}) => {
+  const logAuthEvent = useCallback(async (event: string, data: any = {}) => {
     const connection: NetworkInformation | null = (typeof navigator !== 'undefined' && 'connection' in navigator)
       ? (navigator as Navigator & { connection?: NetworkInformation }).connection || null
       : null;
@@ -112,13 +110,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.warn('Failed to send auth log:', error);
       }
     }
-  };
+  }, []);
 
   /**
    * Calcula un timeout adaptativo para la inicialización de autenticación
    * basado en el estado de la red del navegador.
    */
-  const getAdaptiveAuthTimeout = (): number => {
+  const getAdaptiveAuthTimeout = useCallback((): number => {
     const baseDesktop = 15000;
     const baseMobile = 25000;
     const isMobile = isMobileDevice();
@@ -140,7 +138,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       default:
         return base;
     }
-  };
+  }, []);
 
   // Función de reintento para autenticación - más conservadora
   const retryAuth = async () => {
@@ -165,7 +163,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   // Función para generar automáticamente token FCM
-  const generateFCMTokenAutomatically = async (userId: string) => {
+  const generateFCMTokenAutomatically = useCallback(async (userId: string) => {
     try {
       await logAuthEvent('fcm_auto_generation_start', { userId });
       
@@ -241,7 +239,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
     }
-  };
+  }, [logAuthEvent]);
 
   // Función para cargar datos del usuario
   const loadUserData = async (authUser: AuthUser): Promise<User | null> => {
@@ -397,7 +395,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               // Generar automáticamente token FCM para notificaciones push
               // Se ejecuta en background para no bloquear la autenticación
               setTimeout(() => {
-                generateFCMTokenAutomatically(authUser.uid).catch(error => {
+                generateFCMTokenAutomatically(authUser.uid).catch((error: unknown) => {
                   console.warn('Error en generación automática de token FCM:', error);
                 });
               }, 2000); // Delay de 2 segundos para permitir que la autenticación se complete
@@ -433,11 +431,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setAuthUser(null);
             setUser(null);
           } finally {
-            if (mounted && hasRealChange) {
+            if (mounted) {
               setLoading(false);
               setInitializing(false);
-            }
-            if (mounted) {
               clearTimeout(initTimeout);
             }
           }
@@ -467,7 +463,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       mounted = false;
       cleanup.then(cleanupFn => cleanupFn?.());
     };
-  }, [retryCount]);
+  }, [retryCount, authUser, initializing, getAdaptiveAuthTimeout, logAuthEvent, generateFCMTokenAutomatically]);
 
   // Función de login
   const login = async (data: LoginForm): Promise<void> => {

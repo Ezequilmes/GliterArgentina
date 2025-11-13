@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { 
@@ -32,12 +32,12 @@ import {
   Trash2,
   Crown,
   Upload,
-  Image,
   Edit,
   Bell,
   Send
 } from 'lucide-react';
 import { storageService } from '@/lib/storage';
+import Image from 'next/image';
 
 interface ExclusiveCard {
   id: string;
@@ -164,7 +164,7 @@ export default function AdminPanel() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  
   
   // Estados para edición
   const [editingCard, setEditingCard] = useState<string | null>(null);
@@ -364,7 +364,7 @@ export default function AdminPanel() {
   };
 
   // Funciones para notificaciones
-  const loadNotificationHistory = async () => {
+  const loadNotificationHistory = useCallback(async () => {
     if (!user?.email) return;
     
     setLoadingHistory(true);
@@ -380,9 +380,9 @@ export default function AdminPanel() {
     } finally {
       setLoadingHistory(false);
     }
-  };
+  }, [user?.email]);
 
-  const loadUsersForNotification = async () => {
+  const loadUsersForNotification = useCallback(async () => {
     if (!user?.email) return;
     
     setLoadingUsers(true);
@@ -398,7 +398,7 @@ export default function AdminPanel() {
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, [user?.email, userSearch]);
 
   const sendNotification = async () => {
     if (!user?.email || !notificationForm.title || !notificationForm.message) return;
@@ -459,13 +459,13 @@ export default function AdminPanel() {
     if (isAdmin) {
       loadNotificationHistory();
     }
-  }, [isAdmin]);
+  }, [isAdmin, loadNotificationHistory]);
 
   useEffect(() => {
     if (isAdmin && notificationForm.targetType === 'specific') {
       loadUsersForNotification();
     }
-  }, [isAdmin, notificationForm.targetType, userSearch]);
+  }, [isAdmin, notificationForm.targetType, userSearch, loadUsersForNotification]);
 
   // Funciones para edición de perfiles exclusivos
   const startEditing = (card: ExclusiveCard) => {
@@ -522,7 +522,6 @@ export default function AdminPanel() {
 
   const removePhoto = (index: number) => {
     setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
-    setPhotoUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   const uploadPhotos = async (): Promise<string[]> => {
@@ -607,7 +606,6 @@ export default function AdminPanel() {
       });
       
       setSelectedPhotos([]);
-      setPhotoUrls([]);
       setShowCreateForm(false);
       alert('Perfil exclusivo creado exitosamente');
     } catch (error) {
@@ -752,10 +750,13 @@ export default function AdminPanel() {
                       <div className="grid grid-cols-3 gap-2 mb-4">
                         {selectedPhotos.map((file, index) => (
                           <div key={index} className="relative">
-                            <img
+                            <Image
                               src={URL.createObjectURL(file)}
                               alt={`Preview ${index + 1}`}
+                              width={160}
+                              height={80}
                               className="w-full h-20 object-cover rounded-lg"
+                              unoptimized
                             />
                             <button
                               onClick={() => removePhoto(index)}

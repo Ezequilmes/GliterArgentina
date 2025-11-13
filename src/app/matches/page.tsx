@@ -3,17 +3,16 @@
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AppLayout, Header } from '@/components/layout';
-import { Avatar } from '@/components/ui/Avatar';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import Loading from '@/components/ui/Loading';
 import { useMatches } from '@/hooks/useMatches';
 import { getUserProfilePhoto } from '@/lib/userUtils';
 import { MessageCircle, Heart, X, Star, Clock, MapPin } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { analyticsService } from '@/services/analyticsService';
+import Image from 'next/image';
 
 
 
@@ -165,9 +164,11 @@ export default function MatchesPage() {
                       </button>
 
                       <div className="relative">
-                        <img
+                        <Image
                           src={getUserProfilePhoto(match.otherUser) || '/default-avatar.png'}
                           alt={match.otherUser.name}
+                          width={800}
+                          height={384}
                           className="w-full h-48 object-cover"
                         />
                         
