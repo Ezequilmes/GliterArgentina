@@ -71,10 +71,9 @@ build:
     echo ">>> Cleaning node state"
     rm -rf node_modules pnpm-lock.yaml
     echo ">>> Installing dependencies"
-    npm ci
+    npm ci --omit=dev
     echo ">>> Building Next.js app"
-    export NODE_OPTIONS="--max_old_space_size=4096"
-    npm run build
+    NODE_OPTIONS="--max_old_space_size=4096" npm run build
     echo ">>> Copying public assets for standalone server"
     cp -r public .next/standalone/public || echo "No public directory copied"
   environment:
