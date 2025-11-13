@@ -82,7 +82,7 @@ build:
 
 resources:
   cpu: 2
-  memoryMiB: 4096
+  memoryMiB: 8192
   diskMiB: 8192
 
 handlers:
