@@ -1,5 +1,5 @@
 runtime: nodejs20
-entrypoint: npm run start
+entrypoint: node .next/standalone/server.js
 
 env:
   - variable: NODE_ENV
@@ -10,6 +10,12 @@ env:
     value: "8080"
   - variable: NEXT_PUBLIC_APP_URL
     value: "https://gliter.com.ar"
+    availability:
+      - BUILD
+      - RUNTIME
+  # Disable sharp to avoid native module build issues in App Hosting
+  - variable: NEXT_SHARP_DISABLE
+    value: "true"
   # Firebase Admin SDK configuration - Set these in Firebase Console -> App Hosting -> Environment Variables
   - variable: FIREBASE_PROJECT_ID
     availability:
@@ -53,25 +59,32 @@ env:
     value: "GLITER"
     availability:
       - RUNTIME
+  # Firebase Web Push VAPID public key - ensure this is configured in App Hosting env
+  - variable: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+    value: "BGVjAOjpQTeTCnmNcFrrLHsaHA7a1KSSsn7n0msDXz_0kH_rIkuqNUwYRQn4BnH0-fa-pY24OW3rZDYKwUYbPW4"
+    availability:
+      - BUILD
+      - RUNTIME
 
 build:
   command: |
     echo ">>> Cleaning node state"
     rm -rf node_modules pnpm-lock.yaml
     echo ">>> Installing dependencies"
-    npm install --omit=dev
-    echo ">>> Type-check"
-    npm run type-check
+    npm ci
     echo ">>> Building Next.js app"
+    export NODE_OPTIONS="--max_old_space_size=4096"
     npm run build
+    echo ">>> Copying public assets for standalone server"
+    cp -r public .next/standalone/public || echo "No public directory copied"
   environment:
     - variable: NODE_ENV
       value: production
 
 resources:
-  cpu: 1
-  memoryMiB: 2048
-  diskMiB: 4096
+  cpu: 2
+  memoryMiB: 4096
+  diskMiB: 8192
 
 handlers:
   - glob: '**'
