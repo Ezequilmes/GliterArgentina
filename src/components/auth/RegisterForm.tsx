@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, Mail, Lock, User, Calendar, Heart, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Calendar, Heart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { RegisterForm as RegisterFormType } from '@/types';
 import { isValidEmail, isValidPassword } from '@/lib/utils';
@@ -31,10 +32,11 @@ export default function RegisterForm() {
     password: '',
     confirmPassword: '',
     name: '',
-    age: 18,
+    age: 0,
     gender: '',
     sexualRole: '',
   });
+  const [ageInput, setAgeInput] = useState<string>('');
   const [errors, setErrors] = useState<Partial<Record<keyof (RegisterFormType & { confirmPassword: string }), string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -87,7 +89,9 @@ export default function RegisterForm() {
     }
 
     // Validar edad
-    if (formData.age < 18) {
+    if (!ageInput.trim()) {
+      newErrors.age = 'La edad es requerida';
+    } else if (formData.age < 18) {
       newErrors.age = 'Debes ser mayor de 18 años';
     } else if (formData.age > 100) {
       newErrors.age = 'Edad inválida';
@@ -155,10 +159,13 @@ export default function RegisterForm() {
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 p-3 sm:p-3.5 md:p-4">
-            <img 
-              src="/logo.svg" 
+            <Image 
+              src="/logo.svg?v=1" 
               alt="Gliter Logo" 
+              width={64}
+              height={64}
               className="w-full h-full object-contain"
+              priority
             />
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">
@@ -312,9 +319,17 @@ export default function RegisterForm() {
                 type="number"
                 min="18"
                 max="100"
-                placeholder="18"
-                value={formData.age}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('age', parseInt(e.target.value) || 18)}
+                placeholder="Tu edad"
+                inputMode="numeric"
+                value={ageInput}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const val = e.target.value;
+                  setAgeInput(val);
+                  const parsed = parseInt(val, 10);
+                  if (!isNaN(parsed)) {
+                    setFormData(prev => ({ ...prev, age: parsed }));
+                  }
+                }}
                 error={errors.age}
                 icon={<Calendar className="w-4 h-4" />}
               />
