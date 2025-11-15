@@ -18,15 +18,14 @@ import {
   arrayRemove,
   increment,
   Timestamp,
-  DocumentReference,
-  QuerySnapshot,
-  DocumentSnapshot,
-  Unsubscribe
+  Unsubscribe,
+  QueryDocumentSnapshot,
+  DocumentData
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { User, Chat, Message, UserDistance } from '@/types';
+import { User, Chat, Message, UserDistance, PopulatedChat } from '@/types';
 import { notificationService } from '@/services/notificationService';
-import { withRetry, safeFirestoreReadSimple as safeFirestoreRead, safeFirestoreWriteSimple as safeFirestoreWrite } from './firestoreErrorHandler';
+import { safeFirestoreReadSimple as safeFirestoreRead, safeFirestoreWriteSimple as safeFirestoreWrite } from './firestoreErrorHandler';
 import { calculateDistance } from './geolocation';
 
 // Servicios de usuarios
@@ -387,8 +386,7 @@ export const chatService = {
         throw new Error('Usuario no encontrado');
       }
       
-      const userData1 = userSnap1.data() as User;
-      const userData2 = userSnap2.data() as User;
+      // Datos obtenidos para validaciones futuras, no necesarios actualmente
       
       // Validación básica: evitar chat consigo mismo
       if (userId1 === userId2) {
@@ -434,7 +432,7 @@ export const chatService = {
   },
 
   // Obtener chats del usuario
-  async getUserChats(userId: string): Promise<Chat[]> {
+  async getUserChats(userId: string): Promise<PopulatedChat[]> {
     return await safeFirestoreRead(async () => {
       const chatsRef = collection(db, 'chats');
       const q = query(
@@ -444,7 +442,7 @@ export const chatService = {
       );
       
       const querySnapshot = await getDocs(q);
-      const chats: Chat[] = [];
+      const chats: PopulatedChat[] = [];
       
       for (const docSnap of querySnapshot.docs) {
         const chatData = docSnap.data();
@@ -464,7 +462,7 @@ export const chatService = {
           id: docSnap.id, 
           ...chatData,
           participants 
-        } as unknown as Chat);
+        } as PopulatedChat);
       }
       
       return chats;
@@ -472,7 +470,7 @@ export const chatService = {
   },
 
   // Escuchar chats en tiempo real
-  onChatsChange(userId: string, callback: (chats: Chat[]) => void): Unsubscribe {
+  onChatsChange(userId: string, callback: (chats: PopulatedChat[]) => void): Unsubscribe {
     const chatsRef = collection(db, 'chats');
     const q = query(
       chatsRef,
@@ -481,15 +479,15 @@ export const chatService = {
     );
     
     return onSnapshot(q, async (querySnapshot) => {
-      const chats: Chat[] = [];
+      const chats: PopulatedChat[] = [];
       
       for (const docSnap of querySnapshot.docs) {
-        const chatData = { id: docSnap.id, ...docSnap.data() } as any;
+        const baseChat = docSnap.data() as Omit<Chat, 'participants' | 'id'>;
         
         // Populate participant User objects
         const participants: User[] = [];
-        if (chatData.participantIds) {
-          for (const participantId of chatData.participantIds) {
+        if (baseChat.participantIds) {
+          for (const participantId of baseChat.participantIds) {
             const user = await userService.getUser(participantId);
             if (user) {
               participants.push(user);
@@ -498,9 +496,10 @@ export const chatService = {
         }
         
         chats.push({
-          ...chatData,
+          id: docSnap.id,
+          ...baseChat,
           participants
-        } as Chat);
+        } as PopulatedChat);
       }
       
       callback(chats);
@@ -508,7 +507,7 @@ export const chatService = {
   },
 
   // Alias para compatibilidad con useChat hook
-  getUserChatsRealtime(userId: string, callback: (chats: Chat[]) => void): Unsubscribe {
+  getUserChatsRealtime(userId: string, callback: (chats: PopulatedChat[]) => void): Unsubscribe {
     return this.onChatsChange(userId, callback);
   }
 };
@@ -575,9 +574,6 @@ export const messageService = {
         ]);
         
         if (senderSnap.exists() && otherSnap.exists()) {
-          const senderData = senderSnap.data() as User;
-          const otherData = otherSnap.data() as User;
-          
           // Validación básica: verificar que no sea el mismo usuario
           if (senderId === otherParticipantId) {
             throw new Error('No puedes enviarte mensajes a ti mismo');
@@ -673,7 +669,7 @@ export const messageService = {
   // Función para useChat hook - obtener mensajes en tiempo real con paginación
   getChatMessagesRealtime(
     chatId: string,
-    callback: (messages: Message[], lastDoc: any, hasMore: boolean) => void,
+    callback: (messages: Message[], lastDoc: QueryDocumentSnapshot<DocumentData> | null, hasMore: boolean) => void,
     limitCount: number = 50
   ): Unsubscribe {
     const messagesRef = collection(db, 'chats', chatId, 'messages');
@@ -689,7 +685,7 @@ export const messageService = {
         messages.push({ id: doc.id, ...doc.data() } as Message);
       });
       
-      const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      const lastDoc: QueryDocumentSnapshot<DocumentData> | null = querySnapshot.docs[querySnapshot.docs.length - 1] ?? null;
       const hasMore = querySnapshot.docs.length === limitCount;
       
       callback(messages.reverse(), lastDoc, hasMore);
@@ -700,9 +696,9 @@ export const messageService = {
   async getChatMessages(
     chatId: string,
     limitCount: number = 50,
-    startAfterDoc?: any
-  ): Promise<{ messages: Message[]; lastDoc: any; hasMore: boolean }> {
-    return await safeFirestoreRead(async () => {
+    startAfterDoc?: QueryDocumentSnapshot<DocumentData>
+  ): Promise<{ messages: Message[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasMore: boolean }> {
+    return await safeFirestoreRead<{ messages: Message[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasMore: boolean }>(async () => {
       const messagesRef = collection(db, 'chats', chatId, 'messages');
       let q = query(
         messagesRef,
@@ -726,7 +722,7 @@ export const messageService = {
         messages.push({ id: doc.id, ...doc.data() } as Message);
       });
       
-      const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      const lastDoc: QueryDocumentSnapshot<DocumentData> | null = querySnapshot.docs[querySnapshot.docs.length - 1] ?? null;
       const hasMore = querySnapshot.docs.length === limitCount;
       
       return {
@@ -734,7 +730,7 @@ export const messageService = {
         lastDoc,
         hasMore
       };
-    }, { messages: [], lastDoc: null as any, hasMore: false }, `getChatMessages(${chatId})`);
+    }, { messages: [], lastDoc: null, hasMore: false }, `getChatMessages(${chatId})`);
   },
 
   // Marcar mensajes como leídos
@@ -785,5 +781,80 @@ export const messageService = {
       const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
       await deleteDoc(messageRef);
     }, `deleteMessage(${chatId}, ${messageId})`);
+  }
+};
+
+// Servicios de publicaciones (Muro)
+export const postsService = {
+  async createPost(authorId: string, authorName: string, content: string, imageUrl?: string): Promise<string> {
+    return await safeFirestoreWrite(async () => {
+      const postsRef = collection(db, 'posts');
+      const newDoc = await addDoc(postsRef, {
+        authorId,
+        author: authorName,
+        content,
+        image: imageUrl || '',
+        likes: 0,
+        dislikes: 0,
+        comments: [],
+        createdAt: serverTimestamp()
+      });
+      return newDoc.id;
+    }, `createPost(${authorId})`);
+  },
+
+  async listPosts(limitCount: number = 20, startAfterDoc?: QueryDocumentSnapshot<DocumentData>): Promise<{ posts: any[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasMore: boolean }>{
+    return await safeFirestoreRead(async () => {
+      const postsRef = collection(db, 'posts');
+      let q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
+      if (startAfterDoc) {
+        q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(startAfterDoc), limit(limitCount));
+      }
+      const snap = await getDocs(q);
+      const posts: any[] = [];
+      snap.forEach(d => posts.push({ id: d.id, ...d.data() }));
+      const lastDoc = snap.docs[snap.docs.length - 1] ?? null;
+      const hasMore = snap.docs.length === limitCount;
+      return { posts, lastDoc, hasMore };
+    }, { posts: [], lastDoc: null, hasMore: false }, 'listPosts');
+  },
+
+  async deletePost(authorId: string, postId: string): Promise<void> {
+    return await safeFirestoreWrite(async () => {
+      const postRef = doc(db, 'posts', postId);
+      const postSnap = await getDoc(postRef);
+      if (!postSnap.exists()) throw new Error('Post no encontrado');
+      const data = postSnap.data();
+      if (data.authorId !== authorId) throw new Error('No tienes permiso para eliminar este post');
+      await deleteDoc(postRef);
+    }, `deletePost(${postId})`);
+  },
+
+  async likePost(userId: string, postId: string): Promise<void> {
+    return await safeFirestoreWrite(async () => {
+      const postRef = doc(db, 'posts', postId);
+      await updateDoc(postRef, {
+        likes: increment(1),
+      });
+    }, `likePost(${postId})`);
+  },
+
+  async dislikePost(userId: string, postId: string): Promise<void> {
+    return await safeFirestoreWrite(async () => {
+      const postRef = doc(db, 'posts', postId);
+      await updateDoc(postRef, {
+        dislikes: increment(1),
+      });
+    }, `dislikePost(${postId})`);
+  },
+
+  async addComment(postId: string, authorId: string, authorName: string, text: string): Promise<void> {
+    return await safeFirestoreWrite(async () => {
+      const postRef = doc(db, 'posts', postId);
+      const comment = { id: Date.now(), authorId, author: authorName, text };
+      await updateDoc(postRef, {
+        comments: arrayUnion(comment)
+      });
+    }, `addComment(${postId})`);
   }
 };
