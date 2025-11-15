@@ -856,5 +856,20 @@ export const postsService = {
         comments: arrayUnion(comment)
       });
     }, `addComment(${postId})`);
+  },
+
+  onPostsChange(
+    limitCount: number,
+    callback: (posts: any[], lastDoc: QueryDocumentSnapshot<DocumentData> | null, hasMore: boolean) => void
+  ): Unsubscribe {
+    const postsRef = collection(db, 'posts');
+    const q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
+    return onSnapshot(q, (snap) => {
+      const posts: any[] = [];
+      snap.forEach((d) => posts.push({ id: d.id, ...d.data() }));
+      const lastDoc = snap.docs[snap.docs.length - 1] ?? null;
+      const hasMore = snap.docs.length === limitCount;
+      callback(posts, lastDoc, hasMore);
+    });
   }
 };

@@ -38,7 +38,7 @@ export default function MuroPage(): JSX.Element {
    * Carga inicial de publicaciones (simulada).
    */
   useEffect(() => {
-    postsService.listPosts(20).then(({ posts, lastDoc, hasMore }) => {
+    const unsub = postsService.onPostsChange(20, (posts, last, more) => {
       const normalized = posts.map(p => ({
         id: p.id,
         author: p.author || 'Usuario',
@@ -51,11 +51,12 @@ export default function MuroPage(): JSX.Element {
         comments: Array.isArray(p.comments) ? p.comments : []
       }));
       setPosts(normalized);
-      setLastDoc(lastDoc);
-      setHasMore(hasMore);
-    }).catch(() => {
-      setPosts([]);
+      setLastDoc(last);
+      setHasMore(more);
     });
+    return () => {
+      if (unsub) unsub();
+    };
   }, []);
 
   /**
