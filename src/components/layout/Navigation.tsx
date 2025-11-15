@@ -2,12 +2,15 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserProfilePhoto, userHasPhotos } from '@/lib/userUtils';
 import { NotificationBadge, NotificationCenter } from '@/components/notifications';
 import { FollowInstagramButton } from '@/components/ui';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { fcmService } from '@/services/fcmService';
 import {
   Home,
   Heart,
@@ -21,7 +24,8 @@ import {
   Bell,
   Zap,
   X,
-  Star
+  Star,
+  Newspaper
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -33,6 +37,11 @@ const navigationItems = [
     name: 'Descubrir',
     href: '/discover',
     icon: Home
+  },
+  {
+    name: 'Muro',
+    href: '/muro',
+    icon: Newspaper
   },
   {
     name: 'Matches',
@@ -94,6 +103,22 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { isInstallAvailable, promptInstall } = usePWAInstall();
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    setNotifPermission(fcmService.getPermissionStatus());
+  }, []);
+
+  const enableNotifications = async () => {
+    const granted = await fcmService.requestPermission();
+    setNotifPermission(fcmService.getPermissionStatus());
+    if (!granted) return;
+    const token = await fcmService.getRegistrationToken();
+    if (token && user?.id) {
+      await fcmService.saveTokenToServer(user.id, token);
+    }
+  };
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
@@ -126,10 +151,13 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
         {/* Logo/Title - Hidden on mobile */}
         <div className="hidden sm:flex items-center space-x-3 sm:space-x-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/40 backdrop-blur-sm rounded-lg flex items-center justify-center p-1">
-            <img 
-              src="/logo.svg" 
-              alt="Gliter Logo" 
+            <Image
+              src="/logo.svg?v=1"
+              alt="Gliter Logo"
+              width={48}
+              height={48}
               className="w-full h-full object-contain drop-shadow-md"
+              priority
             />
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-white">Gliter</h1>
@@ -186,10 +214,14 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                    <div className="flex items-center space-x-3 sm:space-x-3">
                      <div className="w-12 h-12 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-white/30">
                        {userHasPhotos(user) ? (
-                         <img
+                         <Image
                            src={getUserProfilePhoto(user) || ''}
                            alt={user?.name || 'Usuario'}
+                           width={48}
+                           height={48}
                            className="w-full h-full object-cover"
+                           priority
+                           unoptimized
                          />
                        ) : (
                          <div className="w-full h-full bg-white/20 flex items-center justify-center">
@@ -251,6 +283,44 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                       )}
                     </Link>
                   ))}
+                  {isInstallAvailable && (
+                    <button
+                      onClick={() => promptInstall()}
+                      className={cn(
+                        'w-full flex items-center px-4 sm:px-4 py-3 sm:py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors touch-manipulation'
+                      )}
+                    >
+                      <div className={cn(
+                        'w-10 h-10 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-3 flex-shrink-0',
+                        'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                      )}>
+                        <Star className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={cn('font-medium text-sm sm:text-base truncate','text-gray-900 dark:text-gray-100')}>Instalar app</h4>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">Añadir Gliter al dispositivo</p>
+                      </div>
+                    </button>
+                  )}
+                  {notifPermission !== 'granted' && (
+                    <button
+                      onClick={enableNotifications}
+                      className={cn(
+                        'w-full flex items-center px-4 sm:px-4 py-3 sm:py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors touch-manipulation'
+                      )}
+                    >
+                      <div className={cn(
+                        'w-10 h-10 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-3 flex-shrink-0',
+                        'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                      )}>
+                        <Bell className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={cn('font-medium text-sm sm:text-base truncate','text-gray-900 dark:text-gray-100')}>Activar notificaciones</h4>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">Recibir alertas aunque la app esté cerrada</p>
+                      </div>
+                    </button>
+                  )}
                 </div>
 
                 {/* Logout Button */}
