@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { userService } from "@/lib/firestore";
+import { cn } from "@/lib/utils";
 
 interface Comment { id: number; authorId?: string; author: string; authorPhoto?: string; text: string }
 interface Post {
@@ -40,6 +41,9 @@ export function PostCard({ post, currentUser, onDelete, onLike, onDislike, onCom
   const [dislikesModalOpen, setDislikesModalOpen] = useState(false);
   const [likedUsersFull, setLikedUsersFull] = useState<{ id: string; name: string; photo?: string }[]>([]);
   const [dislikedUsersFull, setDislikedUsersFull] = useState<{ id: string; name: string; photo?: string }[]>([]);
+
+  const hasLiked = useMemo(() => Array.isArray(post.likedBy) && !!currentUser?.id && post.likedBy.includes(currentUser.id), [post.likedBy, currentUser?.id]);
+  const hasDisliked = useMemo(() => Array.isArray(post.dislikedBy) && !!currentUser?.id && post.dislikedBy.includes(currentUser.id), [post.dislikedBy, currentUser?.id]);
 
   useEffect(() => {
     const loadUsers = async (ids?: string[]) => {
@@ -116,7 +120,16 @@ export function PostCard({ post, currentUser, onDelete, onLike, onDislike, onCom
       )}
       <p className="text-white mb-2">{post.content}</p>
       <div className="flex space-x-4 mb-2 items-center">
-        <button onClick={() => onLike(post.id)} className="text-accent hover:opacity-80">👍 {post.likes}</button>
+        <button
+          onClick={() => onLike(post.id)}
+          aria-label="Me gusta"
+          className={cn(
+            "hover:opacity-80",
+            hasLiked ? "text-primary" : "text-accent"
+          )}
+        >
+          👍 {post.likes}
+        </button>
         <div className="flex -space-x-2 items-center">
           {likedUsers.map(u => (
             u.photo ? (
@@ -129,7 +142,16 @@ export function PostCard({ post, currentUser, onDelete, onLike, onDislike, onCom
             <button onClick={openLikesModal} className="ml-2 text-xs text-primary underline">Ver todos</button>
           )}
         </div>
-        <button onClick={() => onDislike(post.id)} className="text-accent hover:opacity-80">👎 {post.dislikes}</button>
+        <button
+          onClick={() => onDislike(post.id)}
+          aria-label="No me gusta"
+          className={cn(
+            "hover:opacity-80",
+            hasDisliked ? "text-primary" : "text-accent"
+          )}
+        >
+          👎 {post.dislikes}
+        </button>
         <div className="flex -space-x-2 items-center">
           {dislikedUsers.map(u => (
             u.photo ? (
