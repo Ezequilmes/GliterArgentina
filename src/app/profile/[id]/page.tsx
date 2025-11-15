@@ -5,11 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AppLayout, Header } from '@/components/layout';
-import { Button, Loading, Badge } from '@/components/ui';
-import { UserCard } from '@/components/profile';
+import { Button, Badge } from '@/components/ui';
+// UserCard not used in this page
 import Image from 'next/image';
 import { 
-  ArrowLeft, 
   Heart, 
   X, 
   Star, 
@@ -17,7 +16,6 @@ import {
   Flag,
   Shield,
   MapPin,
-  Calendar,
   Crown,
   ChevronLeft,
   ChevronRight
@@ -464,6 +462,16 @@ export default function UserProfilePage() {
               </>
             )}
             
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleMessage}
+              className="flex items-center space-x-2"
+            >
+              <MessageCircle className="w-5 h-5" />
+              <span>Chat</span>
+            </Button>
+
             {isMatch && (
               <Button
                 variant="primary"
