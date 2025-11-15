@@ -789,13 +789,21 @@ export const postsService = {
   async createPost(authorId: string, authorName: string, content: string, imageUrl?: string): Promise<string> {
     return await safeFirestoreWrite(async () => {
       const postsRef = collection(db, 'posts');
+      let authorPhoto = '';
+      try {
+        const userSnap = await getDoc(doc(db, 'users', authorId));
+        const data = userSnap.data() as any;
+        const photos: string[] = Array.isArray(data?.photos) ? data.photos : [];
+        authorPhoto = photos && photos.length > 0 ? photos[0] : '';
+      } catch {}
       const newDoc = await addDoc(postsRef, {
         authorId,
         author: authorName,
+        authorPhoto,
         content,
         image: imageUrl || '',
-        likes: 0,
-        dislikes: 0,
+        likedBy: [],
+        dislikedBy: [],
         comments: [],
         createdAt: serverTimestamp()
       });
@@ -834,7 +842,8 @@ export const postsService = {
     return await safeFirestoreWrite(async () => {
       const postRef = doc(db, 'posts', postId);
       await updateDoc(postRef, {
-        likes: increment(1),
+        likedBy: arrayUnion(userId),
+        dislikedBy: arrayRemove(userId)
       });
     }, `likePost(${postId})`);
   },
@@ -843,7 +852,8 @@ export const postsService = {
     return await safeFirestoreWrite(async () => {
       const postRef = doc(db, 'posts', postId);
       await updateDoc(postRef, {
-        dislikes: increment(1),
+        dislikedBy: arrayUnion(userId),
+        likedBy: arrayRemove(userId)
       });
     }, `dislikePost(${postId})`);
   },
@@ -851,7 +861,14 @@ export const postsService = {
   async addComment(postId: string, authorId: string, authorName: string, text: string): Promise<void> {
     return await safeFirestoreWrite(async () => {
       const postRef = doc(db, 'posts', postId);
-      const comment = { id: Date.now(), authorId, author: authorName, text };
+      let authorPhoto = '';
+      try {
+        const userSnap = await getDoc(doc(db, 'users', authorId));
+        const data = userSnap.data() as any;
+        const photos: string[] = Array.isArray(data?.photos) ? data.photos : [];
+        authorPhoto = photos && photos.length > 0 ? photos[0] : '';
+      } catch {}
+      const comment = { id: Date.now(), authorId, author: authorName, authorPhoto, text };
       await updateDoc(postRef, {
         comments: arrayUnion(comment)
       });
