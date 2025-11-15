@@ -812,7 +812,7 @@ export const postsService = {
   },
 
   async listPosts(limitCount: number = 20, startAfterDoc?: QueryDocumentSnapshot<DocumentData>): Promise<{ posts: any[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasMore: boolean }>{
-    return await safeFirestoreRead(async () => {
+    return await safeFirestoreRead<{ posts: any[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasMore: boolean }>(async () => {
       const postsRef = collection(db, 'posts');
       let q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
       if (startAfterDoc) {

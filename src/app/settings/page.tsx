@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -33,7 +32,6 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const router = useRouter();
-  const router = useRouter();
   const [ageRange, setAgeRange] = useState<[number, number]>([18, 35]);
   const [maxDistance, setMaxDistance] = useState<[number]>([50]);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
@@ -59,7 +57,7 @@ export default function SettingsPage() {
       if (typeof noti.matches === 'boolean') setMatchNotifications(noti.matches);
       if (typeof noti.messages === 'boolean') setMessageNotifications(noti.messages);
     }
-  }, [user?.id]);
+  }, [user?.id, user?.settings]);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -110,11 +108,11 @@ export default function SettingsPage() {
   const [isUnblocking, setIsUnblocking] = useState<string | null>(null);
 
   const handleAgeRangeChange = (values: number[]) => {
-    setAgeRange(values);
+    setAgeRange([values[0], values[1]]);
   };
 
   const handleDistanceChange = (values: number[]) => {
-    setMaxDistance(values);
+    setMaxDistance([values[0]]);
   };
 
   // Load blocked users when modal opens

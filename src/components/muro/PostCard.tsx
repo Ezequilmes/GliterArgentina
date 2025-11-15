@@ -22,9 +22,9 @@ interface Post {
 interface PostCardProps {
   post: Post;
   currentUser: any;
-  onDelete: (id: number) => void;
-  onLike: (id: number) => void;
-  onDislike: (id: number) => void;
+  onDelete: (id: string | number) => void;
+  onLike: (id: string | number) => void;
+  onDislike: (id: string | number) => void;
   onComment?: (id: string, text: string) => void;
 }
 
@@ -32,10 +32,14 @@ interface PostCardProps {
  * PostCard
  * Tarjeta de publicación del muro.
  */
-export function PostCard({ post, currentUser, onDelete, onLike, onDislike, onComment }: PostCardProps): JSX.Element {
+export function PostCard({ post, currentUser, onDelete, onLike, onDislike, onComment }: PostCardProps): React.ReactElement {
   const [commentText, setCommentText] = useState("");
   const [likedUsers, setLikedUsers] = useState<{ id: string; name: string; photo?: string }[]>([]);
   const [dislikedUsers, setDislikedUsers] = useState<{ id: string; name: string; photo?: string }[]>([]);
+  const [likesModalOpen, setLikesModalOpen] = useState(false);
+  const [dislikesModalOpen, setDislikesModalOpen] = useState(false);
+  const [likedUsersFull, setLikedUsersFull] = useState<{ id: string; name: string; photo?: string }[]>([]);
+  const [dislikedUsersFull, setDislikedUsersFull] = useState<{ id: string; name: string; photo?: string }[]>([]);
 
   useEffect(() => {
     const loadUsers = async (ids?: string[]) => {
@@ -52,6 +56,32 @@ export function PostCard({ post, currentUser, onDelete, onLike, onDislike, onCom
     loadUsers(post.likedBy).then(setLikedUsers);
     loadUsers(post.dislikedBy).then(setDislikedUsers);
   }, [post.likedBy, post.dislikedBy]);
+
+  const openLikesModal = async () => {
+    const ids = post.likedBy || [];
+    const out: { id: string; name: string; photo?: string }[] = [];
+    for (const id of ids) {
+      try {
+        const u = await userService.getUser(id);
+        if (u) out.push({ id: u.id, name: u.name || "Usuario", photo: Array.isArray(u.photos) && u.photos.length > 0 ? u.photos[0] : undefined });
+      } catch {}
+    }
+    setLikedUsersFull(out);
+    setLikesModalOpen(true);
+  };
+
+  const openDislikesModal = async () => {
+    const ids = post.dislikedBy || [];
+    const out: { id: string; name: string; photo?: string }[] = [];
+    for (const id of ids) {
+      try {
+        const u = await userService.getUser(id);
+        if (u) out.push({ id: u.id, name: u.name || "Usuario", photo: Array.isArray(u.photos) && u.photos.length > 0 ? u.photos[0] : undefined });
+      } catch {}
+    }
+    setDislikedUsersFull(out);
+    setDislikesModalOpen(true);
+  };
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,30 +120,36 @@ export function PostCard({ post, currentUser, onDelete, onLike, onDislike, onCom
         <div className="flex -space-x-2 items-center">
           {likedUsers.map(u => (
             u.photo ? (
-              <Image key={`like-${u.id}`} src={u.photo} alt={u.name} width={20} height={20} className="rounded-full border border-primary" />
+              <Image key={`like-${u.id}`} src={u.photo} alt={u.name} title={u.name} width={20} height={20} className="rounded-full border border-primary" />
             ) : (
-              <div key={`like-${u.id}`} className="w-5 h-5 rounded-full bg-primary" />
+              <div key={`like-${u.id}`} title={u.name} className="w-5 h-5 rounded-full bg-primary" />
             )
           ))}
+          {Array.isArray(post.likedBy) && post.likedBy.length > likedUsers.length && (
+            <button onClick={openLikesModal} className="ml-2 text-xs text-primary underline">Ver todos</button>
+          )}
         </div>
         <button onClick={() => onDislike(post.id)} className="text-accent hover:opacity-80">👎 {post.dislikes}</button>
         <div className="flex -space-x-2 items-center">
           {dislikedUsers.map(u => (
             u.photo ? (
-              <Image key={`dislike-${u.id}`} src={u.photo} alt={u.name} width={20} height={20} className="rounded-full border border-primary" />
+              <Image key={`dislike-${u.id}`} src={u.photo} alt={u.name} title={u.name} width={20} height={20} className="rounded-full border border-primary" />
             ) : (
-              <div key={`dislike-${u.id}`} className="w-5 h-5 rounded-full bg-primary" />
+              <div key={`dislike-${u.id}`} title={u.name} className="w-5 h-5 rounded-full bg-primary" />
             )
           ))}
+          {Array.isArray(post.dislikedBy) && post.dislikedBy.length > dislikedUsers.length && (
+            <button onClick={openDislikesModal} className="ml-2 text-xs text-primary underline">Ver todos</button>
+          )}
         </div>
       </div>
       <div className="space-y-1 mb-2">
         {post.comments.map((c) => (
           <div key={c.id} className="text-white/90 text-sm flex items-center gap-2">
             {c.authorPhoto ? (
-              <Image src={c.authorPhoto} alt={c.author} width={20} height={20} className="rounded-full object-cover" />
+              <Image src={c.authorPhoto} alt={c.author} title={c.author} width={20} height={20} className="rounded-full object-cover" />
             ) : (
-              <div className="w-5 h-5 rounded-full bg-primary" />
+              <div title={c.author} className="w-5 h-5 rounded-full bg-primary" />
             )}
             <span className="font-semibold">{c.author}:</span> {c.text}
           </div>
@@ -129,6 +165,52 @@ export function PostCard({ post, currentUser, onDelete, onLike, onDislike, onCom
         />
         <button type="submit" className="px-3 py-1 bg-accent text-accent-foreground rounded-r-md">Comentar</button>
       </form>
+
+      {likesModalOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setLikesModalOpen(false)}>
+          <div className="bg-black border border-primary rounded-xl p-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h4 className="text-white font-semibold mb-3">A quién le gusta</h4>
+            <div className="space-y-2 max-h-80 overflow-auto">
+              {likedUsersFull.map(u => (
+                <Link key={`likes-full-${u.id}`} href={`/profile/${u.id}`} className="flex items-center gap-2">
+                  {u.photo ? (
+                    <Image src={u.photo} alt={u.name} width={24} height={24} className="rounded-full object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-primary" />
+                  )}
+                  <span className="text-white text-sm">{u.name}</span>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button onClick={() => setLikesModalOpen(false)} className="px-3 py-1 bg-primary text-primary-foreground rounded-md">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dislikesModalOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setDislikesModalOpen(false)}>
+          <div className="bg-black border border-primary rounded-xl p-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h4 className="text-white font-semibold mb-3">A quién no le gusta</h4>
+            <div className="space-y-2 max-h-80 overflow-auto">
+              {dislikedUsersFull.map(u => (
+                <Link key={`dislikes-full-${u.id}`} href={`/profile/${u.id}`} className="flex items-center gap-2">
+                  {u.photo ? (
+                    <Image src={u.photo} alt={u.name} width={24} height={24} className="rounded-full object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-primary" />
+                  )}
+                  <span className="text-white text-sm">{u.name}</span>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button onClick={() => setDislikesModalOpen(false)} className="px-3 py-1 bg-primary text-primary-foreground rounded-md">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

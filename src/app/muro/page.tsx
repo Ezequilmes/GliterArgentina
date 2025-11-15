@@ -31,7 +31,7 @@ interface Post {
  * Página de muro público con lista de publicaciones y carga incremental.
  * Mantiene solo las 30 publicaciones más recientes en memoria.
  */
-export default function MuroPage(): JSX.Element {
+export default function MuroPage(): React.ReactElement {
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -72,7 +72,7 @@ export default function MuroPage(): JSX.Element {
   const fetchMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    postsService.listPosts(20, lastDoc).then(({ posts, lastDoc: newLast, hasMore: more }) => {
+    postsService.listPosts(20, lastDoc ?? undefined).then(({ posts, lastDoc: newLast, hasMore: more }) => {
       const normalized = posts.map(p => ({
         id: p.id,
         author: p.author || 'Usuario',

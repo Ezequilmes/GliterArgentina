@@ -11,7 +11,7 @@ interface CreatePostFormProps {
  * CreatePostForm
  * Formulario para crear publicaciones del muro.
  */
-export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): JSX.Element {
+export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): React.ReactElement {
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
