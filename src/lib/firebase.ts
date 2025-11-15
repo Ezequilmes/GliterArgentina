@@ -1,11 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { connectFirestoreEmulator, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getDatabase, connectDatabaseEmulator } from 'firebase/database';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
-import { getAnalytics, isSupported } from 'firebase/analytics';
-import { getMessaging } from 'firebase/messaging';
+import { getAnalytics, isSupported as isAnalyticsSupported } from 'firebase/analytics';
+import { getMessaging, isSupported as isMessagingSupported } from 'firebase/messaging';
 import { firebaseConfig } from './firebase-config';
 
 // Configurar logging de Firebase para evitar errores de logType
@@ -45,7 +45,10 @@ if (typeof window !== 'undefined' && validateFirebaseConfig()) {
   
   // Inicializar servicios
   auth = getAuth(app);
-  db = getFirestore(app);
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    experimentalAutoDetectLongPolling: true,
+  });
 } else if (typeof window === 'undefined') {
   // En el servidor, crear objetos mock para evitar errores
   console.log('🔄 Running on server - Firebase services will be initialized on client');
@@ -87,23 +90,53 @@ if (typeof window !== 'undefined' && app) {
     console.error('❌ Error initializing Firebase Functions:', error);
   }
 
-  // Inicializar Messaging
+  // Inicializar Messaging solo si está soportado por el navegador
   try {
-    messaging = getMessaging(app);
+    isMessagingSupported()
+      .then((supported) => {
+        if (supported) {
+          try {
+            messaging = getMessaging(app);
+          } catch (e) {
+            console.warn('Firebase Messaging initialization failed:', e);
+          }
+        } else {
+          console.warn('Firebase Messaging not supported in this browser');
+        }
+      })
+      .catch((e) => {
+        console.warn('Firebase Messaging support check failed:', e);
+      });
   } catch (error) {
-    console.warn('Firebase Messaging not available:', error);
+    console.warn('Firebase Messaging setup skipped due to environment:', error);
   }
 
-  // Inicializar Analytics
-  isSupported().then((supported) => {
-    if (supported) {
-      try {
-        analytics = getAnalytics(app);
-      } catch (error) {
-        console.error('❌ Error initializing Firebase Analytics:', error);
+  // Inicializar Analytics con manejo de errores y diagnóstico
+  isAnalyticsSupported()
+    .then((supported) => {
+      if (!supported) {
+        console.warn('Firebase Analytics not supported in this environment');
+        return;
       }
-    }
-  });
+      try {
+        console.log('🔎 Analytics init: projectId=%s appId=%s measurementId=%s',
+          firebaseConfig.projectId,
+          firebaseConfig.appId,
+          firebaseConfig.measurementId
+        );
+        analytics = getAnalytics(app);
+      } catch (error: any) {
+        const msg = error?.message || String(error);
+        console.error('❌ Error initializing Firebase Analytics:', msg);
+        if (msg.includes('config-fetch-failed') || msg.includes('App not found') || msg.includes('measurement ID')) {
+          console.warn('⚠️ Analytics dynamic config fetch failed. Falling back to local measurementId:', firebaseConfig.measurementId);
+          console.warn('⚙️ Verify Firebase Console: app registration, Analytics enabled, and appId/measurementId match');
+        }
+      }
+    })
+    .catch((e) => {
+      console.warn('Firebase Analytics support check failed:', e);
+    });
 }
 
 export { database, storage, functions, messaging, analytics };
@@ -126,7 +159,7 @@ if (false && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && typeof 
       if (functions) connectFunctionsEmulator(functions, 'localhost', 5001);
       emulatorsConnected = true;
       console.log('🔥 Firebase emulators connected');
-    } catch (error) {
+    } catch {
       console.log('Emulators already connected or not available');
     }
   }
