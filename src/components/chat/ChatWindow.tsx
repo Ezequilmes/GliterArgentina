@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChat } from '../../hooks/useChat';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
@@ -10,7 +11,6 @@ import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
-import Badge from '../ui/Badge';
 import Loading from '../ui/Loading';
 import { getUserProfilePhoto } from '../../lib/userUtils';
 import NotificationManager from '../notifications/NotificationManager';
@@ -30,7 +30,6 @@ import {
   X,
   Edit3
 } from 'lucide-react';
-import { ChatMessage as ChatMessageType } from '../../services/chatService';
 import { PopulatedChat } from '../../types';
 
 export interface ChatWindowProps {
@@ -54,7 +53,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     retryMessage,
     selectChat
   } = useChat();
-  const { playReceiveChatSound, playVoipCallSound } = useSounds();
+  const { playReceiveChatSound, playVoipCallSound, playSound } = useSounds();
   const { effectsSettings } = useNotificationSettings();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -86,8 +85,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     setTyping,
     watchTyping,
     watchUserPresence,
-    isUserTyping,
-    getTypingUsers
+    isUserTyping
   } = useRealtime({
     enablePresence: true,
     enableTyping: true,
@@ -174,12 +172,14 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
         
         // Mantener el sonido original como fallback
         if (effectsSettings.soundEnabled) {
-          playReceiveChatSound();
+          playSound('receive_chat', { volume: effectsSettings.volume }).catch(() => {
+            playReceiveChatSound();
+          });
         }
       }
     }
     setPreviousMessageCount(messages.length);
-  }, [messages.length, messages, user?.id, playReceiveChatSound, previousMessageCount, otherUser?.name, effectsSettings.soundEnabled]);
+  }, [messages.length, messages, user?.id, playReceiveChatSound, playSound, previousMessageCount, otherUser?.name, effectsSettings.soundEnabled, effectsSettings.visualEnabled, effectsSettings.volume]);
 
   // Configurar listeners de scroll
   useEffect(() => {
@@ -242,7 +242,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     addReaction(messageId, emoji);
   };
 
-  const handleRemoveReaction = (messageId: string, emoji: string) => {
+  const handleRemoveReaction = (messageId: string, _emoji: string) => {
     removeReaction(messageId);
   };
 
@@ -320,9 +320,12 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                 <>
                   <Circle className="w-2 h-2 fill-muted-foreground text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    {lastSeen || userPresence[otherUser.id]?.lastSeen
-                      ? formatLastSeen(lastSeen || new Date(userPresence[otherUser.id]?.lastSeen!))
-                      : 'Desconectado'}
+                    {(() => {
+                      if (lastSeen) return formatLastSeen(lastSeen);
+                      const presenceLastSeen = userPresence[otherUser.id]?.lastSeen;
+                      if (presenceLastSeen) return formatLastSeen(new Date(presenceLastSeen));
+                      return 'Desconectado';
+                    })()}
                   </span>
                 </>
               )}
@@ -512,9 +515,11 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
             >
               <X className="w-6 h-6" />
             </Button>
-            <img
+            <Image
               src={selectedImage}
               alt="Imagen ampliada"
+              width={1200}
+              height={800}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />

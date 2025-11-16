@@ -12,8 +12,15 @@ export function useSounds() {
   const audioRefs = useRef<Map<SoundType, HTMLAudioElement>>(new Map());
 
   const initializeSound = useCallback((soundType: SoundType, config: SoundConfig = {}) => {
+    const fileMap: Record<SoundType, string> = {
+      send_chat: 'send_chat.mp3',
+      receive_chat: 'tono-mensaje-.mp3',
+      refresh: 'refresh.mp3',
+      voip_call: 'voip_call.mp3',
+    };
     if (!audioRefs.current.has(soundType)) {
-      const audio = new Audio(`/sounds/${soundType}.mp3`);
+      const fileName = fileMap[soundType] ?? `${soundType}.mp3`;
+      const audio = new Audio(`/sounds/${fileName}`);
       audio.volume = config.volume ?? 0.5;
       audio.loop = config.loop ?? false;
       if (config.preload) {
