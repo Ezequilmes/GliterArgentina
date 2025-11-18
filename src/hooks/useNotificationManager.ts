@@ -1,4 +1,5 @@
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
+import { createNotificationAudio, playAudioSafely } from '@/utils/audio';
 import { toast } from 'react-hot-toast';
 
 interface NotificationSettings {
@@ -33,7 +34,6 @@ const DEFAULT_SETTINGS: NotificationSettings = {
 };
 
 export const useNotificationManager = ({
-  isChatActive = false,
   settings = {},
 }: UseNotificationManagerProps = {}): NotificationManagerHook => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -54,14 +54,15 @@ export const useNotificationManager = ({
   useEffect(() => {
     if (typeof window === 'undefined' || !finalSettings.soundEnabled) return;
 
-    const audio = new Audio('/sounds/newMessage.mp3');
-    audio.volume = finalSettings.volume;
-    audio.preload = 'auto';
-    
+    const audio = createNotificationAudio([
+      '/sounds/tono-mensaje-.mp3',
+      '/sounds/receive_chat.mp3',
+      '/sounds/newMessage.mp3',
+      '/sounds/refresh.mp3'
+    ], finalSettings.volume);
     const handleError = (e: Event) => {
       console.warn('Error loading notification sound:', e);
     };
-    
     audio.addEventListener('error', handleError);
     audioRef.current = audio;
 
@@ -69,9 +70,20 @@ export const useNotificationManager = ({
     const cleanup = () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('error', handleError);
-        audioRef.current.pause();
-        audioRef.current.src = '';
-        audioRef.current = null;
+        if (!audioRef.current.paused) {
+          const el = audioRef.current;
+          const onEnded = () => {
+            el.removeEventListener('ended', onEnded);
+            el.pause();
+            el.src = '';
+            audioRef.current = null;
+          };
+          el.addEventListener('ended', onEnded);
+        } else {
+          audioRef.current.pause();
+          audioRef.current.src = '';
+          audioRef.current = null;
+        }
       }
     };
 
@@ -94,10 +106,7 @@ export const useNotificationManager = ({
     // Usar requestAnimationFrame para mejor rendimiento
     requestAnimationFrame(() => {
       if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch((error) => {
-          console.warn('Error playing notification sound:', error);
-        });
+        playAudioSafely(audioRef.current);
       }
     });
   }, [finalSettings.soundEnabled]);

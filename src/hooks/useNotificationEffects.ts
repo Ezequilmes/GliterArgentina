@@ -1,4 +1,5 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
+import { createNotificationAudio, playAudioSafely } from '@/utils/audio';
 import { toast } from 'react-hot-toast';
 
 interface NotificationSettings {
@@ -40,11 +41,12 @@ export const useNotificationEffects = ({
   // Inicializar audio
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      audioRef.current = new Audio('/sounds/newMessage.mp3');
-      audioRef.current.volume = settings.volume;
-      
-      // Precargar el audio
-      audioRef.current.preload = 'auto';
+      audioRef.current = createNotificationAudio([
+        '/sounds/tono-mensaje-.mp3',
+        '/sounds/receive_chat.mp3',
+        '/sounds/newMessage.mp3',
+        '/sounds/refresh.mp3'
+      ], settings.volume);
       
       // Manejar errores de carga
       audioRef.current.addEventListener('error', (e) => {
@@ -55,10 +57,19 @@ export const useNotificationEffects = ({
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('error', () => {});
-        audioRef.current = null;
+        if (!audioRef.current.paused) {
+          const el = audioRef.current;
+          const onEnded = () => {
+            el.removeEventListener('ended', onEnded);
+            audioRef.current = null;
+          };
+          el.addEventListener('ended', onEnded);
+        } else {
+          audioRef.current = null;
+        }
       }
     };
-  }, []);
+  }, [settings.volume]);
 
   // Actualizar volumen cuando cambie la configuración
   useEffect(() => {
@@ -80,9 +91,7 @@ export const useNotificationEffects = ({
     // Resetear el audio al inicio para permitir múltiples reproducciones
     audioRef.current.currentTime = 0;
     
-    audioRef.current.play().catch((error) => {
-      console.warn('Error playing notification sound:', error);
-    });
+    playAudioSafely(audioRef.current);
   }, [settings.soundEnabled]);
 
   const showToastNotification = useCallback((message: string, sender?: string) => {

@@ -1,4 +1,5 @@
 import { getMessaging, getToken, onMessage, MessagePayload, isSupported, type Messaging } from 'firebase/messaging';
+import { createNotificationAudio, playAudioSafely } from '@/utils/audio';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import app, { db } from '../lib/firebase';
@@ -142,17 +143,20 @@ export class FCMService {
     }
   }
 
-  private playNotificationSound(payload: MessagePayload) {
+  private async playNotificationSound(payload: MessagePayload) {
     try {
       const messageType = payload.data?.type;
       
       // Reproducir sonido específico para mensajes
       if (messageType === 'message') {
-        const audio = new Audio('/sounds/newMessage.mp3');
-        audio.volume = 0.8;
-        audio.play().catch(error => {
-          console.warn('FCM: Could not play notification sound:', error);
-        });
+        // Prefer newMessage.mp3, then fall back to other bundled sounds if needed
+        const audio = createNotificationAudio([
+          '/sounds/tono-mensaje-.mp3',
+          '/sounds/receive_chat.mp3',
+          '/sounds/newMessage.mp3',
+          '/sounds/refresh.mp3'
+        ], 0.8);
+        await playAudioSafely(audio);
       }
     } catch (error) {
       console.error('FCM: Error playing notification sound:', error);
@@ -304,9 +308,13 @@ export class FCMService {
       }
       console.log('FCM: PushManager is available');
 
-      // Verificar VAPID key
+      // Verificar VAPID key (variable original)
       const finalVapidKey = vapidKey || process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-      console.log('FCM: Using VAPID key:', finalVapidKey ? finalVapidKey.substring(0, 20) + '...' : 'undefined');
+      if (!finalVapidKey) {
+        console.error('FCM: VAPID public key missing. Configure NEXT_PUBLIC_FIREBASE_VAPID_KEY.');
+        return null;
+      }
+      console.log('FCM: Using VAPID key:', finalVapidKey.substring(0, 20) + '...');
 
       // Obtener token de registro
       console.log('FCM: Requesting registration token from Firebase...');
