@@ -167,6 +167,9 @@ export class FCMService {
     if (!('Notification' in window)) return;
 
     const { title, body, icon } = payload.notification || {};
+    const rawData = payload.data || {} as any;
+    const chatId = rawData.chatId || rawData.conversationId || rawData.threadId || '';
+    const type = rawData.type || (title?.toLowerCase().includes('mensaje') ? 'message' : 'general');
     
     if (title && body) {
       try {
@@ -175,8 +178,8 @@ export class FCMService {
           body,
           icon: icon || '/icons/notification-icon-192x192.png',
           badge: '/icons/notification-badge-72x72.png',
-          tag: payload.data?.type || 'general',
-          data: payload.data,
+          tag: type,
+          data: { ...rawData, chatId, type },
           requireInteraction: true,
           actions: [
             {

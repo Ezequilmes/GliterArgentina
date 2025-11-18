@@ -7,8 +7,10 @@ import {
   listAll,
   getMetadata,
   updateMetadata,
-  UploadTask,
-  UploadTaskSnapshot
+  UploadTaskSnapshot,
+  FullMetadata,
+  SettableMetadata,
+  TaskState
 } from 'firebase/storage';
 import { storage } from './firebase';
 
@@ -16,13 +18,13 @@ export interface UploadProgress {
   bytesTransferred: number;
   totalBytes: number;
   progress: number;
-  state: 'running' | 'paused' | 'success' | 'canceled' | 'error';
+  state: TaskState | 'error';
 }
 
 export interface UploadResult {
   url: string;
   path: string;
-  metadata: any;
+  metadata: FullMetadata;
 }
 
 // Servicio de almacenamiento
@@ -69,7 +71,7 @@ export const storageService = {
               bytesTransferred: snapshot.bytesTransferred,
               totalBytes: snapshot.totalBytes,
               progress,
-              state: snapshot.state as any
+              state: snapshot.state
             });
           },
           (error) => {
@@ -132,7 +134,7 @@ export const storageService = {
               bytesTransferred: snapshot.bytesTransferred,
               totalBytes: snapshot.totalBytes,
               progress,
-              state: snapshot.state as any
+              state: snapshot.state
             });
           },
           (error) => {
@@ -188,7 +190,7 @@ export const storageService = {
               bytesTransferred: snapshot.bytesTransferred,
               totalBytes: snapshot.totalBytes,
               progress,
-              state: snapshot.state as any
+              state: snapshot.state
             });
           },
           (error) => {
@@ -287,7 +289,7 @@ export const storageService = {
               bytesTransferred: snapshot.bytesTransferred,
               totalBytes: snapshot.totalBytes,
               progress,
-              state: snapshot.state as any
+              state: snapshot.state
             });
           },
           (error) => {
@@ -348,13 +350,69 @@ export const storageService = {
   },
 
   // Obtener metadatos de archivo
-  async getFileMetadata(filePath: string): Promise<any> {
+  async getFileMetadata(filePath: string): Promise<FullMetadata> {
     const storageRef = ref(storage, filePath);
     return await getMetadata(storageRef);
   },
 
+  // Subir imagen del muro (posts)
+  async uploadPostImage(
+    userId: string,
+    file: File,
+    onProgress?: (progress: UploadProgress) => void
+  ): Promise<UploadResult> {
+    if (!userId) throw new Error('ID de usuario requerido');
+    if (!file) throw new Error('Archivo requerido');
+    if (!file.type.startsWith('image/')) throw new Error('El archivo debe ser una imagen');
+    if (file.size > 10 * 1024 * 1024) throw new Error('El archivo es demasiado grande (máximo 10MB)');
+
+    const sanitized = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileName = `${Date.now()}_${sanitized}`;
+    const filePath = `posts/${userId}/${fileName}`;
+    const storageRef = ref(storage, filePath);
+
+    if (onProgress) {
+      const uploadTask = uploadBytesResumable(storageRef, file, {
+        contentType: file.type,
+        cacheControl: 'public,max-age=86400',
+      });
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot: UploadTaskSnapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            onProgress({
+              bytesTransferred: snapshot.bytesTransferred,
+              totalBytes: snapshot.totalBytes,
+              progress,
+              state: snapshot.state
+            });
+          },
+          (error) => reject(error),
+          async () => {
+            try {
+              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              const metadata = await getMetadata(uploadTask.snapshot.ref);
+              resolve({ url, path: filePath, metadata });
+            } catch (err) {
+              reject(err);
+            }
+          }
+        );
+      });
+    } else {
+      const snapshot = await uploadBytes(storageRef, file, {
+        contentType: file.type,
+        cacheControl: 'public,max-age=86400',
+      });
+      const url = await getDownloadURL(snapshot.ref);
+      const metadata = await getMetadata(snapshot.ref);
+      return { url, path: filePath, metadata };
+    }
+  },
+
   // Actualizar metadatos de archivo
-  async updateFileMetadata(filePath: string, metadata: any): Promise<void> {
+  async updateFileMetadata(filePath: string, metadata: SettableMetadata): Promise<void> {
     const storageRef = ref(storage, filePath);
     await updateMetadata(storageRef, metadata);
   },

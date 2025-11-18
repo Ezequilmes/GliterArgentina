@@ -128,7 +128,11 @@ export default function MuroPage(): React.ReactElement {
                 key={post.id}
                 post={post}
                 currentUser={user}
-                onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
+                onDelete={(id) => {
+                  const authorId = user?.id || '';
+                  postsService.deletePost(authorId, String(id)).catch(() => {});
+                  setPosts(prev => prev.filter(p => p.id !== id));
+                }}
                 onLike={(id) => {
                   postsService.likePost(user?.id || '', String(id)).catch(() => {});
                   setPosts(prev => prev.map(p => p.id === id ? { ...p, likedBy: Array.from(new Set([...(p.likedBy||[]), user?.id || ''])), dislikedBy: (p.dislikedBy||[]).filter(u => u !== (user?.id||'')), likes: (p.likedBy?.length || 0) + 1, dislikes: (p.dislikedBy?.length || 0) - ((p.dislikedBy||[]).includes(user?.id||'') ? 1 : 0) } : p));

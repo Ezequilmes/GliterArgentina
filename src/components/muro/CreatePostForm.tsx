@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { Image as ImageIcon } from "lucide-react";
+import { storageService } from "@/lib/storage";
 
 interface CreatePostFormProps {
   onCreate: (post: any) => void;
@@ -15,12 +16,24 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content && !imageFile) return;
     let imageUrl = "";
-    if (imageFile) imageUrl = URL.createObjectURL(imageFile);
+    try {
+      if (imageFile && currentUser?.id) {
+        setIsUploading(true);
+        const result = await storageService.uploadPostImage(currentUser.id, imageFile, (p) => {
+          setUploadProgress(Math.round(p.progress));
+        });
+        imageUrl = result.url;
+      }
+    } catch (err) {
+      console.warn('Error uploading post image:', err);
+    }
     const newPost = {
       id: Date.now(),
       author: currentUser?.name || "Usuario",
@@ -35,6 +48,8 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
     onCreate(newPost);
     setContent("");
     setImageFile(null);
+    setIsUploading(false);
+    setUploadProgress(0);
   };
 
   return (
@@ -52,7 +67,10 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
           id="post-image"
           type="file"
           accept="image/*"
-          onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+          onChange={(e) => {
+            setImageFile(e.target.files?.[0] || null);
+            setUploadProgress(0);
+          }}
           className="sr-only"
         />
         <Button
@@ -67,9 +85,18 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
           <span className="text-sm text-white/80 truncate max-w-[200px]">{imageFile.name}</span>
         )}
       </div>
+
+      {isUploading && (
+        <div className="mt-2 w-full">
+          <div className="w-full h-2 bg-black border border-primary rounded">
+            <div className="h-full bg-primary" style={{ width: `${uploadProgress}%` }} />
+          </div>
+          <div className="mt-1 text-xs text-white/80">Subiendo imagen... {uploadProgress}%</div>
+        </div>
+      )}
       <div className="flex justify-end">
-        <button type="submit" className="px-4 py-2 rounded-md bg-primary text-primary-foreground">
-          Publicar
+        <button type="submit" disabled={isUploading} className="px-4 py-2 rounded-md bg-primary text-primary-foreground disabled:opacity-60 disabled:cursor-not-allowed">
+          {isUploading ? 'Publicando...' : 'Publicar'}
         </button>
       </div>
     </form>
