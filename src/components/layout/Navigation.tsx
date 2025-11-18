@@ -146,11 +146,11 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
   };
 
   return (
-    <div className={cn("fixed top-0 left-0 right-0 z-50 bg-primary px-4 sm:px-6 py-3 sm:py-4 shadow-lg", className)}>
+    <div className={cn("fixed top-0 left-0 right-0 z-50 bg-black px-4 sm:px-6 py-3 sm:py-4 shadow-lg", className)}>
       <div className="flex items-center justify-between sm:justify-between">
         {/* Logo/Title - Hidden on mobile */}
         <div className="hidden sm:flex items-center space-x-3 sm:space-x-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/40 backdrop-blur-sm rounded-lg flex items-center justify-center p-1">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-black rounded-lg flex items-center justify-center p-1 border border-primary">
             <Image
               src="/logo.svg?v=1"
               alt="Gliter Logo"
@@ -172,11 +172,11 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'w-9 h-9 sm:w-10 sm:h-10 backdrop-blur-sm rounded-lg flex items-center justify-center transition-colors touch-manipulation',
-                  isActive
-                    ? 'bg-white/30 text-white'
-                    : 'bg-white/20 text-white/80 hover:bg-white/30 hover:text-white active:bg-white/40'
-                )}
+                'w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-colors touch-manipulation border border-primary/40',
+                isActive
+                    ? 'bg-primary/20 text-white'
+                    : 'bg-black text-white/80 hover:bg-primary/10 hover:text-white active:bg-primary/20'
+              )}
               >
                 <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
@@ -208,9 +208,9 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
 
             {/* Dropdown Content */}
             {isDropdownOpen && (
-              <div className="absolute right-0 top-12 sm:top-12 w-72 sm:w-80 md:w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="absolute right-0 top-12 sm:top-12 w-72 sm:w-80 md:w-80 bg-black rounded-2xl shadow-2xl border border-primary overflow-hidden">
                 {/* User Info Header */}
-                 <div className="bg-gradient-to-r from-primary to-accent p-4 sm:p-4 text-white">
+                 <div className="bg-black p-4 sm:p-4 text-white border-b border-primary">
                    <div className="flex items-center space-x-3 sm:space-x-3">
                      <div className="w-12 h-12 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-white/30">
                        {userHasPhotos(user) ? (
@@ -237,7 +237,7 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                  </div>
 
                 {/* Instagram Follow Button */}
-                <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                <div className="p-3 border-b border-primary">
                   <FollowInstagramButton 
                     onClick={() => setIsDropdownOpen(false)}
                   />
@@ -251,15 +251,15 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                       href={item.href}
                       onClick={() => setIsDropdownOpen(false)}
                       className={cn(
-                        'flex items-center px-4 sm:px-4 py-3 sm:py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors touch-manipulation',
-                        item.highlight && 'bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20'
+                        'flex items-center px-4 sm:px-4 py-3 sm:py-3 hover:bg-primary/10 transition-colors touch-manipulation',
+                        item.highlight && 'bg-primary/5'
                       )}
                     >
                       <div className={cn(
                         'w-10 h-10 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-3 flex-shrink-0',
                         item.highlight 
-                          ? 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white'
-                          : 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-black text-white'
                       )}>
                         <item.icon className="w-5 h-5" />
                       </div>
@@ -267,17 +267,17 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                         <h4 className={cn(
                           'font-medium text-sm sm:text-base truncate',
                           item.highlight 
-                            ? 'text-orange-600 dark:text-orange-400'
-                            : 'text-gray-900 dark:text-gray-100'
+                            ? 'text-primary'
+                            : 'text-white'
                         )}>
                           {item.name}
                         </h4>
-                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
+                        <p className="text-xs sm:text-sm text-white/70 truncate">
                           {item.description}
                         </p>
                       </div>
                       {item.highlight && (
-                        <div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs px-2 py-1 rounded-full font-medium flex-shrink-0">
+                        <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full font-medium flex-shrink-0">
                           NUEVO
                         </div>
                       )}
@@ -286,13 +286,13 @@ export const Navigation: React.FC<NavigationProps> = ({ className }) => {
                   {isInstallAvailable && (
                     <button
                       onClick={() => promptInstall()}
-                      className={cn(
-                        'w-full flex items-center px-4 sm:px-4 py-3 sm:py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors touch-manipulation'
-                      )}
+                    className={cn(
+                      'w-full flex items-center px-4 sm:px-4 py-3 sm:py-3 hover:bg-primary/10 transition-colors touch-manipulation'
+                    )}
                     >
                       <div className={cn(
                         'w-10 h-10 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-3 flex-shrink-0',
-                        'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                        'bg-black text-white'
                       )}>
                         <Star className="w-5 h-5" />
                       </div>

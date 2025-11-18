@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AppLayout, Header } from '@/components/layout';
 import { Card, Button, Switch, Slider, Select, Modal } from '@/components/ui';
+import { useSounds } from '@/hooks/useSounds';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import PushNotificationSetup from '@/components/notifications/PushNotificationSetup';
 import { analyticsService } from '@/services/analyticsService';
@@ -349,6 +350,21 @@ export default function SettingsPage() {
 
               <div className="flex items-center justify-between">
                 <div>
+                  <h4 className="font-medium text-foreground">Probar sonido</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Reproduce el tono de mensaje con el volumen actual
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => playSound('receive_chat', { volume: 0.7 })}
+                >
+                  Probar
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
                   <h4 className="font-medium text-foreground">Vibración</h4>
                   <p className="text-sm text-muted-foreground">
                     Vibrar al recibir notificaciones
@@ -663,3 +679,4 @@ export default function SettingsPage() {
     </ProtectedRoute>
   );
 }
+  const { playSound } = useSounds();
