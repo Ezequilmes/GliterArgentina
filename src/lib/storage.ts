@@ -359,7 +359,8 @@ export const storageService = {
   async uploadPostImage(
     userId: string,
     file: File,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    onStart?: (cancel: () => void) => void
   ): Promise<UploadResult> {
     if (!userId) throw new Error('ID de usuario requerido');
     if (!file) throw new Error('Archivo requerido');
@@ -376,6 +377,9 @@ export const storageService = {
         contentType: file.type,
         cacheControl: 'public,max-age=86400',
       });
+      if (onStart) {
+        try { onStart(() => uploadTask.cancel()); } catch {}
+      }
       return new Promise((resolve, reject) => {
         uploadTask.on(
           'state_changed',

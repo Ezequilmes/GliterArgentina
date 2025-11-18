@@ -18,6 +18,8 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const cancelUploadRef = useRef<(() => void) | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,9 +28,12 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
     try {
       if (imageFile && currentUser?.id) {
         setIsUploading(true);
-        const result = await storageService.uploadPostImage(currentUser.id, imageFile, (p) => {
-          setUploadProgress(Math.round(p.progress));
-        });
+        const result = await storageService.uploadPostImage(
+          currentUser.id,
+          imageFile,
+          (p) => { setUploadProgress(Math.round(p.progress)); },
+          (cancel) => { cancelUploadRef.current = cancel; }
+        );
         imageUrl = result.url;
       }
     } catch (err) {
@@ -50,6 +55,7 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
     setImageFile(null);
     setIsUploading(false);
     setUploadProgress(0);
+    cancelUploadRef.current = null;
   };
 
   return (
@@ -70,6 +76,15 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
           onChange={(e) => {
             setImageFile(e.target.files?.[0] || null);
             setUploadProgress(0);
+            if (previewUrl) {
+              try { URL.revokeObjectURL(previewUrl); } catch {}
+            }
+            const file = e.target.files?.[0] || null;
+            if (file) {
+              try { setPreviewUrl(URL.createObjectURL(file)); } catch {}
+            } else {
+              setPreviewUrl("");
+            }
           }}
           className="sr-only"
         />
@@ -86,12 +101,26 @@ export function CreatePostForm({ onCreate, currentUser }: CreatePostFormProps): 
         )}
       </div>
 
+      {previewUrl && (
+        <div className="mt-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={previewUrl} alt="Vista previa" className="rounded-lg max-h-40 w-full object-cover border border-primary" />
+        </div>
+      )}
+
       {isUploading && (
         <div className="mt-2 w-full">
           <div className="w-full h-2 bg-black border border-primary rounded">
             <div className="h-full bg-primary" style={{ width: `${uploadProgress}%` }} />
           </div>
-          <div className="mt-1 text-xs text-white/80">Subiendo imagen... {uploadProgress}%</div>
+          <div className="mt-1 text-xs text-white/80 flex items-center justify-between">
+            <span>Subiendo imagen... {uploadProgress}%</span>
+            <button type="button" className="text-primary underline" onClick={() => {
+              try { cancelUploadRef.current?.(); } catch {}
+              setIsUploading(false);
+              setUploadProgress(0);
+            }}>Cancelar</button>
+          </div>
         </div>
       )}
       <div className="flex justify-end">
